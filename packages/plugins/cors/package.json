@@ -1,7 +1,7 @@
 {
-  "name": "capix-testing",
+  "name": "capix-plugin-cors",
   "version": "0.1.0",
-  "description": "Capix testing utilities",
+  "description": "CORS plugin for Capix",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -13,16 +13,13 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "capix": "workspace:*",
-    "zod": "^3.23.0"
+    "capix-transport-rest": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "typescript": "^5.5.0",
-    "vitest": "^1.6.0"
+    "typescript": "^5.5.0"
   }
 }

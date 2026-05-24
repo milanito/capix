@@ -16,15 +16,21 @@ import type { Router } from './router.js';
 
 const DEFAULT_MAX_BODY_SIZE = 1024 * 1024; // 1MB
 
+export type RestTransportHooks = {
+  /** Called on every response before headers are written. Use to inject additional headers. */
+  readonly onRequest?: (req: IncomingMessage, res: ServerResponse) => void;
+};
+
 export type RestTransportOptions = {
   readonly port: number;
   readonly host?: string;
   readonly cors?: {
-    readonly origin?: string;
+    readonly origin?: string | ((origin: string) => boolean);
     readonly methods?: string;
     readonly headers?: string;
   };
   readonly maxBodySize?: number;
+  readonly hooks?: RestTransportHooks;
 };
 
 /** Creates a REST transport using node:http. */
@@ -33,11 +39,18 @@ export function restTransport(options: RestTransportOptions): Transport {
   let router: Router | null = null;
   let invokeFn: InvokeFn | null = null;
 
-  const corsOrigin = options.cors?.origin ?? '*';
+  const corsOriginOpt = options.cors?.origin ?? '*';
   const maxBodySize = options.maxBodySize ?? DEFAULT_MAX_BODY_SIZE;
 
-  function setCorsHeaders(res: ServerResponse): void {
-    res.setHeader('Access-Control-Allow-Origin', corsOrigin);
+  function setCorsHeaders(req: IncomingMessage, res: ServerResponse): void {
+    const reqOrigin = req.headers['origin'] ?? '';
+    let allowOrigin: string;
+    if (typeof corsOriginOpt === 'function') {
+      allowOrigin = corsOriginOpt(reqOrigin) ? reqOrigin : '';
+    } else {
+      allowOrigin = corsOriginOpt;
+    }
+    if (allowOrigin) res.setHeader('Access-Control-Allow-Origin', allowOrigin);
     res.setHeader(
       'Access-Control-Allow-Methods',
       options.cors?.methods ?? 'GET, POST, PATCH, PUT, DELETE, OPTIONS',
@@ -97,7 +110,8 @@ export function restTransport(options: RestTransportOptions): Transport {
   }
 
   function handler(req: IncomingMessage, res: ServerResponse): void {
-    setCorsHeaders(res);
+    setCorsHeaders(req, res);
+    options.hooks?.onRequest?.(req, res);
 
     // CORS preflight
     if (req.method === 'OPTIONS') {
