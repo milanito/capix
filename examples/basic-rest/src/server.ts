@@ -1,0 +1,145 @@
+/**
+ * basic-rest example — demonstrates the full Capix API:
+ * defineContext, defineGuard, defineError, capability, groups, restTransport
+ */
+
+import { z } from 'zod';
+import {
+  capability,
+  defineContext,
+  defineGuard,
+  defineError,
+  createServer,
+} from 'capix';
+import { restTransport } from 'capix-transport-rest';
+
+// ---------------------------------------------------------------------------
+// Domain types
+// ---------------------------------------------------------------------------
+
+type User = { id: string; name: string; email: string; role: 'user' | 'admin' };
+
+const USERS: User[] = [
+  { id: '1', name: 'Alice', email: 'alice@example.com', role: 'user' },
+  { id: '2', name: 'Bob', email: 'bob@example.com', role: 'admin' },
+];
+
+// ---------------------------------------------------------------------------
+// Errors
+// ---------------------------------------------------------------------------
+
+export const errors = {
+  Unauthorized: defineError(401, 'Unauthorized'),
+  Forbidden: defineError(403, 'Forbidden'),
+  NotFound: defineError(404, 'Not found'),
+  Conflict: defineError(409, 'Conflict'),
+};
+
+// ---------------------------------------------------------------------------
+// Context
+// ---------------------------------------------------------------------------
+
+type Context = {
+  requestId: string;
+  user: User | null;
+};
+
+const buildContext = defineContext(async (req): Promise<Context> => {
+  const auth = req.headers['authorization'];
+  const token = typeof auth === 'string' ? auth.replace('Bearer ', '') : null;
+
+  // Fake auth: token is the user id
+  const user = token ? (USERS.find((u) => u.id === token) ?? null) : null;
+
+  return { requestId: crypto.randomUUID(), user };
+});
+
+// ---------------------------------------------------------------------------
+// Guards
+// ---------------------------------------------------------------------------
+
+const mustBeUser = defineGuard((ctx: Context): asserts ctx is Context & { user: User } => {
+  if (!ctx.user) throw errors.Unauthorized();
+});
+
+const mustBeAdmin = defineGuard(
+  (ctx: Context): asserts ctx is Context & { user: User & { role: 'admin' } } => {
+    if (!ctx.user) throw errors.Unauthorized();
+    if (ctx.user.role !== 'admin') throw errors.Forbidden();
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Capabilities
+// ---------------------------------------------------------------------------
+
+const UserSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.string(),
+  role: z.enum(['user', 'admin']),
+});
+
+const getUser = capability(
+  z.object({ id: z.string() }),
+  async ({ id }) => {
+    const user = USERS.find((u) => u.id === id);
+    if (!user) throw errors.NotFound({ resource: 'user', id });
+    return user;
+  },
+)
+  .guard(mustBeUser)
+  .output(UserSchema);
+
+const listUsers = capability(
+  z.object({}),
+  async (_, ctx) => {
+    void ctx; // ctx is available
+    return USERS;
+  },
+).guard(mustBeUser);
+
+const createUser = capability(
+  z.object({ name: z.string(), email: z.string() }),
+  async ({ name, email }) => {
+    if (USERS.some((u) => u.email === email)) throw errors.Conflict({ email });
+    const newUser: User = { id: String(USERS.length + 1), name, email, role: 'user' };
+    USERS.push(newUser);
+    return newUser;
+  },
+).guard(mustBeAdmin);
+
+const updateUser = capability(
+  z.object({ id: z.string(), name: z.string().optional(), email: z.string().optional() }),
+  async ({ id, name, email }) => {
+    const user = USERS.find((u) => u.id === id);
+    if (!user) throw errors.NotFound({ resource: 'user', id });
+    if (name !== undefined) user.name = name;
+    if (email !== undefined) user.email = email;
+    return user;
+  },
+).guard(mustBeAdmin);
+
+const deleteUser = capability(
+  z.object({ id: z.string() }),
+  async ({ id }) => {
+    const idx = USERS.findIndex((u) => u.id === id);
+    if (idx === -1) throw errors.NotFound({ resource: 'user', id });
+    USERS.splice(idx, 1);
+    return { deleted: true };
+  },
+).guard(mustBeAdmin);
+
+// ---------------------------------------------------------------------------
+// Server
+// ---------------------------------------------------------------------------
+
+const server = createServer({
+  context: buildContext,
+  capabilities: {
+    users: { get: getUser, list: listUsers, create: createUser, update: updateUser, delete: deleteUser },
+  },
+  transports: [restTransport({ port: 3000 })],
+});
+
+server.start().catch(console.error);
