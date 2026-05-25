@@ -62,6 +62,18 @@ export function createServer(config: ServerConfig): Server {
     invoke,
 
     async start() {
+      if (config.transports.length === 0) {
+        console.warn(
+          '[capix] Warning: no transports registered. The server will start but cannot receive requests. ' +
+          'Add at least one transport to createServer({ transports: [...] }).',
+        );
+      }
+      if (registry.size === 0) {
+        console.warn(
+          '[capix] Warning: no capabilities registered. ' +
+          'Add capabilities to createServer({ capabilities: { ... } }).',
+        );
+      }
       for (const transport of config.transports) {
         await transport.mount(invoke, mountOptions);
       }

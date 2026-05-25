@@ -64,8 +64,8 @@ export function wsTransport(options: WsTransportOptions): Transport {
       if (response.ok) {
         send(ws, { id: msg.id, ok: true, data: response.data });
       } else {
-        const { error, message, meta } = response.error;
-        const payload: Record<string, unknown> = { id: msg.id, ok: false, error, message };
+        const { status, error, message, meta } = response.error;
+        const payload: Record<string, unknown> = { id: msg.id, ok: false, status, error, message };
         if (meta !== undefined) payload['meta'] = meta;
         send(ws, payload);
       }

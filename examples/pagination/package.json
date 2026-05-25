@@ -1,0 +1,21 @@
+{
+  "name": "capix-example-pagination",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Capix paginated API example",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "dev": "tsx watch src/server.ts"
+  },
+  "dependencies": {
+    "capix": "workspace:*",
+    "capix-transport-rest": "workspace:*",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.5.0"
+  }
+}

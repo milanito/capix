@@ -4,7 +4,8 @@
  */
 
 import type { Enhancer, AnyCapability } from './capability.js';
-import { isFrameworkError } from './errors.js';
+import { defineError, isFrameworkError } from './errors.js';
+import { defaultErrors } from './errors.js';
 
 /** Pass-through for type inference. */
 export function defineEnhancer(fn: Enhancer): Enhancer {
@@ -31,7 +32,7 @@ export const withLogging = defineEnhancer((cap) => ({
   },
 })) as Enhancer;
 
-const cacheStore = new Map<string, { value: unknown; expiresAt: number }>();
+export const cacheStore = new Map<string, { value: unknown; expiresAt: number }>();
 
 /** In-memory cache. Key = capabilityName:JSON(input). TTL in seconds. */
 export function withCache(ttlSeconds: number): Enhancer {
@@ -86,4 +87,149 @@ export function withRetry(maxAttempts: number, delayMs = 100): Enhancer {
       throw lastError;
     },
   })) as Enhancer;
+}
+
+// ---------------------------------------------------------------------------
+// withRateLimit
+// ---------------------------------------------------------------------------
+
+export type RateLimitOptions = {
+  readonly limit: number;
+  readonly windowMs: number;
+  readonly keyFn?: (input: unknown, ctx: unknown) => string;
+};
+
+/** Sliding-window in-memory rate limiter. Throws 429 when limit exceeded. */
+export const rateLimitStore = new Map<string, number[]>();
+
+export function withRateLimit(options: RateLimitOptions): Enhancer {
+  const { limit, windowMs, keyFn } = options;
+  return defineEnhancer((cap) => ({
+    ...cap,
+    resolve: async (input: unknown, ctx: unknown) => {
+      const key = keyFn ? keyFn(input, ctx) : cap.name;
+      const now = Date.now();
+      const windowStart = now - windowMs;
+
+      let timestamps = rateLimitStore.get(key) ?? [];
+      timestamps = timestamps.filter((t) => t > windowStart);
+
+      if (timestamps.length >= limit) {
+        throw defaultErrors.TooManyRequests();
+      }
+
+      timestamps.push(now);
+      rateLimitStore.set(key, timestamps);
+
+      return (cap as AnyCapability).resolve(input, ctx);
+    },
+  })) as Enhancer;
+}
+
+// ---------------------------------------------------------------------------
+// withMetrics
+// ---------------------------------------------------------------------------
+
+export interface MetricsCollector {
+  increment(name: string, tags?: Record<string, string>): void;
+  histogram(name: string, value: number, tags?: Record<string, string>): void;
+}
+
+/** Metrics collector that logs to console. */
+export const consoleMetricsCollector: MetricsCollector = {
+  increment(name, tags) {
+    console.log(`[capix:metrics] ${name}`, tags ?? {});
+  },
+  histogram(name, value, tags) {
+    console.log(`[capix:metrics] ${name}=${value}ms`, tags ?? {});
+  },
+};
+
+/** Wraps a capability to emit duration and success/error metrics. */
+export function withMetrics(collector: MetricsCollector): Enhancer {
+  return defineEnhancer((cap) => ({
+    ...cap,
+    resolve: async (input: unknown, ctx: unknown) => {
+      const start = Date.now();
+      const tags = { capability: cap.name };
+      try {
+        const result = await (cap as AnyCapability).resolve(input, ctx);
+        collector.histogram('capability.duration', Date.now() - start, tags);
+        collector.increment('capability.success', tags);
+        return result;
+      } catch (err) {
+        collector.histogram('capability.duration', Date.now() - start, tags);
+        collector.increment('capability.error', tags);
+        throw err;
+      }
+    },
+  })) as Enhancer;
+}
+
+// ---------------------------------------------------------------------------
+// withCircuitBreaker
+// ---------------------------------------------------------------------------
+
+export type CircuitBreakerOptions = {
+  readonly failureThreshold: number;
+  readonly successThreshold: number;
+  readonly timeoutMs: number;
+};
+
+type CircuitState = 'closed' | 'open' | 'half-open';
+
+const circuitUnavailable = defineError(503, 'Service unavailable');
+
+/**
+ * Circuit breaker with closed/open/half-open states.
+ * State is closure-captured per capability application.
+ * FrameworkErrors do not count toward the failure threshold.
+ */
+export function withCircuitBreaker(options: CircuitBreakerOptions): Enhancer {
+  const { failureThreshold, successThreshold, timeoutMs } = options;
+
+  return defineEnhancer((cap) => {
+    let state: CircuitState = 'closed';
+    let failures = 0;
+    let successes = 0;
+    let openedAt = 0;
+
+    return {
+      ...cap,
+      resolve: async (input: unknown, ctx: unknown) => {
+        if (state === 'open') {
+          if (Date.now() - openedAt >= timeoutMs) {
+            state = 'half-open';
+            successes = 0;
+          } else {
+            throw circuitUnavailable({ reason: `Circuit open for '${cap.name}'` });
+          }
+        }
+
+        try {
+          const result = await (cap as AnyCapability).resolve(input, ctx);
+          if (state === 'half-open') {
+            successes++;
+            if (successes >= successThreshold) {
+              state = 'closed';
+              failures = 0;
+            }
+          } else {
+            failures = 0;
+          }
+          return result;
+        } catch (err) {
+          if (!isFrameworkError(err)) {
+            failures++;
+            if (state === 'half-open' || failures >= failureThreshold) {
+              state = 'open';
+              openedAt = Date.now();
+              failures = 0;
+            }
+          }
+          throw err;
+        }
+      },
+    };
+  }) as Enhancer;
 }

@@ -25,10 +25,31 @@ export function registerDev(program: Command): void {
       print.blank();
 
       const child = spawn('npx', ['tsx', 'watch', entryFile], {
-        stdio: 'inherit',
+        stdio: ['inherit', 'pipe', 'pipe'],
         env,
         shell: false,
       });
+
+      let serverUrlPrinted = false;
+
+      function forwardOutput(data: Buffer): void {
+        process.stdout.write(data);
+        if (!serverUrlPrinted) {
+          const text = data.toString();
+          const portMatch = text.match(/(?:Listening|listening|port|PORT)[^\d]*(\d{3,5})/i);
+          if (portMatch?.[1]) {
+            const port = portMatch[1];
+            serverUrlPrinted = true;
+            print.blank();
+            print.success(`Server running at http://localhost:${port}`);
+            print.item('Press Ctrl+C to stop');
+            print.blank();
+          }
+        }
+      }
+
+      child.stdout?.on('data', forwardOutput);
+      child.stderr?.on('data', (data: Buffer) => process.stderr.write(data));
 
       child.on('error', (err) => {
         if ((err as NodeJS.ErrnoException).code === 'ENOENT') {

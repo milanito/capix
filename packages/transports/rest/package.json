@@ -2,6 +2,7 @@
   "name": "capix-transport-rest",
   "version": "0.1.0",
   "description": "Capix HTTP/REST transport",
+  "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -10,6 +11,23 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     }
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "keywords": [
+    "capix",
+    "rest",
+    "http",
+    "transport",
+    "router",
+    "multipart",
+    "file-upload",
+    "typescript"
+  ],
+  "engines": {
+    "node": ">=20"
   },
   "scripts": {
     "build": "tsc",

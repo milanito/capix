@@ -46,7 +46,11 @@ export function registerCall(program: Command): void {
 
       if (opts.json) {
         if (response.ok) {
-          console.log(JSON.stringify(response.data, null, 2));
+          try {
+            console.log(JSON.stringify(response.data, null, 2));
+          } catch {
+            print.fatal(`Response data is not JSON-serializable`);
+          }
         } else {
           console.error(JSON.stringify(response.error, null, 2));
           process.exit(1);
@@ -57,7 +61,14 @@ export function registerCall(program: Command): void {
       if (response.ok) {
         print.success(`${capName}`);
         print.blank();
-        console.log(JSON.stringify(response.data, null, 2));
+        try {
+          console.log(JSON.stringify(response.data, null, 2));
+        } catch {
+          print.error(`Response data is not JSON-serializable`);
+          print.item(String(response.data));
+          print.blank();
+          process.exit(1);
+        }
       } else {
         const { status, error, message, meta } = response.error;
         print.error(`${status} ${error}: ${message}`);

@@ -91,6 +91,17 @@ export type Capability<
   readonly http?: HttpOverride;
   readonly resolve: Resolver<TInput, TOutput, TContext>;
 
+  /**
+   * Adds a guard to this capability.
+   *
+   * KNOWN LIMITATION: `.guard()` accepts `(ctx: any) => any` due to TypeScript's
+   * function-parameter contravariance. A guard typed for `AppContext` cannot be
+   * directly assigned to `Guard<BaseContext>` — `AppContext` is more specific and
+   * TypeScript correctly rejects the narrower-to-broader assignment in strict mode.
+   * `any` bypasses this so guards can be chained across context types.
+   * Attempted fix: `guard<TGuard extends (ctx: NoInfer<TContext>) => any>` — breaks
+   * any guard typed more specifically than the current TContext. Track: GitHub issue #2
+   */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   guard<G extends (ctx: any) => any>(
     g: G,
@@ -287,11 +298,21 @@ export interface GroupTree {
  * Walks a group tree recursively, builds a flat Map with dot-path keys,
  * and names each capability from its path.
  */
+const VALID_KEY = /^[a-zA-Z][a-zA-Z0-9]*$/;
+
 export function compileRegistry(tree: GroupTree, prefix = ''): CapabilityRegistry {
   const map = new Map<string, AnyCapability>();
 
   for (const [key, value] of Object.entries(tree)) {
     const path = prefix ? `${prefix}.${key}` : key;
+
+    if (!VALID_KEY.test(key)) {
+      throw new Error(
+        `[capix] Invalid capability key: "${key}" at path "${path}". ` +
+        `Keys must be camelCase identifiers (letters and numbers only, ` +
+        `starting with a letter). Examples: getUser, listOrders, createPost.`,
+      );
+    }
 
     if (isCapability(value)) {
       // Create a named copy by building a fresh capability base with the correct name

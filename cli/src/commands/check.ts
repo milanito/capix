@@ -35,7 +35,17 @@ export function registerCheck(program: Command): void {
         errors++;
       }
 
-      // 3. Naming conventions
+      // 3. Detect scaffold placeholder resolvers
+      const PLACEHOLDER_PATTERNS = [/not.?implemented/i, /TODO/i, /throw new Error\(['"]TODO/i];
+      for (const [name, cap] of registry) {
+        const src = cap.resolve.toString();
+        if (PLACEHOLDER_PATTERNS.some((re) => re.test(src))) {
+          print.warn(`${name}: resolver looks like a scaffold placeholder (not implemented)`);
+          warnings++;
+        }
+      }
+
+      // 4. Naming conventions
       for (const [name] of registry) {
         const parts = name.split('.');
         for (const part of parts) {

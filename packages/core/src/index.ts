@@ -28,7 +28,24 @@ export type {
 } from './capability.js';
 
 // Enhancers
-export { defineEnhancer, withLogging, withCache, withTimeout, withRetry } from './enhancers.js';
+export {
+  defineEnhancer,
+  withLogging,
+  withCache,
+  withTimeout,
+  withRetry,
+  withRateLimit,
+  withMetrics,
+  withCircuitBreaker,
+  consoleMetricsCollector,
+  rateLimitStore,
+  cacheStore,
+} from './enhancers.js';
+export type {
+  RateLimitOptions,
+  MetricsCollector,
+  CircuitBreakerOptions,
+} from './enhancers.js';
 
 // Execution engine
 export { createExecutionEngine } from './execution-engine.js';

@@ -78,7 +78,7 @@ export function createExecutionEngine(options: ExecutionEngineOptions): InvokeFn
         error: {
           status: 404,
           error: 'NotFound',
-          message: `Capability '${req.capability}' not found`,
+          message: `Capability '${req.capability}' not found. Did you register it in your capabilities tree?`,
         },
       };
     }
@@ -94,6 +94,9 @@ export function createExecutionEngine(options: ExecutionEngineOptions): InvokeFn
       };
       ctx = await buildContext(rawReq);
     } catch (err) {
+      if (isFrameworkError(err)) {
+        return toErrorResponse(err, isDevelopment);
+      }
       if (isDevelopment) console.error('[capix] buildContext error:', err);
       return {
         ok: false,
@@ -101,9 +104,19 @@ export function createExecutionEngine(options: ExecutionEngineOptions): InvokeFn
       };
     }
 
-    // 3. Run guards
+    // 3. Run guards (log guard name on unexpected errors in dev mode)
     try {
-      await runGuards(cap.guards, ctx);
+      for (const guard of cap.guards) {
+        try {
+          await guard(ctx);
+        } catch (err) {
+          if (isDevelopment && !isFrameworkError(err)) {
+            const name = (guard as { name?: string }).name || '(anonymous)';
+            console.error(`[capix] Guard '${name}' threw an unexpected error:`, err);
+          }
+          throw err;
+        }
+      }
     } catch (err) {
       return toErrorResponse(err, isDevelopment);
     }
@@ -113,13 +126,17 @@ export function createExecutionEngine(options: ExecutionEngineOptions): InvokeFn
     if (cap.inputSchema !== null) {
       const result = await cap.inputSchema.safeParseAsync(req.input);
       if (!result.success) {
+        const issues = result.error.issues.map((i) => {
+          const path = i.path.length > 0 ? i.path.join('.') + ': ' : '';
+          return path + i.message;
+        });
         return {
           ok: false,
           error: {
             status: 400,
             error: 'BadRequest',
             message: 'Input validation failed',
-            meta: { issues: result.error.issues },
+            meta: { issues },
           },
         };
       }
@@ -136,7 +153,22 @@ export function createExecutionEngine(options: ExecutionEngineOptions): InvokeFn
       return toErrorResponse(err, isDevelopment);
     }
 
-    // 6. Check for undefined return
+    // 6. Check for streaming return (not supported)
+    if (output != null && typeof output === 'object' && Symbol.asyncIterator in (output as object)) {
+      if (isDevelopment) {
+        console.error(`[capix] Capability '${req.capability}' returned an async iterable/stream.`);
+      }
+      return {
+        ok: false,
+        error: {
+          status: 500,
+          error: 'Internal',
+          message: `Capability '${req.capability}' returned a stream or async iterable. Streaming responses are not supported. Return a plain object, string, or null instead.`,
+        },
+      };
+    }
+
+    // Check for undefined return
     if (output === undefined) {
       if (isDevelopment) {
         console.error(`[capix] Capability '${req.capability}' returned undefined`);

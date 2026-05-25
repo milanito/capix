@@ -38,13 +38,50 @@ describe('isFrameworkError', () => {
     expect(isFrameworkError({ status: 404, error: 'NotFound', message: 'Not found' })).toBe(false);
   });
 
+  it('returns false for Error instances', () => {
+    expect(isFrameworkError(new Error('not found'))).toBe(false);
+  });
+
   it('returns false for null', () => {
     expect(isFrameworkError(null)).toBe(false);
+  });
+
+  it('returns false for undefined', () => {
+    expect(isFrameworkError(undefined)).toBe(false);
   });
 
   it('returns false for primitives', () => {
     expect(isFrameworkError('error')).toBe(false);
     expect(isFrameworkError(404)).toBe(false);
+  });
+
+  it('two different error factories are not cross-identified', () => {
+    const ErrA = defineError(404, 'Not found');
+    const ErrB = defineError(401, 'Unauthorized');
+    const errA = ErrA();
+    const errB = ErrB();
+    expect(isFrameworkError(errA)).toBe(true);
+    expect(isFrameworkError(errB)).toBe(true);
+    // Both are FrameworkErrors — the brand is per-type, not per-factory
+    expect(errA.status).not.toBe(errB.status);
+  });
+});
+
+describe('error name derivation', () => {
+  it("'Not found' → 'NotFound'", () => {
+    expect(defineError(404, 'Not found')().error).toBe('NotFound');
+  });
+
+  it("'Bad request' → 'BadRequest'", () => {
+    expect(defineError(400, 'Bad request')().error).toBe('BadRequest');
+  });
+
+  it("'Too many requests' → 'TooManyRequests'", () => {
+    expect(defineError(429, 'Too many requests')().error).toBe('TooManyRequests');
+  });
+
+  it('single word message → unchanged', () => {
+    expect(defineError(401, 'Unauthorized')().error).toBe('Unauthorized');
   });
 });
 

@@ -4,3 +4,4 @@ packages:
   - "packages/plugins/*"
   - "cli"
   - "examples/*"
+  - "test/integration"

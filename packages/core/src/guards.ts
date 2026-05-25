@@ -12,13 +12,14 @@ export type Guard<TContext extends BaseContext> = (
 
 /**
  * A guard that narrows the context type via TypeScript asserts.
- * TContext & TNarrowed is always a structural subtype of TContext; TypeScript's
- * generic variance check incorrectly rejects this in type-alias definitions (TS2677).
+ *
+ * `TNarrowed extends TContext` ensures the asserted type is always a subtype of
+ * the parameter type, satisfying TS2677 without requiring @ts-ignore.
+ * `TNarrowed` is the full narrowed type — e.g. `AppContext & { user: User }`.
  */
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore TS2677
-// prettier-ignore
-export type NarrowingGuard<TContext extends BaseContext, TNarrowed> = (ctx: TContext) => asserts ctx is TContext & TNarrowed;
+export type NarrowingGuard<TContext extends BaseContext, TNarrowed extends TContext> = (
+  ctx: TContext,
+) => asserts ctx is TNarrowed;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 /** Any guard — uses `any` context so guards typed for specific contexts are assignable. */
@@ -27,13 +28,21 @@ export type AnyGuard = (ctx: any) => void | Promise<void>;
 /**
  * Utility type: if TGuard is a NarrowingGuard, extract the narrowed type.
  * Otherwise return TContext unchanged.
+ *
+ * KNOWN LIMITATION: NarrowContext uses 'any' due to TypeScript's function-parameter
+ * contravariance. Guards are often typed for a specific AppContext, but a capability
+ * starts with TContext = BaseContext. Matching on `(ctx: TContext)` fails because
+ * `(ctx: AppContext)` is not assignable to `(ctx: BaseContext)` — the guard demands
+ * a more specific type than the capability provides at definition time.
+ * Using `any` as the match parameter bypasses contravariance and correctly infers
+ * TNarrowed from the asserted type. Track: GitHub issue #1
+ * Attempted fixes: explicit generic `(ctx: TContext)` — breaks guards with specific
+ * contexts; `(ctx: unknown)` — same failure. Revisit when TypeScript improves
+ * conditional assertion inference.
  */
 export type NarrowContext<
   TContext extends BaseContext,
   TGuard,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  // TS 5.5+ requires the asserted type to be assignable to the ctx parameter type,
-  // which fails in generic conditional types. Using `any` as the param avoids this.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 > = TGuard extends (ctx: any) => asserts ctx is infer TNarrowed
   ? TNarrowed extends TContext
