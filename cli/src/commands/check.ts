@@ -56,6 +56,21 @@ export function registerCheck(program: Command): void {
         }
       }
 
+      // 5. Detect nested-resource patterns without an http override
+      // Keys like listProjectTasks, getProjectTask suggest /projects/:id/tasks hierarchy
+      const NESTED_PATTERN = /^(list|get|create|update|delete|find|add|remove)[A-Z][a-z]+[A-Z]/;
+      for (const [name, cap] of registry) {
+        const key = name.split('.').pop() ?? name;
+        if (NESTED_PATTERN.test(key) && !cap.http) {
+          print.warn(
+            `${name}: key "${key}" suggests a nested resource route.\n` +
+            `  The inferred route may be unexpected. Consider:\n` +
+            `  { http: { method: 'GET', path: '/resources/:resourceId/subresources' } }`,
+          );
+          warnings++;
+        }
+      }
+
       print.blank();
 
       if (errors === 0 && warnings === 0) {

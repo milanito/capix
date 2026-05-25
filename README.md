@@ -106,6 +106,53 @@ createServer({
 // POST /users       ← createUser
 ```
 
+## Typing your context
+
+Every real Capix app has app-specific context (database connection, current user, logger). Use `capability.withContext<YourContext>()` to create a factory pre-typed for your context — define it once, import it everywhere:
+
+```ts
+// src/capabilities.ts — define once
+import { capability } from 'capix';
+import type { AppContext } from './context.js';
+
+export const cap = capability.withContext<AppContext>();
+```
+
+```ts
+// src/capabilities/users/get.ts — import and use
+import { cap } from '../../capabilities.js';
+
+export const getUser = cap(
+  z.object({ id: z.string() }),
+  async ({ id }, ctx) => {
+    // ctx.user, ctx.db — all typed correctly, no annotation needed
+    const user = await ctx.db.users.findById(id);
+    if (!user) throw errors.NotFound();
+    return user;
+  },
+  'query',
+).guard(mustBeUser);
+```
+
+Without `withContext`, `ctx` is typed as `BaseContext` (only `requestId`).
+
+**Authenticated capabilities** — create a second factory for capabilities that require a logged-in user:
+
+```ts
+// After mustBeUser runs, ctx.user is non-null.
+// Use authCap to express this in the resolver's type.
+type AuthContext = AppContext & { user: NonNullable<AppContext['user']> };
+
+export const cap     = capability.withContext<AppContext>();   // public endpoints
+export const authCap = capability.withContext<AuthContext>();  // authenticated endpoints
+
+// ctx.user is User (not User | null) — no null check needed
+export const getProfile = authCap(z.object({}), async (_, ctx) => ctx.user, 'query')
+  .guard(mustBeUser);
+```
+
+> **Note:** TypeScript cannot retroactively narrow the resolver's `ctx` from guards added via `.guard()`. The `authCap` pattern pre-types the resolver instead. See [docs/ts-workarounds.md](./docs/ts-workarounds.md) for details.
+
 ## Core concepts
 
 ### Capabilities
@@ -200,6 +247,52 @@ createServer({
 }).start();
 ```
 
+## Nested resource routes
+
+For URLs like `/projects/:projectId/tasks`, use an explicit HTTP override — the inference engine handles flat groups but not hierarchies:
+
+```ts
+const listTasks = capability(
+  z.object({
+    projectId: z.string(),          // ← extracted from :projectId in the URL
+    page:      z.coerce.number().default(1), // ← from query string
+    status:    z.enum(['todo', 'done']).optional(),
+  }),
+  async ({ projectId, page, status }, ctx) => {
+    return ctx.db.tasks.list({ projectId, page, status });
+  },
+  'query',
+  { http: { method: 'GET', path: '/projects/:projectId/tasks' } },
+).guard(mustBeUser);
+```
+
+The REST transport merges URL params, query string, and body into a single typed input object. See [`examples/nested-routes`](./examples/nested-routes) for a full working example.
+
+## Real-time updates
+
+The WebSocket transport is request/response. For server-push (broadcasting mutations to connected WS clients), use a module-level `EventEmitter`:
+
+```ts
+// src/events.ts — shared event bus
+import { EventEmitter } from 'node:events';
+export const taskEvents = new EventEmitter();
+
+// src/capabilities/tasks/update.ts — emit after mutation
+export const updateTask = authCap(Input, async ({ id, ...data }, ctx) => {
+  const task = await ctx.db.tasks.update(id, data);
+  taskEvents.emit('task.updated', { taskId: id, data: task });
+  return task;
+}, 'update').guard(mustBeUser);
+```
+
+See [`examples/realtime`](./examples/realtime) for the complete broadcast pattern.
+
+## Known TypeScript limitation
+
+Guard type narrowing applies to subsequent guards in the chain, but TypeScript cannot retroactively narrow the resolver's `ctx` parameter based on guards added via `.guard()`. Use `capability.withContext<AuthContext>()` as the workaround.
+
+See [docs/ts-workarounds.md](./docs/ts-workarounds.md) for a full explanation, the two-factory pattern, and what a future fix would look like.
+
 ## CLI
 
 ```bash
@@ -219,6 +312,11 @@ npm install -g capix-cli
 |---|---|
 | [`examples/basic-rest`](examples/basic-rest) | CRUD API with REST transport |
 | [`examples/with-auth`](examples/with-auth) | JWT auth, role-based guards |
+| [`examples/nested-routes`](examples/nested-routes) | Nested resource routes with `http` override |
+| [`examples/realtime`](examples/realtime) | EventEmitter broadcast pattern for WS push |
+| [`examples/file-upload`](examples/file-upload) | Multipart file upload |
+| [`examples/pagination`](examples/pagination) | Query string coercion, filters, sorting |
+| [`examples/jwt-auth`](examples/jwt-auth) | Full JWT auth flow |
 
 ## Testing
 

@@ -1,0 +1,22 @@
+{
+  "name": "capix-example-realtime",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Capix real-time updates with EventEmitter broadcast pattern",
+  "type": "module",
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "dev": "tsx watch src/server.ts"
+  },
+  "dependencies": {
+    "capix": "workspace:*",
+    "capix-transport-rest": "workspace:*",
+    "capix-transport-ws": "workspace:*",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "tsx": "^4.0.0",
+    "typescript": "^5.5.0"
+  }
+}
