@@ -33,11 +33,14 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "capix": "workspace:*",
     "zod": "^3.23.0"
+  },
+  "peerDependencies": {
+    "capix": ">=0.1.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "capix": "workspace:*",
     "typescript": "^5.5.0",
     "vitest": "^1.6.0"
   }

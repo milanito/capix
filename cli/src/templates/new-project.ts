@@ -67,34 +67,73 @@ export function renderTsConfig(): string {
 
 export function renderCapabilitiesTs(): string {
   return `import { z } from 'zod';
-import { capability, defineError } from 'capix';
+import { capability, defineContext, defineError } from 'capix';
+
+// ---------------------------------------------------------------------------
+// Context
+// ---------------------------------------------------------------------------
+
+export type AppContext = {
+  readonly requestId: string;
+  // Add your app-specific fields here:
+  // user: AppUser | null;
+  // db: Database;
+};
+
+export const buildContext = defineContext(async (_req): Promise<AppContext> => ({
+  requestId: crypto.randomUUID(),
+}));
+
+// ---------------------------------------------------------------------------
+// Errors
+// ---------------------------------------------------------------------------
 
 const errors = {
   NotFound: defineError(404, 'Not found'),
 };
 
-// Example capabilities — add yours here
-const ping = capability(() => ({ message: 'pong', timestamp: Date.now() }));
+// ---------------------------------------------------------------------------
+// Scoped capability factory
+//
+// Import \`cap\` in every capability file instead of using \`capability\` directly.
+// This pre-binds AppContext so \`ctx\` is correctly typed in every resolver.
+//
+// For capabilities that require authentication, create a second factory:
+//   type AuthContext = AppContext & { user: NonNullable<AppContext['user']> };
+//   export const authCap = capability.withContext<AuthContext>();
+// ---------------------------------------------------------------------------
 
-const getItem = capability(
+export const cap = capability.withContext<AppContext>();
+
+// ---------------------------------------------------------------------------
+// Example capabilities — replace with your own
+// ---------------------------------------------------------------------------
+
+const ping = cap(
+  async (_input, _ctx) => ({ message: 'pong', timestamp: Date.now() }),
+  'query',
+);
+
+const getItem = cap(
   z.object({ id: z.string() }),
-  async ({ id }) => {
+  async ({ id }, _ctx) => {
     if (id !== '1') throw errors.NotFound();
     return { id, name: 'Example item' };
   },
+  'query',
 );
 
 export const capabilities = {
   system: { ping },
-  items: { get: getItem },
+  items: { getItem },
 };
 `;
 }
 
 export function renderServerTs(opts: NewProjectOptions): string {
   const imports: string[] = [
-    `import { defineContext, createServer } from 'capix';`,
-    `import { capabilities } from './capabilities.js';`,
+    `import { createServer } from 'capix';`,
+    `import { buildContext, capabilities } from './capabilities.js';`,
   ];
   const transports: string[] = [];
 
@@ -108,10 +147,6 @@ export function renderServerTs(opts: NewProjectOptions): string {
   }
 
   return `${imports.join('\n')}
-
-const buildContext = defineContext(async (_req) => ({
-  requestId: crypto.randomUUID(),
-}));
 
 const server = createServer({
   context: buildContext,

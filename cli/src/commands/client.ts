@@ -96,15 +96,42 @@ function generateClient(registry: CapabilityRegistry, baseUrl: string): string {
     const fnName = capNameToFn(name);
     const inputType = renderInputType(cap);
     const hasInput = cap.inputSchema !== null;
+    const isBodyMethod = !['GET', 'DELETE', 'HEAD'].includes(route.method);
 
-    const pathWithTypes = route.path.replace(/:([a-z]+)/g, '${input.$1}');
+    // Extract path param names from route pattern (e.g. /projects/:id → ['id'])
+    const pathParams = [...route.path.matchAll(/:([a-zA-Z]+)/g)].map((m) => m[1] ?? '');
+    const pathWithTypes = route.path.replace(/:([a-zA-Z]+)/g, '${input.$1}');
     const useTemplatePath = pathWithTypes !== route.path;
 
     const inputParam = hasInput ? `input: ${inputType}` : '';
     const pathExpr = useTemplatePath ? `\`${pathWithTypes}\`` : `'${route.path}'`;
 
+    // Build the body argument:
+    // - GET/DELETE: no body, pass input as query params via request()
+    // - body method, no path params: pass full input as body
+    // - body method, with path params: extract non-path fields and pass as body
+    let bodyArg = '';
+    if (hasInput) {
+      if (!isBodyMethod) {
+        bodyArg = ', input'; // query params
+      } else if (!useTemplatePath) {
+        bodyArg = ', input'; // full input as body
+      } else {
+        // body method with path params: pass only non-path fields
+        const schema = cap.inputSchema as { _def?: { shape?: () => Record<string, unknown> } };
+        const shapeFn = schema._def?.shape;
+        const shape = typeof shapeFn === 'function' ? shapeFn() : null;
+        const bodyFields = shape
+          ? Object.keys(shape).filter((k) => !pathParams.includes(k))
+          : [];
+        if (bodyFields.length > 0) {
+          bodyArg = `, { ${bodyFields.map((f) => `${f}: input.${f}`).join(', ')} }`;
+        }
+      }
+    }
+
     lines.push(`export async function ${fnName}(${inputParam}): Promise<unknown> {`);
-    lines.push(`  return request('${route.method}', ${pathExpr}${hasInput && !useTemplatePath ? ', input' : hasInput ? '' : ''});`);
+    lines.push(`  return request('${route.method}', ${pathExpr}${bodyArg});`);
     lines.push(`}`);
     lines.push('');
   }

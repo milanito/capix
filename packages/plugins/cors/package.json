@@ -31,11 +31,12 @@
     "build": "tsc",
     "typecheck": "tsc --noEmit"
   },
-  "dependencies": {
-    "capix-transport-rest": "workspace:*"
+  "peerDependencies": {
+    "capix-transport-rest": ">=0.1.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "capix-transport-rest": "workspace:*",
     "typescript": "^5.5.0"
   }
 }

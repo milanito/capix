@@ -88,6 +88,8 @@ export type Capability<
   readonly outputSchema: ZodTypeAny | null;
   readonly guards: ReadonlyArray<AnyGuard>;
   readonly intent: Intent;
+  /** True when intent was explicitly passed to capability(); false when defaulted. */
+  readonly _intentExplicit: boolean;
   readonly http?: HttpOverride;
   readonly resolve: Resolver<TInput, TOutput, TContext>;
 
@@ -128,6 +130,7 @@ type CapabilityBase = {
   outputSchema: ZodTypeAny | null;
   guards: ReadonlyArray<AnyGuard>;
   intent: Intent;
+  _intentExplicit: boolean;
   http?: HttpOverride;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   resolve: (...args: any[]) => any;
@@ -188,6 +191,19 @@ export function capability<TOutput, TContext extends BaseContext = BaseContext>(
   resolver: (input: undefined, ctx: TContext) => TOutput | Promise<TOutput>,
 ): Capability<undefined, TOutput, TContext>;
 
+/** No-input capability with explicit intent. */
+export function capability<TOutput, TContext extends BaseContext = BaseContext>(
+  resolver: (input: undefined, ctx: TContext) => TOutput | Promise<TOutput>,
+  intent: Intent,
+): Capability<undefined, TOutput, TContext>;
+
+/** No-input capability with explicit intent and HTTP override. */
+export function capability<TOutput, TContext extends BaseContext = BaseContext>(
+  resolver: (input: undefined, ctx: TContext) => TOutput | Promise<TOutput>,
+  intent: Intent,
+  opts: { http: HttpOverride },
+): Capability<undefined, TOutput, TContext>;
+
 /** With typed input schema. */
 export function capability<
   TSchema extends ZodTypeAny,
@@ -223,10 +239,10 @@ export function capability<
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function capability(...args: any[]): AnyCapability {
-  const [first, second, thirdIntent, fourthOpts] = args as [
+  const [first, second, thirdArg, fourthOpts] = args as [
     ZodTypeAny | ((...a: unknown[]) => unknown),
-    ((...a: unknown[]) => unknown) | undefined,
-    Intent | undefined,
+    ((...a: unknown[]) => unknown) | Intent | undefined,
+    Intent | { http: HttpOverride } | undefined,
     { http: HttpOverride } | undefined,
   ];
 
@@ -236,6 +252,11 @@ export function capability(...args: any[]): AnyCapability {
     '_def' in (first as object);
 
   if (!isZodSchema) {
+    // No-schema overloads: capability(resolver) | capability(resolver, intent) | capability(resolver, intent, opts)
+    const explicitIntent = typeof second === 'string' ? (second as Intent) : undefined;
+    const noSchemaOpts =
+      typeof thirdArg === 'object' && thirdArg !== null ? (thirdArg as { http: HttpOverride }) : fourthOpts;
+
     return makeCapability<undefined, unknown, BaseContext>({
       _capix: true,
       [CAPABILITY_BRAND]: true,
@@ -246,10 +267,17 @@ export function capability(...args: any[]): AnyCapability {
       inputSchema: null,
       outputSchema: null,
       guards: [],
-      intent: thirdIntent ?? 'mutation',
+      _intentExplicit: explicitIntent !== undefined,
+      intent: explicitIntent ?? 'mutation',
+      ...(noSchemaOpts?.http ? { http: noSchemaOpts.http } : {}),
       resolve: first as (...a: unknown[]) => unknown,
     });
   }
+
+  // Schema overloads: capability(schema, resolver) | capability(schema, resolver, intent) | capability(schema, resolver, intent, opts)
+  const thirdIntent = typeof thirdArg === 'string' ? (thirdArg as Intent) : undefined;
+  const schemaOpts =
+    typeof thirdArg === 'object' && thirdArg !== null ? (thirdArg as { http: HttpOverride }) : fourthOpts;
 
   return makeCapability<unknown, unknown, BaseContext>({
     _capix: true,
@@ -261,8 +289,9 @@ export function capability(...args: any[]): AnyCapability {
     inputSchema: first as ZodTypeAny,
     outputSchema: null,
     guards: [],
+    _intentExplicit: thirdIntent !== undefined,
     intent: thirdIntent ?? 'mutation',
-    ...(fourthOpts?.http ? { http: fourthOpts.http } : {}),
+    ...(schemaOpts?.http ? { http: schemaOpts.http } : {}),
     resolve: second as (...a: unknown[]) => unknown,
   });
 }
@@ -337,6 +366,7 @@ export function compileRegistry(tree: GroupTree, prefix = ''): CapabilityRegistr
         outputSchema: value.outputSchema,
         guards: value.guards,
         intent: value.intent,
+        _intentExplicit: value._intentExplicit,
         ...(value.http ? { http: value.http } : {}),
         resolve: value.resolve,
       };

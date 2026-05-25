@@ -96,6 +96,18 @@ export function withRetry(maxAttempts: number, delayMs = 100): Enhancer {
 export type RateLimitOptions = {
   readonly limit: number;
   readonly windowMs: number;
+  /**
+   * Derives the rate limit key from input and context.
+   *
+   * WARNING: Defaults to the capability name — a GLOBAL limit shared across all callers.
+   * For production use, always provide a keyFn to limit per-user or per-IP:
+   *
+   * @example Per-user rate limit
+   * withRateLimit({ limit: 100, windowMs: 60_000, keyFn: (_input, ctx) => (ctx as AppContext).user?.id ?? 'anon' })
+   *
+   * @example Per-IP rate limit
+   * withRateLimit({ limit: 10, windowMs: 60_000, keyFn: (_input, ctx) => (ctx as AppContext).ip ?? 'unknown' })
+   */
   readonly keyFn?: (input: unknown, ctx: unknown) => string;
 };
 
@@ -115,7 +127,15 @@ export function withRateLimit(options: RateLimitOptions): Enhancer {
       timestamps = timestamps.filter((t) => t > windowStart);
 
       if (timestamps.length >= limit) {
-        throw defaultErrors.TooManyRequests();
+        // Find the oldest timestamp in the window — client can retry after it expires
+        const oldestInWindow = timestamps[0] ?? now;
+        const resetAt = oldestInWindow + windowMs;
+        const retryAfter = Math.ceil((resetAt - now) / 1000);
+        throw defaultErrors.TooManyRequests({
+          retryAfter,
+          resetAt: new Date(resetAt).toISOString(),
+          limit,
+        });
       }
 
       timestamps.push(now);

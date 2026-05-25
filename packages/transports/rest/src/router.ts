@@ -170,7 +170,8 @@ function inferRoutes(dotPath: string, cap: AnyCapability): RouteDefinition[] {
   const groupSegments = segments.slice(0, -1);
   const groupPath = '/' + groupSegments.join('/');
 
-  const intent = inferIntent(key);
+  // Use cap.intent when the user set it explicitly; otherwise infer from key name
+  const intent = cap._intentExplicit ? cap.intent : inferIntent(key);
   const hasIdField = cap.inputSchema
     ? 'shape' in cap.inputSchema &&
       typeof cap.inputSchema.shape === 'object' &&
@@ -184,8 +185,15 @@ function inferRoutes(dotPath: string, cap: AnyCapability): RouteDefinition[] {
         // get* with id → GET /group/:id
         return [{ method: 'GET', path: groupPath + '/:id', capability: dotPath }];
       }
-      // list* or get* without id → GET /group
-      return [{ method: 'GET', path: groupPath || '/', capability: dotPath }];
+      // Standard collection prefixes (list*, get*, find*, etc.) → GET /group
+      if (/^(list|get|find|fetch|read|search|filter|all)/i.test(key)) {
+        return [{ method: 'GET', path: groupPath || '/', capability: dotPath }];
+      }
+      // Named query (me, status, health, etc.) → GET /group/key
+      {
+        const namedPath = groupSegments.length > 0 ? '/' + [...groupSegments, key].join('/') : '/' + key;
+        return [{ method: 'GET', path: namedPath, capability: dotPath }];
+      }
 
     case 'mutation': {
       // create* → POST /group (drop capability key from path)

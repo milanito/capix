@@ -14,6 +14,11 @@ import { compileRegistry, isCapability } from 'capix';
 import type { CapabilityRegistry } from 'capix';
 import * as print from './print.js';
 
+// Register tsx so subsequent dynamic imports can resolve TypeScript source files.
+// This is a no-op when the file is already compiled JS.
+import { register } from 'tsx/esm/api';
+register();
+
 export type LoadedRegistry = {
   registry: CapabilityRegistry;
 };
