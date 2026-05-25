@@ -1,0 +1,10 @@
+# exclude compiled test and type-test artifacts
+dist/*.test.js
+dist/*.test.js.map
+dist/*.test.d.ts
+dist/*.test.d.ts.map
+dist/type-tests.js
+dist/type-tests.js.map
+dist/type-tests.d.ts
+dist/type-tests.d.ts.map
+coverage/

@@ -2,6 +2,7 @@
   "name": "capix-plugin-logging",
   "version": "0.1.0",
   "description": "Structured request logging plugin for Capix using pino",
+  "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -10,6 +11,21 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     }
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "keywords": [
+    "capix",
+    "logging",
+    "pino",
+    "plugin",
+    "observability",
+    "typescript"
+  ],
+  "engines": {
+    "node": ">=20"
   },
   "scripts": {
     "build": "tsc",
