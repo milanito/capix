@@ -85,6 +85,25 @@ describe('capability (with schema)', () => {
     const cap = capability(Input, ({ id }) => id);
     expect(cap.inputSchema).toBe(Input);
   });
+
+  it('async resolver resolves correctly', async () => {
+    const cap = capability(z.object({ x: z.number() }), async ({ x }) => x * 2);
+    const result = await cap.resolve({ x: 5 }, baseCtx);
+    expect(result).toBe(10);
+  });
+
+  it('explicit intent is stored', () => {
+    const cap = capability(z.object({}), () => null, 'query');
+    expect(cap.intent).toBe('query');
+  });
+
+  it('resolver receives raw input from cap.resolve (no Zod parsing here)', async () => {
+    const Input = z.object({ id: z.string() });
+    const cap = capability(Input, ({ id }) => id);
+    // cap.resolve bypasses Zod — transforms and defaults are applied by the execution engine
+    const result = await cap.resolve({ id: 'raw' }, baseCtx);
+    expect(result).toBe('raw');
+  });
 });
 
 describe('.guard()', () => {
@@ -131,6 +150,31 @@ describe('.enhance()', () => {
     const cap = capability(() => 1);
     const enhanced = cap.enhance((c) => c);
     expect(enhanced).not.toBe(cap);
+  });
+
+  it('double enhance — both wrap, outer first', async () => {
+    const log: string[] = [];
+    const cap = capability(() => 'result')
+      .enhance((c) => ({
+        ...c,
+        resolve: async (i, ctx) => {
+          log.push('inner-before');
+          const r = await c.resolve(i, ctx);
+          log.push('inner-after');
+          return r;
+        },
+      }))
+      .enhance((c) => ({
+        ...c,
+        resolve: async (i, ctx) => {
+          log.push('outer-before');
+          const r = await c.resolve(i, ctx);
+          log.push('outer-after');
+          return r;
+        },
+      }));
+    await cap.resolve(undefined, baseCtx);
+    expect(log).toEqual(['outer-before', 'inner-before', 'inner-after', 'outer-after']);
   });
 });
 
@@ -205,6 +249,12 @@ describe('compileRegistry', () => {
     const registry = compileRegistry(tree);
     expect(registry.has('ping')).toBe(true);
     expect(registry.get('ping')?.name).toBe('ping');
+  });
+
+  it('throws on invalid key (non-camelCase)', () => {
+    expect(() =>
+      compileRegistry({ 'invalid-key': capability(() => 1) } as Parameters<typeof compileRegistry>[0]),
+    ).toThrow(/Invalid capability key/);
   });
 
   it('guards throw when condition not met', async () => {

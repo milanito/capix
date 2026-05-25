@@ -13,6 +13,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Transport, MountOptions, InvokeFn } from 'capix';
 import { compileRouter, generateRoutes } from './router.js';
 import type { Router } from './router.js';
+import { parseMultipart } from './multipart-parser.js';
+import type { MultipartOptions } from './multipart.js';
 
 const DEFAULT_MAX_BODY_SIZE = 1024 * 1024; // 1MB
 
@@ -31,6 +33,8 @@ export type RestTransportOptions = {
   };
   readonly maxBodySize?: number;
   readonly hooks?: RestTransportHooks;
+  /** Enable multipart/form-data parsing. Pass true or an options object. */
+  readonly multipart?: boolean | MultipartOptions;
 };
 
 /** Creates a REST transport using node:http. */
@@ -69,7 +73,7 @@ export function restTransport(options: RestTransportOptions): Transport {
       req.on('data', (chunk: Buffer) => {
         size += chunk.byteLength;
         if (size > maxBodySize) {
-          req.destroy();
+          req.resume(); // drain remaining data without closing socket so we can still respond
           reject(new Error('PAYLOAD_TOO_LARGE'));
           return;
         }
@@ -163,7 +167,20 @@ export function restTransport(options: RestTransportOptions): Transport {
 
         if (rawBody.length > 0) {
           const contentType = req.headers['content-type'] ?? '';
-          if (contentType.includes('application/json')) {
+          if (contentType.includes('multipart/form-data') && options.multipart) {
+            const multipartOpts: MultipartOptions =
+              typeof options.multipart === 'object' ? options.multipart : {};
+            try {
+              const parsed = await parseMultipart(req.headers, rawBody, multipartOpts);
+              for (const [k, v] of Object.entries(parsed.fields)) bodyParams[k] = coerceQueryValue(v);
+              for (const [k, f] of Object.entries(parsed.files)) bodyParams[k] = f;
+            } catch (err) {
+              const status = (err as { status?: number }).status ?? 400;
+              const message = err instanceof Error ? err.message : 'Failed to parse multipart body';
+              sendJson(res, status, { error: status === 413 ? 'PayloadTooLarge' : 'BadRequest', message });
+              return;
+            }
+          } else if (contentType.includes('application/json')) {
             try {
               bodyParams = JSON.parse(rawBody.toString('utf8')) as Record<string, unknown>;
             } catch {

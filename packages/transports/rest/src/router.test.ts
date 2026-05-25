@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { compileRouter } from './router.js';
+import { z } from 'zod';
+import { capability, compileRegistry } from 'capix';
+import { compileRouter, generateRoutes } from './router.js';
 import type { RouteDefinition } from './router.js';
 
 function routes(...defs: RouteDefinition[]) {
@@ -65,5 +67,126 @@ describe('compileRouter', () => {
     const router = routes({ method: 'GET', path: '/users', capability: 'users.list' });
     const m = router.match('GET', '/users?page=2&limit=10');
     expect(m).toMatchObject({ found: true, capability: 'users.list' });
+  });
+
+  it('allowedMethods includes all methods for that path', () => {
+    const router = routes(
+      { method: 'GET', path: '/users', capability: 'users.list' },
+      { method: 'POST', path: '/users', capability: 'users.create' },
+    );
+    const m = router.match('DELETE', '/users');
+    expect(m.found).toBe(false);
+    if (!m.found) {
+      expect(m.allowedMethods).toBeDefined();
+      expect(m.allowedMethods).toContain('GET');
+      expect(m.allowedMethods).toContain('POST');
+    }
+  });
+
+  it('two params in a deep path — both extracted', () => {
+    const router = routes({ method: 'GET', path: '/users/:userId/orders/:orderId', capability: 'orders.get' });
+    const m = router.match('GET', '/users/u1/orders/o2');
+    expect(m).toMatchObject({ found: true, params: { userId: 'u1', orderId: 'o2' } });
+  });
+
+  it('empty routes array — no match', () => {
+    const router = compileRouter([]);
+    const m = router.match('GET', '/anything');
+    expect(m.found).toBe(false);
+    if (!m.found) expect(m.allowedMethods).toBeUndefined();
+  });
+
+  it('root param /:id matches anything', () => {
+    const router = routes({ method: 'GET', path: '/:id', capability: 'root.get' });
+    const m = router.match('GET', '/anything');
+    expect(m).toMatchObject({ found: true, capability: 'root.get', params: { id: 'anything' } });
+  });
+
+  it('very deep path works correctly', () => {
+    const router = routes({ method: 'GET', path: '/a/b/c/d/e/:f', capability: 'deep' });
+    const m = router.match('GET', '/a/b/c/d/e/val');
+    expect(m).toMatchObject({ found: true, params: { f: 'val' } });
+  });
+
+  it('conflicting param names at same level throws', () => {
+    expect(() =>
+      routes(
+        { method: 'GET', path: '/users/:id', capability: 'a' },
+        { method: 'POST', path: '/users/:userId', capability: 'b' },
+      ),
+    ).toThrow();
+  });
+
+  it('different methods on same path — each matches correctly', () => {
+    const router = routes(
+      { method: 'GET', path: '/users', capability: 'users.list' },
+      { method: 'POST', path: '/users', capability: 'users.create' },
+    );
+    expect(router.match('GET', '/users')).toMatchObject({ found: true, capability: 'users.list' });
+    expect(router.match('POST', '/users')).toMatchObject({ found: true, capability: 'users.create' });
+  });
+
+  it('static path 405 bubbles up when param child also exists', () => {
+    // /users/me → GET only. /users/:id → POST only.
+    // Matching GET /users/other should fall through to param (no 405 from static).
+    // Matching POST /users/me should give 405 from the static branch.
+    const router = routes(
+      { method: 'GET', path: '/users/me', capability: 'users.me' },
+      { method: 'POST', path: '/users/:id', capability: 'users.create' },
+    );
+    const m = router.match('POST', '/users/me');
+    // 'me' matches static child (GET only), returns allowedMethods ['GET']
+    expect(m.found).toBe(false);
+    if (!m.found) expect(m.allowedMethods).toContain('GET');
+  });
+});
+
+describe('generateRoutes', () => {
+  it('update* → PATCH /group/:id', () => {
+    const reg = compileRegistry({
+      users: { updateUser: capability(z.object({ id: z.string() }), () => null) },
+    });
+    const r = generateRoutes(reg);
+    expect(r).toContainEqual({ method: 'PATCH', path: '/users/:id', capability: 'users.updateUser' });
+  });
+
+  it('replace* → PUT /group/:id', () => {
+    const reg = compileRegistry({
+      users: { replaceUser: capability(z.object({ id: z.string() }), () => null) },
+    });
+    const r = generateRoutes(reg);
+    expect(r).toContainEqual({ method: 'PUT', path: '/users/:id', capability: 'users.replaceUser' });
+  });
+
+  it('delete* → DELETE /group/:id', () => {
+    const reg = compileRegistry({
+      users: { deleteUser: capability(z.object({ id: z.string() }), () => null) },
+    });
+    const r = generateRoutes(reg);
+    expect(r).toContainEqual({ method: 'DELETE', path: '/users/:id', capability: 'users.deleteUser' });
+  });
+
+  it('http override takes precedence over inference', () => {
+    const cap = capability(z.object({}), () => null);
+    (cap as unknown as Record<string, unknown>)['http'] = { method: 'GET', path: '/custom' };
+    const reg = compileRegistry({ createFoo: cap });
+    const r = generateRoutes(reg);
+    expect(r).toContainEqual({ method: 'GET', path: '/custom', capability: 'createFoo' });
+  });
+
+  it('get* without id → GET /group', () => {
+    const reg = compileRegistry({
+      users: { listUsers: capability(() => []) },
+    });
+    const r = generateRoutes(reg);
+    expect(r).toContainEqual({ method: 'GET', path: '/users', capability: 'users.listUsers' });
+  });
+
+  it('named action (non-create) → POST /group/key', () => {
+    const reg = compileRegistry({
+      auth: { login: capability(z.object({ email: z.string() }), () => null) },
+    });
+    const r = generateRoutes(reg);
+    expect(r).toContainEqual({ method: 'POST', path: '/auth/login', capability: 'auth.login' });
   });
 });
