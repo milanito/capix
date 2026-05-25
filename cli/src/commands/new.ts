@@ -11,6 +11,7 @@ import {
   renderGitignore,
   renderReadme,
   renderEnvExample,
+  renderCursorRules,
 } from '../templates/new-project.js';
 
 async function prompt(question: string): Promise<string> {
@@ -89,6 +90,7 @@ export function registerNew(program: Command): void {
         ['.gitignore', renderGitignore()],
         ['.env.example', renderEnvExample()],
         ['README.md', renderReadme({ name, transport })],
+        ['.cursor/rules', renderCursorRules()],
       ];
 
       for (const [rel, content] of files) {

@@ -4,14 +4,19 @@
  */
 
 import type { AnyCapability } from './capability.js';
-import type { BaseContext, ContextBuilder } from './context.js';
+import type { BaseContext, ContextBuilder, RawRequest } from './context.js';
 import type { ErrorFactory } from './errors.js';
 import type { Enhancer } from './capability.js';
 import type { AnyGuard } from './guards.js';
 
 export type Plugin = {
   readonly name: string;
-  readonly context?: (base: BaseContext) => BaseContext;
+  /**
+   * Extend the request context after it has been built by the user's ContextBuilder.
+   * Receives both the built context and the original raw request so plugins can
+   * read headers, URLs, etc. May be async.
+   */
+  readonly context?: (base: BaseContext, req: RawRequest) => BaseContext | Promise<BaseContext>;
   readonly errors?: Record<string, ErrorFactory>;
   readonly enhancers?: Record<string, Enhancer | ((...args: unknown[]) => Enhancer)>;
   readonly capabilities?: Record<string, AnyCapability>;
@@ -54,7 +59,7 @@ export function mergePlugins(plugins: Plugin[]): MergedPlugins {
     return async (req) => {
       let ctx = await builder(req);
       for (const extend of contextExtensions) {
-        ctx = extend(ctx) as Awaited<ReturnType<ContextBuilder>>;
+        ctx = (await extend(ctx, req)) as Awaited<ReturnType<ContextBuilder>>;
       }
       return ctx;
     };

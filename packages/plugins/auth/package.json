@@ -1,0 +1,47 @@
+{
+  "name": "capix-plugin-auth",
+  "version": "0.1.0",
+  "description": "JWT authentication plugin for Capix",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "keywords": [
+    "capix",
+    "auth",
+    "jwt",
+    "authentication",
+    "plugin",
+    "security",
+    "typescript"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "jsonwebtoken": "^9.0.0"
+  },
+  "peerDependencies": {
+    "capix": ">=0.1.0"
+  },
+  "devDependencies": {
+    "@types/jsonwebtoken": "^9.0.0",
+    "@types/node": "^20.0.0",
+    "capix": "workspace:*",
+    "typescript": "^5.5.0"
+  }
+}

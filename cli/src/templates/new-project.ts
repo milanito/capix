@@ -175,6 +175,113 @@ PORT=3000
 `;
 }
 
+export function renderCursorRules(): string {
+  return `# Capix project rules
+
+## Framework overview
+
+This project uses **Capix** — a TypeScript capability-based RPC framework.
+The single primitive is \`capability()\`: a typed pure function with input/output schemas,
+guards, and enhancers. Transports (REST, WebSocket) are wired at startup and are
+separate from capability definitions.
+
+## File layout
+
+- \`src/capabilities.ts\` — context type, scoped factories (\`cap\`, \`authCap\`), shared errors, all capabilities
+- \`src/server.ts\` — creates and starts the server with transports
+- \`src/guards.ts\` — guard definitions (if you split them out)
+
+For larger projects, split capabilities into \`src/capabilities/<group>.ts\` and barrel-export from \`src/capabilities/index.ts\`.
+
+## Defining capabilities
+
+Always use the scoped factory (\`cap\` or \`authCap\`) instead of bare \`capability()\`:
+
+\`\`\`ts
+// query (read)
+export const getItem = cap(
+  z.object({ id: z.string() }),
+  async ({ id }, ctx) => { ... },
+  'query',
+);
+
+// mutation (write) — no explicit intent needed for standard CRUD names
+export const createItem = cap(z.object({ name: z.string() }), async ({ name }) => { ... });
+
+// no-schema query
+export const ping = cap(async (_input, _ctx) => ({ ok: true }), 'query');
+\`\`\`
+
+## Guards
+
+Guards narrow the context type and run before the resolver:
+
+\`\`\`ts
+import { defineGuard, defaultErrors } from 'capix';
+
+export const mustBeAuthenticated = defineGuard(
+  (ctx: AppContext): asserts ctx is AuthContext => {
+    if (!ctx.user) throw defaultErrors.Unauthorized();
+  },
+);
+
+// Apply to a capability:
+export const getProfile = authCap(schema, resolver).guard(mustBeAuthenticated);
+\`\`\`
+
+Always pair \`authCap\` with \`.guard(mustBeAuthenticated)\`. Using \`authCap\` without
+the guard is a footgun — TypeScript won't catch it but unauthenticated requests
+will throw at runtime.
+
+## Context pattern
+
+\`\`\`ts
+export type AppContext  = { requestId: string; user: AppUser | null; db: Database };
+export type AuthContext = AppContext & { user: AppUser }; // narrowed
+
+export const cap     = capability.withContext<AppContext>();  // public endpoints
+export const authCap = capability.withContext<AuthContext>(); // authenticated endpoints
+\`\`\`
+
+## REST route inference
+
+| Key pattern | Intent | HTTP route |
+|---|---|---|
+| \`getItem\`, \`listItems\` | query | GET /items/:id or GET /items |
+| \`createItem\` | mutation | POST /items |
+| \`updateItem\` | mutation | PATCH /items/:id |
+| \`deleteItem\` | mutation | DELETE /items/:id |
+
+To override: \`.http({ method: 'PUT', path: '/custom/:id' })\`
+
+## Errors
+
+\`\`\`ts
+const errors = {
+  NotFound: defineError(404, 'Not found'),
+  Forbidden: defineError(403, 'Forbidden'),
+};
+// In resolver:
+throw errors.NotFound();
+\`\`\`
+
+Framework errors: \`defaultErrors.Unauthorized()\`, \`defaultErrors.Forbidden()\`, \`defaultErrors.TooManyRequests()\`
+
+## Enhancers
+
+\`\`\`ts
+import { withRateLimit, withCache } from 'capix';
+
+export const getItem = cap(schema, resolver).enhance(withRateLimit({ limit: 100, windowMs: 60_000 }));
+\`\`\`
+
+## AI context
+
+Run \`capix ai-context\` to regenerate \`.capix-context.json\` after adding or changing capabilities.
+This file gives AI assistants a machine-readable map of your API surface.
+`;
+}
+
 export function renderReadme(opts: NewProjectOptions): string {
   return `# ${opts.name}
 
