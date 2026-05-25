@@ -59,6 +59,22 @@ export function defineGuard<TFn extends AnyGuard>(fn: TFn): TFn {
 }
 
 /**
+ * Returns a guard factory pre-bound to a specific context type.
+ * Avoids repeating the context type annotation on every guard.
+ *
+ * @example
+ * const defineAppGuard = defineGuardFor<AppContext>();
+ * const mustBeAdmin = defineAppGuard((ctx): asserts ctx is AppContext & { user: Admin } => {
+ *   if (!ctx.user?.admin) throw Errors.Forbidden();
+ * });
+ */
+export function defineGuardFor<TContext extends BaseContext>() {
+  return function <TFn extends (ctx: TContext) => any>(fn: TFn): TFn {
+    return fn;
+  };
+}
+
+/**
  * Runs guards in order. Stops at the first guard that throws.
  * Supports async guards.
  */

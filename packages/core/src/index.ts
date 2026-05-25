@@ -11,7 +11,7 @@ export { defineContext, getHeader } from './context.js';
 export type { RawRequest, BaseContext, ContextBuilder } from './context.js';
 
 // Guards
-export { defineGuard, runGuards } from './guards.js';
+export { defineGuard, defineGuardFor, runGuards } from './guards.js';
 export type { Guard, NarrowingGuard, AnyGuard, NarrowContext } from './guards.js';
 
 // Capability
@@ -25,6 +25,10 @@ export type {
   AnyCapability,
   CapabilityRegistry,
   GroupTree,
+  InferInput,
+  InferOutput,
+  InferContext,
+  ScopedCapabilityFactory,
 } from './capability.js';
 
 // Enhancers

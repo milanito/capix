@@ -94,16 +94,14 @@ export type Capability<
   /**
    * Adds a guard to this capability.
    *
-   * KNOWN LIMITATION: `.guard()` accepts `(ctx: any) => any` due to TypeScript's
-   * function-parameter contravariance. A guard typed for `AppContext` cannot be
-   * directly assigned to `Guard<BaseContext>` — `AppContext` is more specific and
-   * TypeScript correctly rejects the narrower-to-broader assignment in strict mode.
-   * `any` bypasses this so guards can be chained across context types.
-   * Attempted fix: `guard<TGuard extends (ctx: NoInfer<TContext>) => any>` — breaks
-   * any guard typed more specifically than the current TContext. Track: GitHub issue #2
+   * The guard must accept the capability's current TContext (or a supertype of it).
+   * Function-parameter contravariance means a guard typed for a broader context
+   * (e.g. BaseContext) is always assignable, while a guard typed for a more specific
+   * context (e.g. AppContext) requires TContext to already be at least that specific.
+   * Use `capability.withContext<AppContext>()` to start with TContext = AppContext so
+   * all AppContext guards are accepted without explicit resolver annotation.
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  guard<G extends (ctx: any) => any>(
+  guard<G extends (ctx: TContext) => any>(
     g: G,
   ): Capability<TInput, TOutput, NarrowContext<TContext, G>>;
 
@@ -143,8 +141,7 @@ function makeCapability<TInput, TOutput, TContext extends BaseContext>(
   // Attach chaining methods as non-enumerable properties so spread doesn't copy them
   Object.defineProperties(base, {
     guard: {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      value<G extends (ctx: any) => any>(g: G): Capability<TInput, TOutput, NarrowContext<TContext, G>> {
+      value<G extends (ctx: TContext) => any>(g: G): Capability<TInput, TOutput, NarrowContext<TContext, G>> {
         return makeCapability<TInput, TOutput, NarrowContext<TContext, G>>({
           ...base,
           guards: [...base.guards, g as AnyGuard],
@@ -271,6 +268,19 @@ export function capability(...args: any[]): AnyCapability {
 }
 
 // ---------------------------------------------------------------------------
+// Utility inference types
+// ---------------------------------------------------------------------------
+
+/** Extract the validated input type from a Capability. */
+export type InferInput<TCap extends AnyCapability> = TCap['_input'];
+
+/** Extract the resolved output type from a Capability. */
+export type InferOutput<TCap extends AnyCapability> = TCap['_output'];
+
+/** Extract the required context type from a Capability (reflects guard narrowing). */
+export type InferContext<TCap extends AnyCapability> = TCap['_context'];
+
+// ---------------------------------------------------------------------------
 // isCapability
 // ---------------------------------------------------------------------------
 
@@ -340,4 +350,55 @@ export function compileRegistry(tree: GroupTree, prefix = ''): CapabilityRegistr
   }
 
   return map;
+}
+
+// ---------------------------------------------------------------------------
+// capability.withContext — scoped factory with TContext pre-bound
+// ---------------------------------------------------------------------------
+
+/**
+ * The type returned by `capability.withContext<TContext>()`.
+ * Identical to the `capability()` overloads but with TContext fixed.
+ */
+export type ScopedCapabilityFactory<TContext extends BaseContext> = {
+  <TOutput>(
+    resolver: (input: undefined, ctx: TContext) => TOutput | Promise<TOutput>,
+  ): Capability<undefined, TOutput, TContext>;
+  <TSchema extends ZodTypeAny, TOutput>(
+    schema: TSchema,
+    resolver: Resolver<TSchema['_output'], TOutput, TContext>,
+  ): Capability<TSchema['_output'], TOutput, TContext>;
+  <TSchema extends ZodTypeAny, TOutput>(
+    schema: TSchema,
+    resolver: Resolver<TSchema['_output'], TOutput, TContext>,
+    intent: Intent,
+  ): Capability<TSchema['_output'], TOutput, TContext>;
+  <TSchema extends ZodTypeAny, TOutput>(
+    schema: TSchema,
+    resolver: Resolver<TSchema['_output'], TOutput, TContext>,
+    intent: Intent,
+    opts: { http: HttpOverride },
+  ): Capability<TSchema['_output'], TOutput, TContext>;
+};
+
+// eslint-disable-next-line @typescript-eslint/no-namespace
+export namespace capability {
+  /**
+   * Returns a `capability()` factory with TContext pre-bound.
+   * The resolver's `ctx` parameter is inferred as TContext without annotation,
+   * and guards typed for TContext are accepted without the `any` escape hatch.
+   *
+   * @example
+   * const appCap = capability.withContext<AppContext>();
+   * const getUser = appCap(
+   *   z.object({ id: z.string() }),
+   *   async (input, ctx) => {  // ctx: AppContext — no annotation needed
+   *     if (!ctx.user) throw Errors.Unauthorized();
+   *     return db.users.find(input.id);
+   *   },
+   * ).guard(mustBeAuthenticated);
+   */
+  export function withContext<TContext extends BaseContext>(): ScopedCapabilityFactory<TContext> {
+    return capability as unknown as ScopedCapabilityFactory<TContext>;
+  }
 }

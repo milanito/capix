@@ -12,7 +12,8 @@
 import { z } from 'zod';
 import { capability } from './capability.js';
 import { defineContext } from './context.js';
-import { defineError, defineGuard } from './index.js';
+import { defineError, defineGuard, defineGuardFor } from './index.js';
+import type { InferContext, InferInput, InferOutput } from './capability.js';
 import type { NarrowingGuard } from './guards.js';
 
 // ---------------------------------------------------------------------------
@@ -163,6 +164,123 @@ void capExplicit;
 //                                          ^^^^^^^^^^^^^^^^^
 //                   Error: 'token' does not exist on type 'BaseContext'
 //
-// This is the KNOWN LIMITATION documented in guards.ts and capability.ts.
-// Workarounds attempted: explicit generic TNarrowed, NoInfer<TContext> — both
-// break guard usage for contexts more specific than TContext.
+// Solution: use capability.withContext<AppContext>() (see Test 7 below).
+
+// ---------------------------------------------------------------------------
+// Test 7: capability.withContext pre-binds TContext — no resolver annotation needed
+// ---------------------------------------------------------------------------
+
+const appCapability = capability.withContext<AppContext>();
+
+const capViaFactory = appCapability(
+  Input,
+  (_input, ctx) => {
+    // ctx is AppContext — no annotation required
+    return ctx.requestId;
+  },
+);
+
+// _context is AppContext
+type _FactoryContext = typeof capViaFactory['_context'];
+const _factoryCtxCheck: _FactoryContext = { requestId: '', user: null, token: null };
+void _factoryCtxCheck;
+
+// Guards work directly — no `any` escape hatch needed
+const capFactoryWithGuard = appCapability(
+  Input,
+  (_input, ctx) => ctx.requestId,
+).guard(mustBeAuthenticated);
+
+// Context is narrowed after guard
+type _FactoryGuardedContext = typeof capFactoryWithGuard['_context'];
+const _factoryGuardedCheck: _FactoryGuardedContext = { requestId: '', user: null, token: 'tok' };
+void _factoryGuardedCheck;
+
+// @ts-expect-error — token must be non-null in the narrowed context
+const _factoryGuardedBad: _FactoryGuardedContext = { requestId: '', user: null, token: null };
+void _factoryGuardedBad;
+
+// ---------------------------------------------------------------------------
+// Test 8: InferInput / InferOutput / InferContext utility types
+// ---------------------------------------------------------------------------
+
+const TypedCap = capability(
+  z.object({ id: z.string(), count: z.number() }),
+  (_input, _ctx: AppContext) => ({ result: 'ok' as const }),
+);
+
+type _InferredInput = InferInput<typeof TypedCap>;
+type _InferredOutput = InferOutput<typeof TypedCap>;
+type _InferredContext = InferContext<typeof TypedCap>;
+
+const _inputCheck: _InferredInput = { id: 'x', count: 1 };
+void _inputCheck;
+
+const _outputCheck: _InferredOutput = { result: 'ok' };
+void _outputCheck;
+
+const _contextCheck: _InferredContext = { requestId: '', user: null, token: null };
+void _contextCheck;
+
+// @ts-expect-error — id must be string, not number
+const _inputBad: _InferredInput = { id: 42, count: 1 };
+void _inputBad;
+
+// InferContext after .guard() reflects the narrowed context
+const GuardedTypedCap = TypedCap.guard(mustBeAuthenticated);
+type _GuardedInferredContext = InferContext<typeof GuardedTypedCap>;
+const _guardedInferred: _GuardedInferredContext = { requestId: '', user: null, token: 'tok' };
+void _guardedInferred;
+
+// @ts-expect-error — token must be string after guard
+const _guardedInferredBad: _GuardedInferredContext = { requestId: '', user: null, token: null };
+void _guardedInferredBad;
+
+// ---------------------------------------------------------------------------
+// Test 9: defineGuardFor — typed guard factory without repeated annotation
+// ---------------------------------------------------------------------------
+
+const defineAppGuard = defineGuardFor<AppContext>();
+
+// Plain void guard
+const appRateGuard = defineAppGuard((_ctx) => {
+  // _ctx is AppContext — no annotation needed
+});
+
+void appRateGuard;
+
+// Narrowing guard — assertion types are preserved
+const appAuthGuard = defineAppGuard(
+  (ctx): asserts ctx is AppContext & { token: string } => {
+    if (!ctx.token) throw errors.Unauthorized();
+  },
+);
+
+// Should be assignable to the correct NarrowingGuard type
+type _AppAuthGuardType = typeof appAuthGuard extends
+  NarrowingGuard<AppContext, AppContext & { token: string }>
+  ? true : false;
+const _appAuthGuardCheck: _AppAuthGuardType = true;
+void _appAuthGuardCheck;
+
+// defineGuardFor validates context type — wrong context errors
+// @ts-expect-error — guard must accept AppContext, not an incompatible shape
+defineGuardFor<AppContext>()((ctx: { somethingElse: number }) => { void ctx; });
+
+// ---------------------------------------------------------------------------
+// Test 10: .guard() requires guard to be compatible with current TContext
+// ---------------------------------------------------------------------------
+
+// Guard typed for BaseContext works with any capability (it's more permissive)
+const baseGuard = defineGuard((_ctx: { requestId: string }) => {});
+const capWithBaseGuard = appCapability(Input, (_input, _ctx) => 'ok').guard(baseGuard);
+void capWithBaseGuard;
+
+// Guard typed for AppContext works when TContext = AppContext
+const capWithAppGuard = appCapability(Input, (_input, _ctx) => 'ok').guard(mustBeAuthenticated);
+void capWithAppGuard;
+
+// Guard typed for AppContext does NOT work when TContext = BaseContext
+// (default TContext when no resolver annotation and no withContext)
+// @ts-expect-error — mustBeAuthenticated requires AppContext but TContext = BaseContext here
+capability(Input, (_input, _ctx) => 'ok').guard(mustBeAuthenticated);
