@@ -30,10 +30,18 @@ function deriveErrorName(message: string): string {
 
 /**
  * Creates a typed error factory for a given HTTP status code and message.
- * The returned factory is callable and produces objects identifiable by isFrameworkError().
+ *
+ * @param status  HTTP status code
+ * @param message Human-readable error message
+ * @param code    Machine-readable PascalCase error code (defaults to message-derived)
+ *
+ * @example
+ * // Explicit code — predictable, easy to test against:
+ * const NotPurchased = defineError(403, 'You can only review products you have purchased', 'NotPurchased');
+ * // → { error: 'NotPurchased', message: 'You can only review products you have purchased' }
  */
-export function defineError(status: number, message: string): ErrorFactory {
-  const errorName = deriveErrorName(message);
+export function defineError(status: number, message: string, code?: string): ErrorFactory {
+  const errorName = code ?? deriveErrorName(message);
   return (meta?: Record<string, unknown>): FrameworkError => {
     const err: FrameworkError = {
       status,
@@ -60,12 +68,12 @@ export function isFrameworkError(value: unknown): value is FrameworkError {
 
 /** Standard error set shipped with Capix. */
 export const defaultErrors = {
-  BadRequest: defineError(400, 'Bad request'),
-  Unauthorized: defineError(401, 'Unauthorized'),
-  Forbidden: defineError(403, 'Forbidden'),
-  NotFound: defineError(404, 'Not found'),
-  Conflict: defineError(409, 'Conflict'),
-  TooManyRequests: defineError(429, 'Too many requests'),
-  Internal: defineError(500, 'Internal server error'),
-  Timeout: defineError(504, 'Timeout'),
+  BadRequest:      defineError(400, 'Bad request',           'BadRequest'),
+  Unauthorized:    defineError(401, 'Unauthorized',          'Unauthorized'),
+  Forbidden:       defineError(403, 'Forbidden',             'Forbidden'),
+  NotFound:        defineError(404, 'Not found',             'NotFound'),
+  Conflict:        defineError(409, 'Conflict',              'Conflict'),
+  TooManyRequests: defineError(429, 'Too many requests',     'TooManyRequests'),
+  Internal:        defineError(500, 'Internal server error', 'Internal'),
+  Timeout:         defineError(504, 'Timeout',               'Timeout'),
 } as const;

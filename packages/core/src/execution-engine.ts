@@ -5,7 +5,7 @@
 
 import type { CapabilityRegistry } from './capability.js';
 import type { ContextBuilder, RawRequest } from './context.js';
-import { runGuards } from './guards.js';
+import { runGuards, runInputGuards } from './guards.js';
 import { isFrameworkError, defaultErrors } from './errors.js';
 
 export type CapabilityRequest = {
@@ -13,6 +13,8 @@ export type CapabilityRequest = {
   readonly input: unknown;
   readonly headers: Record<string, string>;
   readonly signal: AbortSignal;
+  /** Raw body bytes forwarded from the transport. See RawRequest.rawBody. */
+  readonly rawBody?: Buffer;
 };
 
 export type SerializedError = {
@@ -91,6 +93,7 @@ export function createExecutionEngine(options: ExecutionEngineOptions): InvokeFn
         method: 'POST',
         url: `/${req.capability.replace(/\./g, '/')}`,
         signal: req.signal,
+        ...(req.rawBody !== undefined ? { rawBody: req.rawBody } : {}),
       };
       ctx = await buildContext(rawReq);
     } catch (err) {
@@ -145,7 +148,16 @@ export function createExecutionEngine(options: ExecutionEngineOptions): InvokeFn
       validatedInput = undefined;
     }
 
-    // 5. Resolve
+    // 5. Run input guards (run after validation so guards receive typed input)
+    if (cap.inputGuards.length > 0) {
+      try {
+        await runInputGuards(cap.inputGuards, validatedInput, ctx);
+      } catch (err) {
+        return toErrorResponse(err, isDevelopment);
+      }
+    }
+
+    // 6. Resolve
     let output: unknown;
     try {
       output = await cap.resolve(validatedInput, ctx);
@@ -153,7 +165,7 @@ export function createExecutionEngine(options: ExecutionEngineOptions): InvokeFn
       return toErrorResponse(err, isDevelopment);
     }
 
-    // 6. Check for streaming return (not supported)
+    // 7. Check for streaming return (not supported)
     if (output != null && typeof output === 'object' && Symbol.asyncIterator in (output as object)) {
       if (isDevelopment) {
         console.error(`[capix] Capability '${req.capability}' returned an async iterable/stream.`);
@@ -168,7 +180,7 @@ export function createExecutionEngine(options: ExecutionEngineOptions): InvokeFn
       };
     }
 
-    // Check for undefined return
+    // 8. Check for undefined return
     if (output === undefined) {
       if (isDevelopment) {
         console.error(`[capix] Capability '${req.capability}' returned undefined`);
@@ -183,7 +195,7 @@ export function createExecutionEngine(options: ExecutionEngineOptions): InvokeFn
       };
     }
 
-    // 7. Validate output (internal error if schema fails)
+    // 9. Validate output (internal error if schema fails)
     if (cap.outputSchema !== null) {
       const result = await cap.outputSchema.safeParseAsync(output);
       if (!result.success) {

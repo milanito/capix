@@ -35,6 +35,8 @@ export type RestTransportOptions = {
   readonly hooks?: RestTransportHooks;
   /** Enable multipart/form-data parsing. Pass true or an options object. */
   readonly multipart?: boolean | MultipartOptions;
+  /** Case style for inferred URL segments. Default: 'kebab' (bulkStatus → bulk-status). */
+  readonly urlCase?: 'kebab' | 'camel' | 'snake';
 };
 
 /** Creates a REST transport using node:http. */
@@ -151,6 +153,7 @@ export function restTransport(options: RestTransportOptions): Transport {
     // Async continuation to keep handler signature synchronous (avoids unhandled rejection)
     const finish = async (): Promise<void> => {
       let bodyParams: Record<string, unknown> = {};
+      let rawBodyForContext: Buffer | undefined;
 
       if (!noBody) {
         let rawBody: Buffer;
@@ -166,6 +169,7 @@ export function restTransport(options: RestTransportOptions): Transport {
         }
 
         if (rawBody.length > 0) {
+          rawBodyForContext = rawBody;
           const contentType = req.headers['content-type'] ?? '';
           if (contentType.includes('multipart/form-data') && options.multipart) {
             const multipartOpts: MultipartOptions =
@@ -208,6 +212,7 @@ export function restTransport(options: RestTransportOptions): Transport {
         input,
         headers,
         signal,
+        ...(rawBodyForContext !== undefined ? { rawBody: rawBodyForContext } : {}),
       });
 
       if (response.ok) {
@@ -236,7 +241,8 @@ export function restTransport(options: RestTransportOptions): Transport {
   return {
     async mount(invoke: InvokeFn, mountOptions: MountOptions): Promise<void> {
       invokeFn = invoke;
-      const routes = generateRoutes(mountOptions.registry);
+      const routeOpts = options.urlCase !== undefined ? { urlCase: options.urlCase } : {};
+      const routes = generateRoutes(mountOptions.registry, routeOpts);
       router = compileRouter(routes);
 
       console.log('\nCapix REST transport starting...');

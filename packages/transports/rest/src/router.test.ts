@@ -108,13 +108,25 @@ describe('compileRouter', () => {
     expect(m).toMatchObject({ found: true, params: { f: 'val' } });
   });
 
-  it('conflicting param names at same level throws', () => {
+  it('different methods at same level can use different param names', () => {
+    // GET /users/:id and POST /users/:userId are allowed — different methods
+    const router = routes(
+      { method: 'GET',  path: '/users/:id',     capability: 'a' },
+      { method: 'POST', path: '/users/:userId',  capability: 'b' },
+    );
+    const getMatch = router.match('GET', '/users/42');
+    expect(getMatch).toMatchObject({ found: true, capability: 'a', params: { id: '42' } });
+    const postMatch = router.match('POST', '/users/42');
+    expect(postMatch).toMatchObject({ found: true, capability: 'b', params: { userId: '42' } });
+  });
+
+  it('same method + conflicting param names at same level throws', () => {
     expect(() =>
       routes(
-        { method: 'GET', path: '/users/:id', capability: 'a' },
-        { method: 'POST', path: '/users/:userId', capability: 'b' },
+        { method: 'GET', path: '/users/:id',     capability: 'a' },
+        { method: 'GET', path: '/users/:userId',  capability: 'b' },
       ),
-    ).toThrow();
+    ).toThrow('[capix] Router conflict: param name mismatch for GET');
   });
 
   it('different methods on same path — each matches correctly', () => {
@@ -138,6 +150,64 @@ describe('compileRouter', () => {
     // 'me' matches static child (GET only), returns allowedMethods ['GET']
     expect(m.found).toBe(false);
     if (!m.found) expect(m.allowedMethods).toContain('GET');
+  });
+});
+
+describe('generateRoutes — kebab-case conversion', () => {
+  it('camelCase key → kebab-case URL segment', () => {
+    const reg = compileRegistry({
+      products: { bulkStatus: capability(z.object({}), () => null) },
+    });
+    const r = generateRoutes(reg);
+    expect(r).toContainEqual({ method: 'POST', path: '/products/bulk-status', capability: 'products.bulkStatus' });
+  });
+
+  it('camelCase group name → kebab-case URL group', () => {
+    const reg = compileRegistry({
+      myGroup: { listItems: capability(z.object({}), () => []) },
+    });
+    const r = generateRoutes(reg);
+    expect(r).toContainEqual({ method: 'GET', path: '/my-group', capability: 'myGroup.listItems' });
+  });
+
+  it('urlCase: camel preserves camelCase', () => {
+    const reg = compileRegistry({
+      products: { bulkStatus: capability(z.object({}), () => null) },
+    });
+    const r = generateRoutes(reg, { urlCase: 'camel' });
+    expect(r).toContainEqual({ method: 'POST', path: '/products/bulkStatus', capability: 'products.bulkStatus' });
+  });
+
+  it('urlCase: snake converts to snake_case', () => {
+    const reg = compileRegistry({
+      products: { bulkStatus: capability(z.object({}), () => null) },
+    });
+    const r = generateRoutes(reg, { urlCase: 'snake' });
+    expect(r).toContainEqual({ method: 'POST', path: '/products/bulk_status', capability: 'products.bulkStatus' });
+  });
+
+  it('v1 group prefix is not altered by kebab conversion', () => {
+    const reg = compileRegistry({
+      v1: { products: { listProducts: capability(z.object({}), () => []) } },
+    });
+    const r = generateRoutes(reg);
+    expect(r).toContainEqual({ method: 'GET', path: '/v1/products', capability: 'v1.products.listProducts' });
+  });
+
+  it('create-prefix key still drops from URL even with kebab conversion', () => {
+    const reg = compileRegistry({
+      products: { createProduct: capability(z.object({ name: z.string() }), () => null) },
+    });
+    const r = generateRoutes(reg);
+    expect(r).toContainEqual({ method: 'POST', path: '/products', capability: 'products.createProduct' });
+  });
+
+  it('register is no longer a create prefix → POST /auth/register', () => {
+    const reg = compileRegistry({
+      auth: { register: capability(z.object({ email: z.string() }), () => null) },
+    });
+    const r = generateRoutes(reg);
+    expect(r).toContainEqual({ method: 'POST', path: '/auth/register', capability: 'auth.register' });
   });
 });
 

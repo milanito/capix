@@ -21,6 +21,11 @@ export type Router = {
   readonly routes: ReadonlyArray<RouteDefinition>;
 };
 
+export type GenerateRoutesOptions = {
+  /** Case style for URL path segments. Default: 'kebab' (bulkStatus → bulk-status). */
+  urlCase?: 'kebab' | 'camel' | 'snake';
+};
+
 // ---------------------------------------------------------------------------
 // Radix tree node
 // ---------------------------------------------------------------------------
@@ -30,8 +35,12 @@ type RadixNode = {
   handlers: Map<string, string>;
   // static children: segment → node
   staticChildren: Map<string, RadixNode>;
-  // param child: stores the param name and child node
-  paramChild?: { name: string; node: RadixNode };
+  // param child: stores the param name per method and the child node
+  paramChild?: {
+    node: RadixNode;
+    /** method → param name for that method. Different HTTP methods may use different param names. */
+    methodNames: Map<string, string>;
+  };
 };
 
 function newNode(): RadixNode {
@@ -40,19 +49,24 @@ function newNode(): RadixNode {
 
 function insertRoute(root: RadixNode, method: string, path: string, capability: string): void {
   const segments = path.split('/').filter((s) => s.length > 0);
+  const upperMethod = method.toUpperCase();
   let node = root;
 
   for (const seg of segments) {
     if (seg.startsWith(':')) {
       const paramName = seg.slice(1);
       if (!node.paramChild) {
-        node.paramChild = { name: paramName, node: newNode() };
-      } else if (node.paramChild.name !== paramName) {
-        // Two routes differ only by param name at the same level
-        throw new Error(
-          `[capix] Router conflict: param name mismatch at same level ` +
-            `(':${node.paramChild.name}' vs ':${paramName}') for capability '${capability}'`,
-        );
+        node.paramChild = { node: newNode(), methodNames: new Map([[upperMethod, paramName]]) };
+      } else {
+        // Allow different param names per method — only error on same method with conflicting names
+        const existing = node.paramChild.methodNames.get(upperMethod);
+        if (existing !== undefined && existing !== paramName) {
+          throw new Error(
+            `[capix] Router conflict: param name mismatch for ${upperMethod} at same level ` +
+              `(':${existing}' vs ':${paramName}') for capability '${capability}'`,
+          );
+        }
+        node.paramChild.methodNames.set(upperMethod, paramName);
       }
       node = node.paramChild.node;
     } else {
@@ -63,12 +77,12 @@ function insertRoute(root: RadixNode, method: string, path: string, capability: 
     }
   }
 
-  if (node.handlers.has(method)) {
+  if (node.handlers.has(upperMethod)) {
     throw new Error(
-      `[capix] Duplicate route: ${method} ${path} (capability: ${capability})`,
+      `[capix] Duplicate route: ${upperMethod} ${path} (capability: ${capability})`,
     );
   }
-  node.handlers.set(method, capability);
+  node.handlers.set(upperMethod, capability);
 }
 
 function matchRoute(
@@ -101,10 +115,14 @@ function matchRoute(
     if (!result.found && result.allowedMethods !== undefined) return result;
   }
 
-  // Param match
+  // Param match — look up the param name for the current method
   if (root.paramChild !== undefined) {
     const decoded = decodeURIComponent(seg);
-    const newParams = { ...params, [root.paramChild.name]: decoded };
+    const paramName =
+      root.paramChild.methodNames.get(method) ??
+      root.paramChild.methodNames.values().next().value ??
+      'id';
+    const newParams = { ...params, [paramName]: decoded };
     return matchRoute(root.paramChild.node, method, segments, index + 1, newParams);
   }
 
@@ -139,6 +157,26 @@ export function compileRouter(routes: RouteDefinition[]): Router {
 }
 
 // ---------------------------------------------------------------------------
+// URL case conversion
+// ---------------------------------------------------------------------------
+
+function toKebabCase(s: string): string {
+  return s.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
+}
+
+function toSnakeCase(s: string): string {
+  return s.replace(/([a-z])([A-Z])/g, '$1_$2').toLowerCase();
+}
+
+function applyUrlCase(s: string, urlCase: 'kebab' | 'camel' | 'snake'): string {
+  switch (urlCase) {
+    case 'kebab': return toKebabCase(s);
+    case 'snake': return toSnakeCase(s);
+    case 'camel': return s;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // generateRoutes
 // ---------------------------------------------------------------------------
 
@@ -146,7 +184,11 @@ export function compileRouter(routes: RouteDefinition[]): Router {
  * Generates route definitions from a compiled capability registry.
  * Applies HTTP override if cap.http is set; otherwise infers from intent and key name.
  */
-export function generateRoutes(registry: CapabilityRegistry): RouteDefinition[] {
+export function generateRoutes(
+  registry: CapabilityRegistry,
+  options: GenerateRoutesOptions = {},
+): RouteDefinition[] {
+  const urlCase = options.urlCase ?? 'kebab';
   const routes: RouteDefinition[] = [];
 
   for (const [dotPath, cap] of registry) {
@@ -156,18 +198,22 @@ export function generateRoutes(registry: CapabilityRegistry): RouteDefinition[] 
       continue;
     }
 
-    routes.push(...inferRoutes(dotPath, cap));
+    routes.push(...inferRoutes(dotPath, cap, urlCase));
   }
 
   return routes;
 }
 
-function inferRoutes(dotPath: string, cap: AnyCapability): RouteDefinition[] {
+function inferRoutes(
+  dotPath: string,
+  cap: AnyCapability,
+  urlCase: 'kebab' | 'camel' | 'snake',
+): RouteDefinition[] {
   const segments = dotPath.split('.');
   const key = segments[segments.length - 1] ?? dotPath;
 
-  // Group path = all segments except the last one (the capability key)
-  const groupSegments = segments.slice(0, -1);
+  // Group path = all segments except the last one, with case conversion applied
+  const groupSegments = segments.slice(0, -1).map((s) => applyUrlCase(s, urlCase));
   const groupPath = '/' + groupSegments.join('/');
 
   // Use cap.intent when the user set it explicitly; otherwise infer from key name
@@ -178,6 +224,9 @@ function inferRoutes(dotPath: string, cap: AnyCapability): RouteDefinition[] {
       cap.inputSchema.shape !== null &&
       'id' in (cap.inputSchema.shape as object)
     : false;
+
+  // Key after case conversion (used when key appears in the URL)
+  const urlKey = applyUrlCase(key, urlCase);
 
   switch (intent) {
     case 'query':
@@ -191,18 +240,19 @@ function inferRoutes(dotPath: string, cap: AnyCapability): RouteDefinition[] {
       }
       // Named query (me, status, health, etc.) → GET /group/key
       {
-        const namedPath = groupSegments.length > 0 ? '/' + [...groupSegments, key].join('/') : '/' + key;
+        const namedPath = groupSegments.length > 0 ? '/' + [...groupSegments, urlKey].join('/') : '/' + urlKey;
         return [{ method: 'GET', path: namedPath, capability: dotPath }];
       }
 
     case 'mutation': {
       // create* → POST /group (drop capability key from path)
-      const isCreate = /^(create|add|register|new)/i.test(key);
+      // 'register' intentionally excluded — it's a named action (POST /auth/register), not a resource creation
+      const isCreate = /^(create|add|new)/i.test(key);
       if (isCreate) {
         return [{ method: 'POST', path: groupPath || '/', capability: dotPath }];
       }
       // Named action → POST /group/key
-      const actionPath = groupSegments.length > 0 ? '/' + [...groupSegments, key].join('/') : '/' + key;
+      const actionPath = groupSegments.length > 0 ? '/' + [...groupSegments, urlKey].join('/') : '/' + urlKey;
       return [{ method: 'POST', path: actionPath, capability: dotPath }];
     }
 

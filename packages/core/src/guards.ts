@@ -86,3 +86,46 @@ export async function runGuards(
     await guard(ctx);
   }
 }
+
+// ---------------------------------------------------------------------------
+// InputGuard — guard that receives both the validated input and context.
+// Runs after input validation, before the resolver.
+// ---------------------------------------------------------------------------
+
+/** A guard that receives both validated input and context. May be async. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type InputGuard<TInput = any, TContext extends BaseContext = BaseContext> = (
+  input: TInput,
+  ctx: TContext,
+) => void | Promise<void>;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type AnyInputGuard = InputGuard<any, any>;
+
+/**
+ * Pass-through for type inference.
+ *
+ * @example
+ * const mustOwnOrder = defineInputGuard(async ({ id }: { id: string }, ctx: AuthContext) => {
+ *   const order = ctx.db.orders.get(id);
+ *   if (!order || order.customerId !== ctx.user.id) throw errors.Forbidden();
+ * });
+ *
+ * export const cancelOrder = authCap(Input, resolver).inputGuard(mustOwnOrder);
+ */
+export function defineInputGuard<TInput, TContext extends BaseContext>(
+  fn: InputGuard<TInput, TContext>,
+): InputGuard<TInput, TContext> {
+  return fn;
+}
+
+/** Runs input guards in order. */
+export async function runInputGuards(
+  guards: ReadonlyArray<AnyInputGuard>,
+  input: unknown,
+  ctx: BaseContext,
+): Promise<void> {
+  for (const guard of guards) {
+    await guard(input, ctx);
+  }
+}

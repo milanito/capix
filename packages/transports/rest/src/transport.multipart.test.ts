@@ -80,7 +80,7 @@ describe('multipart transport integration', () => {
     form.append('file', Buffer.from('hello world'), { filename: 'hello.txt', contentType: 'text/plain' });
     form.append('description', 'A test file');
 
-    const res = await fetch(`http://localhost:${port}/files/receiveFile`, {
+    const res = await fetch(`http://localhost:${port}/files/receive-file`, {
       method: 'POST',
       body: form.getBuffer(),
       headers: form.getHeaders(),
@@ -99,7 +99,7 @@ describe('multipart transport integration', () => {
     form.append('file', Buffer.from('data'), { filename: 'data.bin', contentType: 'application/octet-stream' });
     form.append('description', 'merged');
 
-    const res = await fetch(`http://localhost:${port}/files/receiveFile`, {
+    const res = await fetch(`http://localhost:${port}/files/receive-file`, {
       method: 'POST',
       body: form.getBuffer(),
       headers: form.getHeaders(),
@@ -114,7 +114,7 @@ describe('multipart transport integration', () => {
     const form = new FormData();
     form.append('file', Buffer.alloc(600), { filename: 'big.bin', contentType: 'application/octet-stream' });
 
-    const res = await fetch(`http://localhost:${port}/files/receiveFile`, {
+    const res = await fetch(`http://localhost:${port}/files/receive-file`, {
       method: 'POST',
       body: form.getBuffer(),
       headers: form.getHeaders(),
@@ -169,7 +169,7 @@ describe('multipart transport integration', () => {
     const form = new FormData();
     form.append('name', 'test');
 
-    const res = await fetch(`http://localhost:${portNoMultipart}/api/jsonOnly`, {
+    const res = await fetch(`http://localhost:${portNoMultipart}/api/json-only`, {
       method: 'POST',
       body: form.getBuffer(),
       headers: form.getHeaders(),

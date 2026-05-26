@@ -284,3 +284,39 @@ void capWithAppGuard;
 // (default TContext when no resolver annotation and no withContext)
 // @ts-expect-error — mustBeAuthenticated requires AppContext but TContext = BaseContext here
 capability(Input, (_input, _ctx) => 'ok').guard(mustBeAuthenticated);
+
+// ---------------------------------------------------------------------------
+// Test 11: ScopedCapabilityFactory supports (resolver, intent) and (resolver, intent, opts)
+// ---------------------------------------------------------------------------
+
+type MinContext = { readonly requestId: string };
+const minCap = capability.withContext<MinContext>();
+
+// no-schema, no intent
+const _t11a = minCap(() => 42);
+void _t11a;
+
+// no-schema + intent
+const _t11b = minCap(() => 42, 'query');
+void _t11b;
+
+// no-schema + intent + opts
+const _t11c = minCap(() => 42, 'query', { http: { method: 'GET', path: '/test' } });
+void _t11c;
+
+// schema + resolver
+const _t11d = minCap(z.object({ id: z.string() }), ({ id }) => id);
+void _t11d;
+
+// schema + resolver + intent
+const _t11e = minCap(z.object({ id: z.string() }), ({ id }) => id, 'query');
+void _t11e;
+
+// schema + resolver + intent + opts
+const _t11f = minCap(
+  z.object({ id: z.string() }),
+  ({ id }) => id,
+  'query',
+  { http: { method: 'GET', path: '/test/:id' } },
+);
+void _t11f;

@@ -118,8 +118,8 @@ function makeForm(file: { name: string; content: string | Buffer; type: string }
 describe('multipart file upload — integration', () => {
   it('authenticated user can upload a text file', async () => {
     const form = makeForm({ name: 'hello.txt', content: 'hello world', type: 'text/plain' });
-    // uploadFile → mutation (non-create) → POST /uploads/uploadFile
-    const res = await fetch(`${baseUrl}/uploads/uploadFile`, {
+    // uploadFile → mutation (non-create) → POST /uploads/upload-file
+    const res = await fetch(`${baseUrl}/uploads/upload-file`, {
       method: 'POST',
       headers: { Authorization: 'Bearer user-token' },
       body: form,
@@ -134,7 +134,7 @@ describe('multipart file upload — integration', () => {
 
   it('unauthenticated request returns 401', async () => {
     const form = makeForm({ name: 'hello.txt', content: 'hello', type: 'text/plain' });
-    const res = await fetch(`${baseUrl}/uploads/uploadFile`, {
+    const res = await fetch(`${baseUrl}/uploads/upload-file`, {
       method: 'POST',
       body: form,
     });
@@ -143,7 +143,7 @@ describe('multipart file upload — integration', () => {
 
   it('disallowed file type returns 400 via Zod schema', async () => {
     const form = makeForm({ name: 'script.ts', content: 'const x = 1;', type: 'text/typescript' });
-    const res = await fetch(`${baseUrl}/uploads/uploadFile`, {
+    const res = await fetch(`${baseUrl}/uploads/upload-file`, {
       method: 'POST',
       headers: { Authorization: 'Bearer user-token' },
       body: form,
@@ -159,7 +159,7 @@ describe('multipart file upload — integration', () => {
       { name: 'photo.txt', content: 'fake image', type: 'text/plain' },
       { description: 'my favorite photo' },
     );
-    const res = await fetch(`${baseUrl}/uploads/uploadFile`, {
+    const res = await fetch(`${baseUrl}/uploads/upload-file`, {
       method: 'POST',
       headers: { Authorization: 'Bearer user-token' },
       body: form,
@@ -172,7 +172,7 @@ describe('multipart file upload — integration', () => {
   it('oversized file returns 413 before capability runs', async () => {
     const bigContent = 'x'.repeat(600 * 1024); // 600KB > 512KB limit
     const form = makeForm({ name: 'big.txt', content: bigContent, type: 'text/plain' });
-    const res = await fetch(`${baseUrl}/uploads/uploadFile`, {
+    const res = await fetch(`${baseUrl}/uploads/upload-file`, {
       method: 'POST',
       headers: { Authorization: 'Bearer user-token' },
       body: form,
@@ -185,7 +185,7 @@ describe('multipart file upload — integration', () => {
   it('capability receives correct file buffer content', async () => {
     const content = 'the quick brown fox';
     const form = makeForm({ name: 'fox.txt', content, type: 'text/plain' });
-    const res = await fetch(`${baseUrl}/uploads/uploadFile`, {
+    const res = await fetch(`${baseUrl}/uploads/upload-file`, {
       method: 'POST',
       headers: { Authorization: 'Bearer user-token' },
       body: form,
@@ -197,8 +197,8 @@ describe('multipart file upload — integration', () => {
 
   it('uploadAny accepts files of any type', async () => {
     const form = makeForm({ name: 'data.bin', content: Buffer.from([0x01, 0x02, 0x03]), type: 'application/octet-stream' });
-    // uploadAny → mutation (non-create) → POST /open/uploadAny
-    const res = await fetch(`${baseUrl}/open/uploadAny`, {
+    // uploadAny → mutation (non-create) → POST /open/upload-any
+    const res = await fetch(`${baseUrl}/open/upload-any`, {
       method: 'POST',
       body: form,
     });
@@ -211,7 +211,7 @@ describe('multipart file upload — integration', () => {
   it('missing file field returns 400 — Zod rejects missing required field', async () => {
     const form = new FormData();
     form.append('description', 'no file here');
-    const res = await fetch(`${baseUrl}/uploads/uploadFile`, {
+    const res = await fetch(`${baseUrl}/uploads/upload-file`, {
       method: 'POST',
       headers: { Authorization: 'Bearer user-token' },
       body: form,

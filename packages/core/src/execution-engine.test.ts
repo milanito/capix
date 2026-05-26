@@ -4,6 +4,7 @@ import { capability } from './capability.js';
 import { compileRegistry } from './capability.js';
 import { createExecutionEngine } from './execution-engine.js';
 import { defineError, defaultErrors } from './errors.js';
+import { defineInputGuard } from './guards.js';
 
 const buildContext = async () => ({ requestId: 'test-id', user: null as null | { id: string } });
 const signal = AbortSignal.timeout(5000);
@@ -193,6 +194,114 @@ describe('execution engine', () => {
     const res = await invoke({ capability: 'cap', input: {}, headers: {}, signal });
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.error.status).toBe(500);
+  });
+
+  // ---------------------------------------------------------------------------
+  // inputGuard
+  // ---------------------------------------------------------------------------
+
+  it('inputGuard — runs after input validation, before resolver', async () => {
+    const order: string[] = [];
+    const cap = capability(
+      z.object({ id: z.string() }),
+      ({ id }) => { order.push('resolver'); return id; },
+    ).inputGuard(defineInputGuard(({ id }: { id: string }) => { order.push('inputGuard:' + id); }));
+    const invoke = makeEngine({ cap });
+    await invoke({ capability: 'cap', input: { id: 'x' }, headers: {}, signal });
+    expect(order).toEqual(['inputGuard:x', 'resolver']);
+  });
+
+  it('inputGuard — receives validated input', async () => {
+    const received = vi.fn();
+    const cap = capability(
+      z.object({ n: z.string().transform(Number) }),
+      ({ n }) => n,
+    ).inputGuard(defineInputGuard(({ n }: { n: number }) => { received(n); }));
+    const invoke = makeEngine({ cap });
+    await invoke({ capability: 'cap', input: { n: '42' }, headers: {}, signal });
+    expect(received).toHaveBeenCalledWith(42); // transformed value
+  });
+
+  it('inputGuard — FrameworkError maps to correct status', async () => {
+    const NotOwner = defineError(403, 'Not the owner', 'NotOwner');
+    const cap = capability(z.object({ id: z.string() }), ({ id }) => id)
+      .inputGuard(defineInputGuard(() => { throw NotOwner(); }));
+    const invoke = makeEngine({ cap });
+    const res = await invoke({ capability: 'cap', input: { id: '1' }, headers: {}, signal });
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      expect(res.error.status).toBe(403);
+      expect(res.error.error).toBe('NotOwner');
+    }
+  });
+
+  it('inputGuard — unknown error maps to 500', async () => {
+    const cap = capability(z.object({ id: z.string() }), ({ id }) => id)
+      .inputGuard(defineInputGuard(() => { throw new Error('db error'); }));
+    const invoke = makeEngine({ cap }, false);
+    const res = await invoke({ capability: 'cap', input: { id: '1' }, headers: {}, signal });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error.status).toBe(500);
+  });
+
+  it('inputGuard — multiple guards run in order', async () => {
+    const order: number[] = [];
+    const cap = capability(z.object({ id: z.string() }), ({ id }) => id)
+      .inputGuard(defineInputGuard(() => { order.push(1); }))
+      .inputGuard(defineInputGuard(() => { order.push(2); }))
+      .inputGuard(defineInputGuard(() => { order.push(3); }));
+    const invoke = makeEngine({ cap });
+    await invoke({ capability: 'cap', input: { id: 'x' }, headers: {}, signal });
+    expect(order).toEqual([1, 2, 3]);
+  });
+
+  it('inputGuard — first failing guard stops execution', async () => {
+    const resolverCalled = vi.fn();
+    const cap = capability(z.object({ id: z.string() }), () => { resolverCalled(); return 'ok'; })
+      .inputGuard(defineInputGuard(() => { throw defaultErrors.Forbidden(); }))
+      .inputGuard(defineInputGuard(() => { throw new Error('should not run'); }));
+    const invoke = makeEngine({ cap });
+    const res = await invoke({ capability: 'cap', input: { id: '1' }, headers: {}, signal });
+    expect(res.ok).toBe(false);
+    if (!res.ok) expect(res.error.status).toBe(403);
+    expect(resolverCalled).not.toHaveBeenCalled();
+  });
+
+  it('inputGuard — immutable: .inputGuard() returns new capability', () => {
+    const original = capability(z.object({ id: z.string() }), ({ id }) => id);
+    const withGuard = original.inputGuard(defineInputGuard(() => {}));
+    expect((original as unknown as { inputGuards: unknown[] }).inputGuards).toHaveLength(0);
+    expect((withGuard as unknown as { inputGuards: unknown[] }).inputGuards).toHaveLength(1);
+  });
+
+  // ---------------------------------------------------------------------------
+  // rawBody threading
+  // ---------------------------------------------------------------------------
+
+  it('rawBody from CapabilityRequest is available in buildContext via RawRequest', async () => {
+    const bodyBuf = Buffer.from('{"key":"value"}');
+    let capturedRawBody: Buffer | undefined;
+    const registry = compileRegistry({ cap: capability(() => 'ok') });
+    const invoke = createExecutionEngine({
+      registry,
+      buildContext: async (req) => { capturedRawBody = req.rawBody; return { requestId: 'x' }; },
+      isDevelopment: false,
+    });
+    await invoke({ capability: 'cap', input: {}, headers: {}, signal, rawBody: bodyBuf });
+    expect(capturedRawBody).toBe(bodyBuf);
+    expect(capturedRawBody?.toString()).toBe('{"key":"value"}');
+  });
+
+  it('rawBody is undefined when not provided', async () => {
+    let capturedRawBody: Buffer | undefined = Buffer.from('initial');
+    const registry = compileRegistry({ cap: capability(() => 'ok') });
+    const invoke = createExecutionEngine({
+      registry,
+      buildContext: async (req) => { capturedRawBody = req.rawBody; return { requestId: 'x' }; },
+      isDevelopment: false,
+    });
+    await invoke({ capability: 'cap', input: {}, headers: {}, signal });
+    expect(capturedRawBody).toBeUndefined();
   });
 
   it('concurrent invocations do not share state', async () => {

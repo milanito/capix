@@ -3,12 +3,19 @@
  * No dependencies.
  */
 
-/** Raw request data passed to buildContext. Body is excluded — parsed separately. */
+/** Raw request data passed to buildContext. */
 export type RawRequest = {
   readonly headers: Record<string, string | string[] | undefined>;
   readonly method: string;
   readonly url: string;
   readonly signal: AbortSignal;
+  /**
+   * Raw request body bytes, populated by the transport when a body is present.
+   * Useful for HMAC webhook signature verification where re-serializing parsed
+   * JSON is not safe (key order and whitespace may differ).
+   * Undefined for GET/HEAD requests and empty-body requests.
+   */
+  readonly rawBody?: Buffer;
 };
 
 /** Minimum fields guaranteed on every context object. */

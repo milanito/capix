@@ -5,9 +5,9 @@
 
 import type { ZodSchema, ZodTypeAny } from 'zod';
 import type { BaseContext } from './context.js';
-import type { AnyGuard, Guard, NarrowContext } from './guards.js';
+import type { AnyGuard, AnyInputGuard, Guard, InputGuard, NarrowContext } from './guards.js';
 
-const CAPABILITY_BRAND = Symbol('capix.Capability');
+const CAPABILITY_BRAND = Symbol.for('capix.Capability');
 
 // ---------------------------------------------------------------------------
 // Intent
@@ -16,7 +16,7 @@ const CAPABILITY_BRAND = Symbol('capix.Capability');
 export type Intent = 'query' | 'mutation' | 'update' | 'replace' | 'delete';
 
 const QUERY_PREFIXES = ['get', 'find', 'fetch', 'read', 'list', 'search', 'filter'] as const;
-const MUTATION_PREFIXES = ['create', 'add', 'register', 'new'] as const;
+const MUTATION_PREFIXES = ['create', 'add', 'new'] as const;
 const UPDATE_PREFIXES = ['update', 'edit', 'patch', 'modify'] as const;
 const REPLACE_PREFIXES = ['replace', 'set', 'put'] as const;
 const DELETE_PREFIXES = ['delete', 'remove', 'destroy', 'cancel'] as const;
@@ -87,6 +87,7 @@ export type Capability<
   readonly inputSchema: ZodTypeAny | null;
   readonly outputSchema: ZodTypeAny | null;
   readonly guards: ReadonlyArray<AnyGuard>;
+  readonly inputGuards: ReadonlyArray<AnyInputGuard>;
   readonly intent: Intent;
   /** True when intent was explicitly passed to capability(); false when defaulted. */
   readonly _intentExplicit: boolean;
@@ -106,6 +107,13 @@ export type Capability<
   guard<G extends (ctx: TContext) => any>(
     g: G,
   ): Capability<TInput, TOutput, NarrowContext<TContext, G>>;
+
+  /**
+   * Adds an input guard that receives both validated input and context.
+   * Runs after input validation, before the resolver.
+   * Use for resource ownership checks and other input-dependent access control.
+   */
+  inputGuard(g: InputGuard<TInput, TContext>): Capability<TInput, TOutput, TContext>;
 
   enhance(e: Enhancer): Capability<TInput, TOutput, TContext>;
 
@@ -129,6 +137,7 @@ type CapabilityBase = {
   inputSchema: ZodTypeAny | null;
   outputSchema: ZodTypeAny | null;
   guards: ReadonlyArray<AnyGuard>;
+  inputGuards: ReadonlyArray<AnyInputGuard>;
   intent: Intent;
   _intentExplicit: boolean;
   http?: HttpOverride;
@@ -148,6 +157,17 @@ function makeCapability<TInput, TOutput, TContext extends BaseContext>(
         return makeCapability<TInput, TOutput, NarrowContext<TContext, G>>({
           ...base,
           guards: [...base.guards, g as AnyGuard],
+        });
+      },
+      writable: false,
+      enumerable: false,
+      configurable: false,
+    },
+    inputGuard: {
+      value(g: InputGuard<TInput, TContext>): Capability<TInput, TOutput, TContext> {
+        return makeCapability<TInput, TOutput, TContext>({
+          ...base,
+          inputGuards: [...base.inputGuards, g as AnyInputGuard],
         });
       },
       writable: false,
@@ -267,6 +287,7 @@ export function capability(...args: any[]): AnyCapability {
       inputSchema: null,
       outputSchema: null,
       guards: [],
+      inputGuards: [],
       _intentExplicit: explicitIntent !== undefined,
       intent: explicitIntent ?? 'mutation',
       ...(noSchemaOpts?.http ? { http: noSchemaOpts.http } : {}),
@@ -289,6 +310,7 @@ export function capability(...args: any[]): AnyCapability {
     inputSchema: first as ZodTypeAny,
     outputSchema: null,
     guards: [],
+    inputGuards: [],
     _intentExplicit: thirdIntent !== undefined,
     intent: thirdIntent ?? 'mutation',
     ...(schemaOpts?.http ? { http: schemaOpts.http } : {}),
@@ -365,6 +387,7 @@ export function compileRegistry(tree: GroupTree, prefix = ''): CapabilityRegistr
         inputSchema: value.inputSchema,
         outputSchema: value.outputSchema,
         guards: value.guards,
+        inputGuards: value.inputGuards,
         intent: value.intent,
         _intentExplicit: value._intentExplicit,
         ...(value.http ? { http: value.http } : {}),
@@ -393,6 +416,15 @@ export function compileRegistry(tree: GroupTree, prefix = ''): CapabilityRegistr
 export type ScopedCapabilityFactory<TContext extends BaseContext> = {
   <TOutput>(
     resolver: (input: undefined, ctx: TContext) => TOutput | Promise<TOutput>,
+  ): Capability<undefined, TOutput, TContext>;
+  <TOutput>(
+    resolver: (input: undefined, ctx: TContext) => TOutput | Promise<TOutput>,
+    intent: Intent,
+  ): Capability<undefined, TOutput, TContext>;
+  <TOutput>(
+    resolver: (input: undefined, ctx: TContext) => TOutput | Promise<TOutput>,
+    intent: Intent,
+    opts: { http: HttpOverride },
   ): Capability<undefined, TOutput, TContext>;
   <TSchema extends ZodTypeAny, TOutput>(
     schema: TSchema,

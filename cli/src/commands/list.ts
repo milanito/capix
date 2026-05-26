@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import * as print from '../utils/print.js';
 import { loadRegistry } from '../utils/loader.js';
+import { generateRoutes } from 'capix-transport-rest';
 
 export function registerList(program: Command): void {
   program
@@ -16,16 +17,38 @@ export function registerList(program: Command): void {
         return;
       }
 
+      const routes = generateRoutes(registry);
+      const routeMap = new Map(routes.map((r) => [r.capability, r]));
+
       print.header(`Capabilities (${registry.size})`);
       print.blank();
 
-      const rows: Array<[string, string, string]> = [];
-      for (const [name, cap] of registry) {
-        const intent = cap.intent.padEnd(8);
-        const guards = cap.guards.length > 0 ? `${cap.guards.length} guard${cap.guards.length > 1 ? 's' : ''}` : '';
-        rows.push([name, intent, print.dim(guards)]);
+      // Calculate column widths
+      const rows = [...registry].map(([name, cap]) => {
+        const route = routeMap.get(name);
+        return {
+          name,
+          method: route?.method ?? '?',
+          path:   route?.path   ?? '(no route)',
+          guards: cap.guards.length > 0
+            ? `${cap.guards.length} guard${cap.guards.length > 1 ? 's' : ''}`
+            : 'public',
+        };
+      });
+
+      const nameW   = Math.max(...rows.map((r) => r.name.length));
+      const methodW = Math.max(...rows.map((r) => r.method.length));
+      const pathW   = Math.max(...rows.map((r) => r.path.length));
+
+      for (const row of rows) {
+        const line =
+          '  ' +
+          row.name.padEnd(nameW + 2) +
+          print.dim(row.method.padEnd(methodW + 2)) +
+          row.path.padEnd(pathW + 2) +
+          print.dim(row.guards);
+        console.log(line);
       }
-      print.table(rows);
       print.blank();
     });
 }

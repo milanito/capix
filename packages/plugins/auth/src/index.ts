@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
-import { defineGuard, defaultErrors } from 'capix';
-import type { BaseContext, RawRequest } from 'capix';
+import { defineGuard, defaultErrors, defineContext } from 'capix';
+import type { BaseContext, RawRequest, ContextBuilder } from 'capix';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -157,4 +157,55 @@ export function authPlugin<TUser>(options: JWTAuthOptions<TUser>): {
   );
 
   return { plugin, mustBeAuthenticated, helpers };
+}
+
+// ---------------------------------------------------------------------------
+// jwtContextBuilder — standalone ContextBuilder with optional extra context
+// ---------------------------------------------------------------------------
+
+export type JWTContextBuilderOptions<TUser, TExtra extends Record<string, unknown> = Record<never, never>> = {
+  /** JWT signing secret. */
+  readonly secret: string;
+  /** Token expiry for jwt.sign. Defaults to '7d'. */
+  readonly expiresIn?: string | number;
+  /** Extract user from verified token payload. Return null for unauthenticated. */
+  readonly userFromToken: (payload: jwt.JwtPayload) => TUser | null | Promise<TUser | null>;
+  /** Build additional context fields from the raw request. Called once per request. */
+  readonly extraContext?: (req: RawRequest) => TExtra | Promise<TExtra>;
+};
+
+/**
+ * Builds a full `ContextBuilder` that handles JWT verification and any additional
+ * context fields in a single function. Use this when you want full type safety
+ * for a context that includes both `user` and custom fields (`db`, `jobs`, etc.)
+ * without needing to wire up the plugin system separately.
+ *
+ * @example
+ * import { jwtContextBuilder } from 'capix-plugin-auth';
+ *
+ * export const buildContext = jwtContextBuilder<Customer, { db: DB; jobs: JobQueue }>({
+ *   secret:          process.env.JWT_SECRET!,
+ *   userFromToken:   async (p) => db.customers.get(p['sub']!),
+ *   extraContext:    async () => ({ db, jobs: jobQueue }),
+ * });
+ * // buildContext returns: { requestId, user: Customer | null, db: DB, jobs: JobQueue }
+ */
+export function jwtContextBuilder<
+  TUser,
+  TExtra extends Record<string, unknown> = Record<never, never>,
+>(
+  options: JWTContextBuilderOptions<TUser, TExtra>,
+): ContextBuilder<{ requestId: string; user: TUser | null } & TExtra> {
+  const helpers = createJWTHelpers(options);
+
+  return defineContext(async (req) => {
+    const token = extractBearerToken(req.headers);
+    const user = token ? await helpers.verify(token) : null;
+    const extra = options.extraContext ? await options.extraContext(req) : ({} as TExtra);
+    return {
+      requestId: crypto.randomUUID(),
+      user,
+      ...extra,
+    } as { requestId: string; user: TUser | null } & TExtra;
+  });
 }

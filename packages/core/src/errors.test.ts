@@ -28,6 +28,28 @@ describe('defineError', () => {
   });
 });
 
+describe('defineError with explicit code', () => {
+  it('uses explicit code when provided', () => {
+    const factory = defineError(403, 'You can only review products you have purchased', 'NotPurchased');
+    expect(factory().error).toBe('NotPurchased');
+  });
+
+  it('message is preserved unchanged when explicit code is given', () => {
+    const factory = defineError(403, 'You can only review products you have purchased', 'NotPurchased');
+    expect(factory().message).toBe('You can only review products you have purchased');
+  });
+
+  it('derives code from message when code not provided (backwards compat)', () => {
+    const factory = defineError(404, 'Not found');
+    expect(factory().error).toBe('NotFound');
+  });
+
+  it('error field matches explicit code in response', () => {
+    const errors = { NotPurchased: defineError(403, 'Not purchased', 'NotPurchased') };
+    expect(errors.NotPurchased().error).toBe('NotPurchased');
+  });
+});
+
 describe('isFrameworkError', () => {
   it('returns true for factory output', () => {
     const factory = defineError(404, 'Not found');
