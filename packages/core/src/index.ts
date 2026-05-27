@@ -39,6 +39,7 @@ export {
   withTimeout,
   withRetry,
   withRateLimit,
+  withRollback,
   withMetrics,
   withCircuitBreaker,
   consoleMetricsCollector,

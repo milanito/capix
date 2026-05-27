@@ -36,17 +36,20 @@ Routes are inferred from capability names — no decorators or annotations neede
 | `replaceUser` | PUT | `/users/:id` |
 | `deleteUser` | DELETE | `/users/:id` |
 | `removeUser` | DELETE | `/users/:id` |
-| `uploadAvatar` | POST | `/users/uploadAvatar` |
+| `bulkStatus` | POST | `/users/bulk-status` |
+| `register` | POST | `/auth/register` |
 
 Rules:
 - The first path segment comes from the capability group key (e.g., `users`)
 - `get*` with an `id`-shaped input field → `GET /:group/:id`
 - `get*` without `id` / `list*` / `find*` / `search*` → `GET /:group`
-- `create*` / `add*` / `new*` / `register*` → `POST /:group`
+- `create*` / `add*` / `new*` → `POST /:group`
 - `update*` / `edit*` / `modify*` → `PATCH /:group/:id`
 - `replace*` / `set*` → `PUT /:group/:id`
 - `delete*` / `remove*` / `destroy*` → `DELETE /:group/:id`
-- Everything else → `POST /:group/:key`
+- Everything else → `POST /:group/:key` (key converted to kebab-case)
+
+Capability keys are converted to kebab-case by default: `bulkStatus` → `bulk-status`, `listItems` → `list-items`. Override with `urlCase: 'camel' | 'snake'`.
 
 ## HTTP override
 
@@ -113,13 +116,27 @@ Send multipart/form-data. Non-file fields are merged alongside file fields in th
 
 ```ts
 restTransport({
-  port: 3000,           // required
-  host: '0.0.0.0',      // default: '0.0.0.0'
-  maxBodySize: 1_048_576, // bytes, default: 1 MiB
+  port: 3000,                  // required
+  host: '0.0.0.0',             // default: '0.0.0.0'
+  maxBodySize: 1_048_576,      // bytes, default: 1 MiB
+  urlCase: 'kebab',            // 'kebab' (default) | 'camel' | 'snake'
   cors: { ... },
   onRequest: (req, res) => void,
+  multipart: { maxFileSize, maxFiles, allowedMimeTypes },
 })
 ```
+
+## Exports
+
+| Export | Description |
+|---|---|
+| `restTransport(opts)` | Creates an HTTP/REST transport |
+| `generateRoutes(registry, opts?)` | Returns route definitions for a registry |
+| `compileRouter(routes)` | Compiles routes into a radix-tree router |
+| `uploadedFile()` | Zod schema for file upload fields |
+| `UploadedFile` | Type for uploaded file objects |
+| `RestTransportOptions` | Options type for `restTransport` |
+| `GenerateRoutesOptions` | Options type for `generateRoutes` |
 
 ## License
 

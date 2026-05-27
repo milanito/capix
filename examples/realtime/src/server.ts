@@ -1,25 +1,22 @@
 /**
- * realtime example — EventEmitter broadcast pattern for WebSocket push.
+ * realtime example — createEventBus for server-push over WebSocket.
  *
  * Architecture:
  * - REST transport handles mutations (POST, PATCH, DELETE)
- * - WS transport handles queries and receives push events
- * - A module-level EventEmitter (taskEvents) bridges the two
+ * - WS transport handles both capability invocations AND server-push events
+ * - eventBus (from capix-transport-ws) bridges REST mutations to WS clients
  *
  * Flow:
- *   REST client → POST /tasks → createTask capability → taskEvents.emit('task', ...)
- *   WS client   → receives broadcast from taskEvents listener
- *
- * The WS transport is request/response. Push delivery happens via the
- * raw ws.Server, which Capix exposes after mounting.
+ *   REST client  → POST /tasks → createTask resolver → eventBus.publish(...)
+ *   WS client    → { action: "subscribe", event: "task:created" }
+ *                ← { event: "task:created", data: { id, title, status } }
  */
 
 import { z } from 'zod';
-import { WebSocketServer } from 'ws';
 import { capability, defineContext, defineError, createServer } from 'capix';
 import { restTransport } from 'capix-transport-rest';
 import { wsTransport } from 'capix-transport-ws';
-import { taskEvents, type TaskEvent } from './events.js';
+import { eventBus } from './events.js';
 
 // ---------------------------------------------------------------------------
 // Domain
@@ -54,8 +51,7 @@ const createTask = capability(
   async ({ title }) => {
     const task: Task = { id: `${Date.now()}`, title, status: 'todo' };
     tasks.push(task);
-    // Broadcast to all WebSocket clients
-    taskEvents.emit('task', { type: 'task.created', taskId: task.id, data: task });
+    eventBus.publish('task:created', { id: task.id, title: task.title, status: task.status });
     return task;
   },
 );
@@ -71,8 +67,11 @@ const updateTask = capability(
     if (!task) throw errors.NotFound();
     if (title !== undefined) task.title = title;
     if (status !== undefined) task.status = status;
-    // Broadcast to all WebSocket clients
-    taskEvents.emit('task', { type: 'task.updated', taskId: id, data: task });
+    eventBus.publish('task:updated', {
+      id,
+      ...(title !== undefined ? { title } : {}),
+      ...(status !== undefined ? { status } : {}),
+    });
     return task;
   },
 );
@@ -83,14 +82,13 @@ const deleteTask = capability(
     const idx = tasks.findIndex((t) => t.id === id);
     if (idx === -1) throw errors.NotFound();
     tasks.splice(idx, 1);
-    // Broadcast to all WebSocket clients
-    taskEvents.emit('task', { type: 'task.deleted', taskId: id });
+    eventBus.publish('task:deleted', { id });
     return null;
   },
 );
 
 // ---------------------------------------------------------------------------
-// Server
+// Server — single WS transport handles both capability calls and push events
 // ---------------------------------------------------------------------------
 
 const server = createServer({
@@ -100,40 +98,18 @@ const server = createServer({
   },
   transports: [
     restTransport({ port: 3000 }),
-    wsTransport({ port: 3001 }),
+    wsTransport({ port: 3001, eventBus }),
   ],
 });
 
 await server.start();
 
-// ---------------------------------------------------------------------------
-// WebSocket broadcast
-//
-// After server.start(), the WS transport's underlying ws.Server is available.
-// Subscribe to taskEvents and forward each event to all connected clients.
-//
-// The WS transport uses port 3001. We create a second ws.Server that shares
-// the same port by attaching to the HTTP server directly (or use a separate
-// port as shown here for simplicity).
-// ---------------------------------------------------------------------------
-
-// Broadcast via a dedicated broadcast WebSocket server on port 3002.
-// WS clients that want push events connect to ws://localhost:3002.
-// Clients that want request/response capabilities connect to ws://localhost:3001.
-const broadcastServer = new WebSocketServer({ port: 3002 });
-
-taskEvents.on('task', (event: TaskEvent) => {
-  const msg = JSON.stringify(event);
-  for (const client of broadcastServer.clients) {
-    if (client.readyState === 1 /* OPEN */) {
-      client.send(msg);
-    }
-  }
-});
-
-console.log('REST transport:      http://localhost:3000');
-console.log('WS transport:        ws://localhost:3001');
-console.log('WS broadcast:        ws://localhost:3002');
+console.log('REST:  http://localhost:3000');
+console.log('WS:    ws://localhost:3001');
 console.log('');
-console.log('Connect a WS client to ws://localhost:3002 to receive live task events.');
-console.log('Mutate tasks via REST and watch events arrive on the WS client.');
+console.log('WS capability call:');
+console.log('  → { "id": "1", "capability": "tasks.listTasks", "input": {} }');
+console.log('');
+console.log('WS event subscription:');
+console.log('  → { "id": "2", "action": "subscribe", "event": "task:created" }');
+console.log('  ← { "event": "task:created", "data": { ... } }  (when REST creates a task)');

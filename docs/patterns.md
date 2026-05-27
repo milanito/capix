@@ -8,13 +8,15 @@ Common patterns for real-world Capix applications.
 
 Capix capabilities are pure functions — they have no built-in transaction support.
 For operations that require multiple steps to succeed atomically (like checkout),
-use the **read-check-act** pattern:
+combine the **read-check-act** pattern with the `withRollback` enhancer:
 
 1. **Read** all data needed for validation
 2. **Check** all business rules (stock, ownership, status)
-3. **Act** only after all checks pass
+3. **Act** — register a `ctx.onRollback()` compensation at each step
 
 ```ts
+import { withRollback } from 'capix';
+
 export const checkout = authCap(z.object({}), async (_, ctx) => {
   // 1. Read
   const cart     = ctx.db.carts.getByCustomer(ctx.user.id);
@@ -28,20 +30,29 @@ export const checkout = authCap(z.object({}), async (_, ctx) => {
     if (product.stock < item.quantity) throw errors.OutOfStock({ productId: product.id });
   }
 
-  // 3. Act — only after all checks pass
+  // 3. Act — register a rollback at each step so failures undo prior work
   const order = ctx.db.orders.create({ customerId: ctx.user.id, items: cart.items });
+  ctx.onRollback(() => ctx.db.orders.delete(order.id));
+
   for (const item of cart.items) {
     ctx.db.products.decrementStock(item.productId, item.quantity);
+    ctx.onRollback(() => ctx.db.products.incrementStock(item.productId, item.quantity));
   }
+
   ctx.db.carts.clear(ctx.user.id);
+  ctx.onRollback(() => ctx.db.carts.restore(ctx.user.id, cart));
+
   ctx.jobs.enqueue({ type: 'send_order_confirmation', orderId: order.id });
+  // No rollback for jobs — they're idempotent
 
   return order;
-}, 'mutation').guard(mustBeCustomer);
+}, 'mutation').guard(mustBeCustomer).enhance(withRollback);
 ```
 
-If a real database is involved, use its transaction API inside the resolver.
-Capix does not provide transaction primitives — your database does.
+`withRollback` runs compensations in reverse order if the resolver throws.
+This is **not** a database transaction — it does not provide atomicity,
+isolation, or durability. Use it for in-memory stores or operations where each
+step can be independently undone. For a real database, use its transaction API.
 
 ---
 

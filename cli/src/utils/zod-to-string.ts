@@ -82,6 +82,7 @@ export function zodSchemaToString(schema: unknown, depth = 0): string {
       return 'enum';
 
     case 'ZodObject': {
+      if (depth > 2) return '{ ... }';
       if (!def.shape) return 'object';
       const shape = def.shape();
       const fields = Object.entries(shape)

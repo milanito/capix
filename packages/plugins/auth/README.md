@@ -1,8 +1,6 @@
 # capix-plugin-auth
 
-JWT authentication plugin for [Capix](https://github.com/capix/capix).
-
-Reads the `Authorization: Bearer <token>` header on every request, verifies the JWT, and sets `ctx.user` in the context. Provides a `mustBeAuthenticated` guard for protecting capabilities.
+JWT authentication plugin for Capix. Reads the `Authorization: Bearer <token>` header, verifies the JWT, and provides typed `ctx.user` access in every capability.
 
 ## Install
 
@@ -10,9 +8,85 @@ Reads the `Authorization: Bearer <token>` header on every request, verifies the 
 npm install capix-plugin-auth jsonwebtoken
 ```
 
-## Usage
+## Recommended: `jwtContextBuilder`
 
-### 1. Create the plugin
+The simplest approach — one function that handles JWT verification AND your custom context fields with full type safety:
+
+```ts
+// src/context.ts
+import { defineContext, capability } from 'capix';
+import { jwtContextBuilder, createJWTHelpers } from 'capix-plugin-auth';
+import { db } from './db.js';
+import { jobs } from './jobs.js';
+
+export type AppUser = { id: string; email: string; role: 'customer' | 'admin' };
+
+export const jwtHelpers = createJWTHelpers<AppUser>({
+  secret: process.env.JWT_SECRET ?? 'dev-secret',
+  expiresIn: '7d',
+  userFromToken: async (payload) => db.users.get(payload['sub'] as string),
+});
+
+// buildContext resolves to: { requestId, user: AppUser | null, db, jobs }
+export const buildContext = jwtContextBuilder<AppUser, { db: typeof db; jobs: typeof jobs }>({
+  jwtHelpers,
+  extraContext: async (_req) => ({ db, jobs }),
+});
+
+// Two scoped factories — one for public capabilities, one for protected ones
+export type AppContext  = { requestId: string; user: AppUser | null; db: typeof db; jobs: typeof jobs };
+export type AuthContext = AppContext & { user: AppUser };
+
+export const cap     = capability.withContext<AppContext>();
+export const authCap = capability.withContext<AuthContext>();
+```
+
+```ts
+// src/server.ts
+import { createServer } from 'capix';
+import { restTransport } from 'capix-transport-rest';
+import { buildContext } from './context.js';
+import { capabilities } from './capabilities/index.js';
+
+createServer({
+  context: buildContext,
+  capabilities,
+  transports: [restTransport({ port: 3000 })],
+}).start();
+```
+
+```ts
+// src/capabilities/profile.ts
+import { z } from 'zod';
+import { authCap } from '../context.js';
+import { mustBeAuthenticated } from 'capix-plugin-auth';
+
+export const getProfile = authCap(
+  z.object({}),
+  async (_, ctx) => ({ id: ctx.user.id, email: ctx.user.email }), // ctx.user is AppUser
+  'query',
+).guard(mustBeAuthenticated);
+```
+
+```ts
+// src/capabilities/auth/login.ts — issue tokens
+import { z } from 'zod';
+import { cap } from '../context.js';
+import { jwtHelpers } from '../context.js';
+
+export const login = cap(
+  z.object({ email: z.string().email(), password: z.string() }),
+  async ({ email, password }, ctx) => {
+    const user = await ctx.db.verifyCredentials(email, password);
+    if (!user) throw errors.Unauthorized();
+    return { token: jwtHelpers.sign({ sub: user.id, email: user.email, role: user.role }) };
+  },
+);
+```
+
+## Alternative: `authPlugin` (plugin-based)
+
+Use when you want Capix to manage the JWT context extension via the plugin system:
 
 ```ts
 // src/auth.ts
@@ -20,120 +94,61 @@ import { authPlugin } from 'capix-plugin-auth';
 
 type AppUser = { id: string; email: string; role: string };
 
-export const {
-  plugin: jwtPlugin,
-  mustBeAuthenticated,
-  helpers: jwt,
-} = authPlugin<AppUser>({
+export const { plugin: jwtPlugin, mustBeAuthenticated, helpers: jwt } = authPlugin<AppUser>({
   secret: process.env.JWT_SECRET!,
-  expiresIn: '7d',           // optional, default '7d'
-  userFromToken: (payload) => ({
-    id: payload['sub']!,
-    email: payload['email'] as string,
-    role: payload['role'] as string,
-  }),
+  userFromToken: (payload) => ({ id: payload['sub'] as string, email: payload['email'] as string, role: payload['role'] as string }),
 });
 ```
-
-### 2. Register the plugin
 
 ```ts
 // src/server.ts
-import { createServer } from 'capix';
-import { jwtPlugin } from './auth.js';
-
-const server = createServer({
+createServer({
   context: buildContext,
   capabilities,
   plugins: [jwtPlugin],
-  transports: [...],
-});
+  transports: [restTransport({ port: 3000 })],
+}).start();
 ```
 
-### 3. Protect capabilities
-
-Use the two-factory pattern so `ctx.user` is typed correctly in resolvers:
-
-```ts
-// src/capabilities.ts
-import { capability } from 'capix';
-import type { AppUser } from './auth.js';
-
-export type AppContext   = { requestId: string; user: AppUser | null };
-export type AuthContext  = AppContext & { user: AppUser };
-
-export const cap     = capability.withContext<AppContext>();
-export const authCap = capability.withContext<AuthContext>();
-```
-
-```ts
-// src/capabilities/profile.ts
-import { z } from 'zod';
-import { authCap } from '../capabilities.js';
-import { mustBeAuthenticated } from '../auth.js';
-
-export const getProfile = authCap(
-  z.object({}),
-  async (_, ctx) => {
-    return { id: ctx.user.id, email: ctx.user.email }; // ctx.user is AppUser
-  },
-  'query',
-).guard(mustBeAuthenticated);
-```
-
-### 4. Issue tokens (login endpoint)
-
-```ts
-import { jwt } from './auth.js';
-
-export const login = cap(
-  z.object({ email: z.string().email(), password: z.string() }),
-  async ({ email, password }, ctx) => {
-    const user = await ctx.db.verifyPassword(email, password);
-    if (!user) throw errors.Unauthorized();
-    const token = jwt.sign({ sub: user.id, email: user.email, role: user.role });
-    return { token };
-  },
-);
-```
+Note: `authPlugin` composes with `buildContext` via the plugin system but loses the ability to add typed custom fields (like `db`, `jobs`) through the plugin — use `jwtContextBuilder` with `extraContext` for that.
 
 ## API
 
-### `authPlugin<TUser>(options)`
+### `jwtContextBuilder<TUser, TExtra>(options)`
 
-Creates the plugin, guard, and JWT helpers as a unit.
+Builds a complete `ContextBuilder` that handles JWT verification and optional extra context.
 
-| Option | Type | Default | Description |
+| Option | Type | Required | Description |
 |---|---|---|---|
-| `secret` | `string` | required | JWT signing secret |
-| `expiresIn` | `string \| number` | `'7d'` | Token lifetime |
-| `userFromToken` | `(payload) => TUser \| null` | required | Extract user from verified payload |
+| `jwtHelpers` | `JWTHelpers<TUser>` | yes | From `createJWTHelpers` |
+| `extraContext` | `(req) => TExtra \| Promise<TExtra>` | no | Adds custom fields (db, jobs, etc.) |
 
-Returns `{ plugin, mustBeAuthenticated, helpers }`.
+Returns a `ContextBuilder` typed as `{ requestId, user: TUser | null } & TExtra`.
 
 ### `createJWTHelpers<TUser>(options)`
 
-Standalone JWT helpers without the Capix plugin machinery. Useful when you need to sign or verify tokens outside of a capability (e.g., in a WebSocket handshake or background job).
+Standalone JWT sign/verify utilities.
+
+| Option | Type | Required | Description |
+|---|---|---|---|
+| `secret` | `string` | yes | JWT signing secret |
+| `expiresIn` | `string \| number` | no | Token lifetime (default `'7d'`) |
+| `userFromToken` | `(payload) => TUser \| null \| Promise<TUser \| null>` | yes | Extract user from verified payload |
 
 ```ts
-import { createJWTHelpers } from 'capix-plugin-auth';
-const jwt = createJWTHelpers({ secret, userFromToken });
-
+const jwt = createJWTHelpers<AppUser>({ secret, userFromToken });
 const token = jwt.sign({ sub: '123', role: 'admin' });
 const user  = await jwt.verify(token); // AppUser | null
 ```
 
+### `authPlugin<TUser>(options)`
+
+Creates `{ plugin, mustBeAuthenticated, helpers }` as a unit.
+
 ### `mustBeAuthenticated`
 
-A Capix guard that asserts `ctx.user` is non-null. Throws `401 Unauthorized` if the request has no valid token.
+Guard that asserts `ctx.user` is non-null. Throws `401 Unauthorized` when no valid token is present. Pair with `authCap` (the narrowed factory) so `ctx.user` is typed as non-null in the resolver.
 
-Always pair with `authCap` (the narrowed factory) — see the [two-factory pattern](../../docs/ts-workarounds.md).
+## License
 
-## Types
-
-```ts
-// Context shape added by the plugin
-type AuthContext<TUser>      = BaseContext & { user: TUser | null };
-// Context shape after the guard runs
-type AuthenticatedContext<TUser> = BaseContext & { user: TUser };
-```
+MIT

@@ -8,6 +8,7 @@ import {
   withTimeout,
   withRetry,
   withRateLimit,
+  withRollback,
   withMetrics,
   withCircuitBreaker,
   consoleMetricsCollector,
@@ -322,5 +323,89 @@ describe('withCircuitBreaker', () => {
     const capB = capability(() => 'healthy').enhance(breaker);
     await tryResolve(capA);
     await expect(capB.resolve(undefined, ctx)).resolves.toBe('healthy');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// withRollback
+// ---------------------------------------------------------------------------
+
+type RollbackCtx = { requestId: string; onRollback: (fn: () => void | Promise<void>) => void };
+
+// Capability receives the enhanced context (with onRollback) as a parameter
+function makeTxCap<T>(resolver: (txCtx: RollbackCtx) => T) {
+  return capability((_input: undefined, c: unknown) => resolver(c as RollbackCtx)).enhance(withRollback);
+}
+
+describe('withRollback', () => {
+  it('does not call rollbacks on success', async () => {
+    const rb = vi.fn();
+    const cap = makeTxCap((c) => { c.onRollback(rb); return 'ok'; });
+    await cap.resolve(undefined, ctx);
+    expect(rb).not.toHaveBeenCalled();
+  });
+
+  it('calls rollbacks in reverse order on failure', async () => {
+    const order: number[] = [];
+    const cap = makeTxCap((c) => {
+      c.onRollback(() => { order.push(1); });
+      c.onRollback(() => { order.push(2); });
+      c.onRollback(() => { order.push(3); });
+      throw new Error('boom');
+    });
+    await tryResolve(cap);
+    expect(order).toEqual([3, 2, 1]);
+  });
+
+  it('re-throws the original error after rollbacks', async () => {
+    const cap = capability(() => { throw new Error('original'); }).enhance(withRollback);
+    const err = await tryResolve(cap);
+    expect(err).toBeInstanceOf(Error);
+    expect((err as Error).message).toBe('original');
+  });
+
+  it('continues rollbacks even if one fails', async () => {
+    const order: number[] = [];
+    const cap = makeTxCap((c) => {
+      c.onRollback(() => { order.push(1); throw new Error('rb fail'); });
+      c.onRollback(() => { order.push(2); });
+      throw new Error('main fail');
+    });
+    await tryResolve(cap);
+    // Both rollbacks ran despite the first one failing (reversed: 2 then 1)
+    expect(order).toEqual([2, 1]);
+  });
+
+  it('rollback errors do not replace the original error', async () => {
+    const cap = makeTxCap((c) => {
+      c.onRollback(() => { throw new Error('rollback error'); });
+      throw new Error('original error');
+    });
+    const err = await tryResolve(cap);
+    expect((err as Error).message).toBe('original error');
+  });
+
+  it('ctx.onRollback is available in resolver when enhancer is applied', async () => {
+    let hasOnRollback = false;
+    const cap = makeTxCap((c) => { hasOnRollback = typeof c.onRollback === 'function'; return 'ok'; });
+    await cap.resolve(undefined, ctx);
+    expect(hasOnRollback).toBe(true);
+  });
+
+  it('async rollbacks are awaited in reverse order', async () => {
+    const order: number[] = [];
+    const cap = makeTxCap((c) => {
+      c.onRollback(async () => { await Promise.resolve(); order.push(1); });
+      c.onRollback(async () => { await Promise.resolve(); order.push(2); });
+      throw new Error('fail');
+    });
+    await tryResolve(cap);
+    expect(order).toEqual([2, 1]);
+  });
+
+  it('no rollbacks registered — failure still re-throws', async () => {
+    const cap = capability(() => { throw new Error('plain fail'); }).enhance(withRollback);
+    const err = await tryResolve(cap);
+    expect((err as Error).message).toBe('plain fail');
   });
 });

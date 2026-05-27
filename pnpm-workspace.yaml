@@ -5,3 +5,4 @@ packages:
   - "cli"
   - "examples/*"
   - "test/integration"
+  - "benchmarks"

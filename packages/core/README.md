@@ -68,7 +68,10 @@ Built-in enhancers:
 | `withRateLimit(opts)` | Sliding window rate limiter |
 | `withCircuitBreaker(opts)` | Opens after N failures, resets after `resetMs` |
 | `withTimeout(ms)` | Rejects if resolver takes longer than `ms` |
-| `withMetrics(collector)` | Calls `collector.record(event)` on each invocation |
+| `withRetry(n, delayMs)` | Retries on non-FrameworkError failures with backoff |
+| `withRollback` | Enables `ctx.onRollback(fn)` — compensates failed multi-step mutations |
+| `withMetrics(collector)` | Emits duration and success/error metrics |
+| `withLogging` | Logs capability name, duration, and outcome |
 
 ## Context
 
@@ -135,6 +138,25 @@ createServer({
   transports: [restTransport({ port: 3000 })],
 }).start();
 ```
+
+## Exports
+
+| Export | Description |
+|---|---|
+| `capability` | Create a capability |
+| `capability.withContext<T>()` | Scoped factory with pre-bound context type |
+| `defineContext` | Define a context builder |
+| `defineGuard` / `defineGuardFor<T>()` | Create guards |
+| `defineInputGuard` | Create input-aware guards (run after validation) |
+| `defineError` | Create typed error factories |
+| `defineEnhancer` | Create custom enhancers |
+| `definePlugin` | Create a Capix plugin |
+| `createServer` | Create and start a server |
+| `compileRegistry` | Compile a capability tree into a registry |
+| `defaultErrors` | Built-in errors: `BadRequest`, `Unauthorized`, `Forbidden`, `NotFound`, `Conflict`, `TooManyRequests`, `Internal`, `Timeout` |
+| `withCache` / `withRateLimit` / `withCircuitBreaker` / `withTimeout` / `withRetry` / `withRollback` / `withMetrics` / `withLogging` | Built-in enhancers |
+| `getHeader` | Type-safe header access from `RawRequest` |
+| `InferInput<Cap>` / `InferOutput<Cap>` / `InferContext<Cap>` | Utility types for capability inference |
 
 ## License
 

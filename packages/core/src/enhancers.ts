@@ -147,6 +147,60 @@ export function withRateLimit(options: RateLimitOptions): Enhancer {
 }
 
 // ---------------------------------------------------------------------------
+// withRollback
+// ---------------------------------------------------------------------------
+
+type RollbackFn = () => void | Promise<void>;
+
+/**
+ * Adds explicit rollback support to a capability.
+ *
+ * Use ctx.onRollback(fn) to register compensation actions that run in reverse
+ * order if the resolver throws after one or more steps have already executed.
+ *
+ * This is NOT a database transaction. It does not provide atomicity,
+ * isolation, or durability. For real transactions, use your database's
+ * transaction API directly inside the resolver.
+ *
+ * Use this for: in-memory stores, multi-step operations where each step can
+ * be independently compensated (undone).
+ *
+ * @example
+ * export const checkout = cap(z.object({}), async (_, ctx) => {
+ *   const order = ctx.db.orders.create({ ... });
+ *   ctx.onRollback(() => ctx.db.orders.delete(order.id));
+ *
+ *   ctx.db.inventory.decrement(item.id);
+ *   ctx.onRollback(() => ctx.db.inventory.increment(item.id));
+ *
+ *   return order;
+ * }).enhance(withRollback);
+ */
+export const withRollback = defineEnhancer((cap) => ({
+  ...cap,
+  resolve: async (input: unknown, ctx: unknown) => {
+    const rollbacks: RollbackFn[] = [];
+    const txCtx = {
+      ...(ctx as object),
+      onRollback: (fn: RollbackFn) => { rollbacks.push(fn); },
+    };
+
+    try {
+      return await (cap as AnyCapability).resolve(input, txCtx);
+    } catch (err) {
+      for (const rollback of rollbacks.reverse()) {
+        try {
+          await rollback();
+        } catch (rollbackErr) {
+          console.error('[capix] Rollback failed:', rollbackErr);
+        }
+      }
+      throw err;
+    }
+  },
+})) as Enhancer;
+
+// ---------------------------------------------------------------------------
 // withMetrics
 // ---------------------------------------------------------------------------
 

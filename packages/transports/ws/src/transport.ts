@@ -3,21 +3,26 @@
  * Depends on: capix core, ws
  */
 
+import { randomUUID } from 'node:crypto';
 import { WebSocketServer } from 'ws';
 import type { WebSocket, RawData } from 'ws';
 import type { IncomingMessage } from 'node:http';
 import type { Transport, MountOptions, InvokeFn } from 'capix';
+import type { EventBus, EventMap } from './event-bus.js';
 
 export type WsTransportOptions = {
   readonly port: number;
   readonly host?: string;
+  readonly eventBus?: EventBus<EventMap>;
 };
 
-type IncomingMessage_ = {
-  readonly id?: string;
-  readonly capability: string;
-  readonly input: unknown;
-};
+type IncomingMessage_ =
+  | { readonly id?: string; readonly capability: string; readonly input: unknown }
+  | { readonly id?: string; readonly action: 'subscribe' | 'unsubscribe'; readonly event: string };
+
+function isCapabilityMessage(msg: IncomingMessage_): msg is { id?: string; capability: string; input: unknown } {
+  return 'capability' in msg;
+}
 
 /** Creates a WebSocket transport using the 'ws' package. */
 export function wsTransport(options: WsTransportOptions): Transport {
@@ -28,6 +33,10 @@ export function wsTransport(options: WsTransportOptions): Transport {
   }
 
   function handleConnection(ws: WebSocket, req: IncomingMessage, invoke: InvokeFn): void {
+    const clientId = randomUUID();
+    // Track per-event unsubscribe fns so individual events can be removed
+    const unsubscribeFns = new Map<string, () => void>();
+
     // Extract headers from the HTTP upgrade request for buildContext
     const rawHeaders: Record<string, string> = {};
     for (let i = 0; i < req.rawHeaders.length; i += 2) {
@@ -48,7 +57,29 @@ export function wsTransport(options: WsTransportOptions): Transport {
         return;
       }
 
-      if (!msg.capability || typeof msg.capability !== 'string') {
+      // Handle subscribe/unsubscribe control messages
+      if ('action' in msg) {
+        if (!options.eventBus) {
+          send(ws, { id: msg.id, ok: false, error: 'BadRequest', message: 'No event bus configured' });
+          return;
+        }
+        if (msg.action === 'subscribe') {
+          // Idempotent: replace any existing subscription for this event
+          unsubscribeFns.get(msg.event)?.();
+          const unsub = options.eventBus.subscribe(clientId, msg.event, (eventData) => {
+            send(ws, { event: (msg as { event: string }).event, data: eventData });
+          });
+          unsubscribeFns.set(msg.event, unsub);
+          send(ws, { id: msg.id, ok: true, event: msg.event, subscribed: true });
+        } else if (msg.action === 'unsubscribe') {
+          unsubscribeFns.get(msg.event)?.();
+          unsubscribeFns.delete(msg.event);
+          send(ws, { id: msg.id, ok: true, event: msg.event, subscribed: false });
+        }
+        return;
+      }
+
+      if (!isCapabilityMessage(msg) || !msg.capability || typeof msg.capability !== 'string') {
         send(ws, { id: msg?.id, ok: false, error: 'BadRequest', message: 'Missing capability field' });
         return;
       }
@@ -69,6 +100,10 @@ export function wsTransport(options: WsTransportOptions): Transport {
         if (meta !== undefined) payload['meta'] = meta;
         send(ws, payload);
       }
+    });
+
+    ws.on('close', () => {
+      if (options.eventBus) options.eventBus.unsubscribeAll(clientId);
     });
 
     ws.on('error', (err) => {
