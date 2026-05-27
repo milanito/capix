@@ -13,7 +13,7 @@ export type RouteDefinition = {
 };
 
 export type RouterMatch =
-  | { readonly found: true; readonly capability: string; readonly params: Record<string, string> }
+  | { readonly found: true; readonly capability: string; readonly params: Record<string, string> | null }
   | { readonly found: false; readonly allowedMethods?: string[] };
 
 export type Router = {
@@ -90,12 +90,13 @@ function matchRoute(
   method: string,
   segments: string[],
   index: number,
-  params: Record<string, string>,
+  params: Record<string, string> | null,
 ): RouterMatch {
   if (index === segments.length) {
     if (node_hasAnyHandler(root)) {
       const cap = root.handlers.get(method);
       if (cap !== undefined) {
+        // null params means no path params were encountered — skip allocation.
         return { found: true, capability: cap, params };
       }
       return { found: false, allowedMethods: [...root.handlers.keys()] };
@@ -122,8 +123,17 @@ function matchRoute(
       root.paramChild.methodNames.get(method) ??
       root.paramChild.methodNames.values().next().value ??
       'id';
-    const newParams = { ...params, [paramName]: decoded };
-    return matchRoute(root.paramChild.node, method, segments, index + 1, newParams);
+    // Lazily allocate params object (only when first param encountered).
+    // Mutate in place and restore on backtrack.
+    const actualParams = params ?? {};
+    const prev = actualParams[paramName];
+    actualParams[paramName] = decoded;
+    const result = matchRoute(root.paramChild.node, method, segments, index + 1, actualParams);
+    if (!result.found) {
+      if (prev === undefined) delete actualParams[paramName];
+      else actualParams[paramName] = prev;
+    }
+    return result;
   }
 
   return { found: false };
@@ -148,10 +158,12 @@ export function compileRouter(routes: RouteDefinition[]): Router {
   return {
     routes,
     match(method: string, rawPath: string): RouterMatch {
-      // Strip query string for matching
-      const pathOnly = rawPath.split('?')[0] ?? rawPath;
+      // Strip query string without creating an intermediate array.
+      const qIdx = rawPath.indexOf('?');
+      const pathOnly = qIdx !== -1 ? rawPath.slice(0, qIdx) : rawPath;
       const segments = pathOnly.split('/').filter((s) => s.length > 0);
-      return matchRoute(root, method.toUpperCase(), segments, 0, {});
+      // Start with null params; allocate only if a route param is matched.
+      return matchRoute(root, method.toUpperCase(), segments, 0, null);
     },
   };
 }

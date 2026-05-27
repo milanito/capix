@@ -17,6 +17,7 @@ import { parseMultipart } from './multipart-parser.js';
 import type { MultipartOptions } from './multipart.js';
 
 const DEFAULT_MAX_BODY_SIZE = 1024 * 1024; // 1MB
+const EMPTY_INPUT: Record<string, unknown> = {};
 
 export type RestTransportHooks = {
   /** Called on every response before headers are written. Use to inject additional headers. */
@@ -37,6 +38,12 @@ export type RestTransportOptions = {
   readonly multipart?: boolean | MultipartOptions;
   /** Case style for inferred URL segments. Default: 'kebab' (bulkStatus → bulk-status). */
   readonly urlCase?: 'kebab' | 'camel' | 'snake';
+  /**
+   * Per-request timeout in milliseconds. Default: 30_000.
+   * Set to false to skip AbortSignal creation entirely (removes ~0.7% overhead
+   * per request but disables request timeout enforcement).
+   */
+  readonly requestTimeout?: number | false;
 };
 
 /** Creates a REST transport using node:http. */
@@ -47,24 +54,36 @@ export function restTransport(options: RestTransportOptions): Transport {
 
   const corsOriginOpt = options.cors?.origin ?? '*';
   const maxBodySize = options.maxBodySize ?? DEFAULT_MAX_BODY_SIZE;
+  const corsMethodsValue = options.cors?.methods ?? 'GET, POST, PATCH, PUT, DELETE, OPTIONS';
+  const corsHeadersValue = options.cors?.headers ?? 'Content-Type, Authorization';
+  const hasDynamicOrigin = typeof corsOriginOpt === 'function';
+  const requestTimeout = options.requestTimeout === undefined ? 30_000 : options.requestTimeout;
+  // When requestTimeout is false/0: share one never-aborted signal per transport instance.
+  const _noTimeoutSignal = requestTimeout === false ? new AbortController().signal : null;
+
+  // Pre-built headers for the fast path (static CORS origin).
+  // When origin is a function, fall back to per-request setCorsHeaders.
+  let _jsonHeaders200: Record<string, string> | null = null;
+  let _jsonHeadersErr: Record<string, string> | null = null;
+  let _preflightHeaders: Record<string, string> | null = null;
+
+  if (!hasDynamicOrigin) {
+    const corsBase: Record<string, string> = {
+      'Access-Control-Allow-Methods': corsMethodsValue,
+      'Access-Control-Allow-Headers': corsHeadersValue,
+    };
+    if (corsOriginOpt) corsBase['Access-Control-Allow-Origin'] = corsOriginOpt;
+    _jsonHeaders200  = { 'Content-Type': 'application/json', ...corsBase };
+    _jsonHeadersErr  = { 'Content-Type': 'application/json', ...corsBase };
+    _preflightHeaders = { ...corsBase };
+  }
 
   function setCorsHeaders(req: IncomingMessage, res: ServerResponse): void {
     const reqOrigin = req.headers['origin'] ?? '';
-    let allowOrigin: string;
-    if (typeof corsOriginOpt === 'function') {
-      allowOrigin = corsOriginOpt(reqOrigin) ? reqOrigin : '';
-    } else {
-      allowOrigin = corsOriginOpt;
-    }
+    const allowOrigin = (corsOriginOpt as (o: string) => boolean)(reqOrigin) ? reqOrigin : '';
     if (allowOrigin) res.setHeader('Access-Control-Allow-Origin', allowOrigin);
-    res.setHeader(
-      'Access-Control-Allow-Methods',
-      options.cors?.methods ?? 'GET, POST, PATCH, PUT, DELETE, OPTIONS',
-    );
-    res.setHeader(
-      'Access-Control-Allow-Headers',
-      options.cors?.headers ?? 'Content-Type, Authorization',
-    );
+    res.setHeader('Access-Control-Allow-Methods', corsMethodsValue);
+    res.setHeader('Access-Control-Allow-Headers', corsHeadersValue);
   }
 
   async function readBody(req: IncomingMessage): Promise<Buffer> {
@@ -94,9 +113,9 @@ export function restTransport(options: RestTransportOptions): Transport {
     return val;
   }
 
-  function parseQueryString(url: string): Record<string, unknown> {
+  function parseQueryString(url: string): Record<string, unknown> | null {
     const idx = url.indexOf('?');
-    if (idx === -1) return {};
+    if (idx === -1) return null;
     const qs = url.slice(idx + 1);
     const result: Record<string, unknown> = {};
     for (const part of qs.split('&')) {
@@ -111,17 +130,23 @@ export function restTransport(options: RestTransportOptions): Transport {
 
   function sendJson(res: ServerResponse, status: number, body: unknown): void {
     const json = JSON.stringify(body);
-    res.writeHead(status, { 'Content-Type': 'application/json' });
+    res.writeHead(status, _jsonHeadersErr ?? { 'Content-Type': 'application/json' });
     res.end(json);
   }
 
   function handler(req: IncomingMessage, res: ServerResponse): void {
-    setCorsHeaders(req, res);
+    // Fast path: pre-built static headers avoid per-request setHeader calls.
+    // Dynamic origin functions still use setCorsHeaders.
+    if (hasDynamicOrigin) setCorsHeaders(req, res);
     options.hooks?.onRequest?.(req, res);
 
     // CORS preflight
     if (req.method === 'OPTIONS') {
-      res.writeHead(204);
+      if (_preflightHeaders) {
+        res.writeHead(204, _preflightHeaders);
+      } else {
+        res.writeHead(204);
+      }
       res.end();
       return;
     }
@@ -195,17 +220,22 @@ export function restTransport(options: RestTransportOptions): Transport {
         }
       }
 
-      // Merge: query params < body params < path params (path wins)
-      const input: Record<string, unknown> = { ...queryParams, ...bodyParams, ...pathParams };
+      // Merge: query params < body params < path params (path wins).
+      // Router returns null for params when no path params exist (avoids allocation).
+      // For the common case (GET with no query and no path params), reuse EMPTY_INPUT.
+      const input: Record<string, unknown> =
+        pathParams === null && noBody && queryParams === null
+          ? EMPTY_INPUT
+          : { ...(queryParams ?? {}), ...bodyParams, ...(pathParams ?? {}) };
 
-      // Build flat headers map
+      // Build flat headers map using for..in (avoids Object.entries array allocation).
       const headers: Record<string, string> = {};
-      for (const [k, v] of Object.entries(req.headers)) {
-        if (v === undefined) continue;
-        headers[k] = Array.isArray(v) ? v.join(', ') : v;
+      for (const k in req.headers) {
+        const v = req.headers[k];
+        if (v !== undefined) headers[k] = Array.isArray(v) ? v.join(', ') : v;
       }
 
-      const signal = AbortSignal.timeout(30_000);
+      const signal = _noTimeoutSignal ?? AbortSignal.timeout(requestTimeout as number);
 
       const response = await invokeFn!({
         capability: match.capability,
@@ -217,10 +247,13 @@ export function restTransport(options: RestTransportOptions): Transport {
 
       if (response.ok) {
         if (response.data === null || response.data === undefined) {
-          res.writeHead(204);
+          res.writeHead(204, _preflightHeaders ?? undefined);
           res.end();
         } else {
-          sendJson(res, 200, { data: response.data });
+          // String concat avoids allocating a { data: output } wrapper object.
+          const json = '{"data":' + JSON.stringify(response.data) + '}';
+          res.writeHead(200, _jsonHeaders200 ?? { 'Content-Type': 'application/json' });
+          res.end(json);
         }
       } else {
         const { status, error, message, meta } = response.error;

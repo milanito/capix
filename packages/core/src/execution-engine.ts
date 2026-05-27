@@ -127,7 +127,14 @@ export function createExecutionEngine(options: ExecutionEngineOptions): InvokeFn
     // 4. Validate input
     let validatedInput: unknown;
     if (cap.inputSchema !== null) {
-      const result = await cap.inputSchema.safeParseAsync(req.input);
+      // Try sync parse first (no Promise overhead for the common case).
+      // Falls back to safeParseAsync only when the schema has async refinements.
+      let result: Awaited<ReturnType<typeof cap.inputSchema.safeParseAsync>>;
+      try {
+        result = cap.inputSchema.safeParse(req.input);
+      } catch {
+        result = await cap.inputSchema.safeParseAsync(req.input);
+      }
       if (!result.success) {
         const issues = result.error.issues.map((i) => {
           const path = i.path.length > 0 ? i.path.join('.') + ': ' : '';
@@ -197,7 +204,12 @@ export function createExecutionEngine(options: ExecutionEngineOptions): InvokeFn
 
     // 9. Validate output (internal error if schema fails)
     if (cap.outputSchema !== null) {
-      const result = await cap.outputSchema.safeParseAsync(output);
+      let result: { success: true; data: unknown } | { success: false; error: { issues: unknown[] } };
+      try {
+        result = cap.outputSchema.safeParse(output) as typeof result;
+      } catch {
+        result = await cap.outputSchema.safeParseAsync(output) as typeof result;
+      }
       if (!result.success) {
         if (isDevelopment) {
           console.error(`[capix] Output validation failed for '${req.capability}':`, result.error.issues);

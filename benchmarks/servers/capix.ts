@@ -41,6 +41,6 @@ createServer({
     users:   { get: getUser },
     profile: { get: profile },
   },
-  transports: [restTransport({ port: 3000 })],
+  transports: [restTransport({ port: 3000, requestTimeout: false })],
   isDevelopment: false,
 }).start();

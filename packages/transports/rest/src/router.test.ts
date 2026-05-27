@@ -12,7 +12,7 @@ describe('compileRouter', () => {
   it('matches a static route', () => {
     const router = routes({ method: 'GET', path: '/users', capability: 'users.list' });
     const m = router.match('GET', '/users');
-    expect(m).toEqual({ found: true, capability: 'users.list', params: {} });
+    expect(m).toEqual({ found: true, capability: 'users.list', params: null });
   });
 
   it('extracts path params', () => {
