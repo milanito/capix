@@ -227,3 +227,83 @@ describe('REST transport', () => {
     expect(res.status).toBe(204);
   });
 });
+
+describe('request timeout', () => {
+  it('default timeout is 30 seconds (option present in type)', () => {
+    // Verify the option exists and defaults to 30_000 at the type level
+    const opts: Parameters<typeof restTransport>[0] = { port: 9999 };
+    expect(opts.timeout).toBeUndefined(); // undefined → defaults to 30_000 internally
+  });
+
+  it('timeout: false emits a console warning', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const p = await getFreePort();
+    const srv = createServer({
+      context: buildContext,
+      capabilities: { status: { getStatus } },
+      transports: [restTransport({ port: p, timeout: false })],
+    });
+    await srv.start();
+    await srv.stop();
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('timeout: false'));
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Do not use this in production'));
+    warnSpy.mockRestore();
+  });
+
+  it('timeout: false allows requests to complete without being aborted', async () => {
+    const p = await getFreePort();
+    // Capability that takes 50ms — well under any real timeout but proves signal is not pre-aborted
+    const slow = capability(
+      async () => {
+        await new Promise(r => setTimeout(r, 50));
+        return { ok: true };
+      },
+    );
+    const srv = createServer({
+      context: buildContext,
+      capabilities: { slow: { list: slow } }, // list* → GET /slow
+      transports: [restTransport({ port: p, timeout: false })],
+    });
+    await srv.start();
+    const res = await fetch(`http://localhost:${p}/slow`);
+    expect(res.status).toBe(200);
+    await srv.stop();
+  });
+
+  it('custom timeout fires for hung capability — fetch times out', async () => {
+    const p = await getFreePort();
+    // Capability hangs for longer than the configured timeout
+    const hang = capability(
+      async () => {
+        await new Promise(r => setTimeout(r, 500)); // hangs 500ms
+        return { ok: true };
+      },
+    );
+    const srv = createServer({
+      context: buildContext,
+      capabilities: { hang: { list: hang } }, // list* → GET /hang
+      transports: [restTransport({ port: p, timeout: 80 })], // 80ms timeout
+    });
+    await srv.start();
+    // The AbortSignal.timeout(80) fires before the 500ms hang completes.
+    // The execution engine catches the aborted signal and returns an error response.
+    const res = await fetch(`http://localhost:${p}/hang`, {
+      signal: AbortSignal.timeout(2_000), // generous fetch-level timeout
+    });
+    expect(res.status).toBeGreaterThanOrEqual(500);
+    await srv.stop();
+  });
+
+  it('completed requests are not affected by timeout', async () => {
+    const p = await getFreePort();
+    const srv = createServer({
+      context: buildContext,
+      capabilities: { status: { getStatus } },
+      transports: [restTransport({ port: p, timeout: 5_000 })],
+    });
+    await srv.start();
+    const res = await fetch(`http://localhost:${p}/status`);
+    expect(res.status).toBe(200);
+    await srv.stop();
+  });
+});

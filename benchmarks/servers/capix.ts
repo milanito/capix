@@ -41,6 +41,6 @@ createServer({
     users:   { get: getUser },
     profile: { get: profile },
   },
-  transports: [restTransport({ port: 3000, requestTimeout: false })],
+  transports: [restTransport({ port: 3000, timeout: false })], // benchmark only — never use false in production
   isDevelopment: false,
 }).start();

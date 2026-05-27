@@ -10,7 +10,7 @@
 
 import * as http from 'node:http';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { Transport, MountOptions, InvokeFn } from 'capix';
+import type { Transport, MountOptions, InvokeFn, CapabilityResponse } from 'capix';
 import { compileRouter, generateRoutes } from './router.js';
 import type { Router } from './router.js';
 import { parseMultipart } from './multipart-parser.js';
@@ -39,11 +39,13 @@ export type RestTransportOptions = {
   /** Case style for inferred URL segments. Default: 'kebab' (bulkStatus → bulk-status). */
   readonly urlCase?: 'kebab' | 'camel' | 'snake';
   /**
-   * Per-request timeout in milliseconds. Default: 30_000.
-   * Set to false to skip AbortSignal creation entirely (removes ~0.7% overhead
-   * per request but disables request timeout enforcement).
+   * Per-request timeout in milliseconds. Default: 30_000 (30 seconds).
+   *
+   * Set to `false` to disable timeouts entirely. **Only use this in benchmarks
+   * or tests — never in production.** A hung capability will hold its connection
+   * and resources indefinitely, causing connection exhaustion under load.
    */
-  readonly requestTimeout?: number | false;
+  readonly timeout?: number | false;
 };
 
 /** Creates a REST transport using node:http. */
@@ -57,9 +59,16 @@ export function restTransport(options: RestTransportOptions): Transport {
   const corsMethodsValue = options.cors?.methods ?? 'GET, POST, PATCH, PUT, DELETE, OPTIONS';
   const corsHeadersValue = options.cors?.headers ?? 'Content-Type, Authorization';
   const hasDynamicOrigin = typeof corsOriginOpt === 'function';
-  const requestTimeout = options.requestTimeout === undefined ? 30_000 : options.requestTimeout;
-  // When requestTimeout is false/0: share one never-aborted signal per transport instance.
+  const requestTimeout = options.timeout === undefined ? 30_000 : options.timeout;
+  // When timeout: false — share one never-aborted signal per transport instance.
   const _noTimeoutSignal = requestTimeout === false ? new AbortController().signal : null;
+  if (requestTimeout === false) {
+    console.warn(
+      '[capix] WARNING: timeout: false disables request timeouts. ' +
+      'Hung capabilities will hold resources indefinitely. ' +
+      'Do not use this in production.',
+    );
+  }
 
   // Pre-built headers for the fast path (static CORS origin).
   // When origin is a function, fall back to per-request setCorsHeaders.
@@ -237,13 +246,27 @@ export function restTransport(options: RestTransportOptions): Transport {
 
       const signal = _noTimeoutSignal ?? AbortSignal.timeout(requestTimeout as number);
 
-      const response = await invokeFn!({
+      const invocation = invokeFn!({
         capability: match.capability,
         input,
         headers,
         signal,
         ...(rawBodyForContext !== undefined ? { rawBody: rawBodyForContext } : {}),
       });
+
+      // Race invocation against the abort signal so hung capabilities don't hold resources.
+      // When timeout: false the signal never fires, so we await directly.
+      const response: CapabilityResponse = requestTimeout === false
+        ? await invocation
+        : await Promise.race([
+            invocation,
+            new Promise<CapabilityResponse>((resolve) => {
+              signal.addEventListener('abort', () => resolve({
+                ok: false,
+                error: { status: 504, error: 'GatewayTimeout', message: 'Request timed out' },
+              }), { once: true });
+            }),
+          ]);
 
       if (response.ok) {
         if (response.data === null || response.data === undefined) {
