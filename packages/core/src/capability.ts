@@ -15,7 +15,7 @@ const CAPABILITY_BRAND = Symbol.for('capix.Capability');
 
 export type Intent = 'query' | 'mutation' | 'update' | 'replace' | 'delete';
 
-const QUERY_PREFIXES = ['get', 'find', 'fetch', 'read', 'list', 'search', 'filter'] as const;
+const QUERY_PREFIXES = ['get', 'find', 'fetch', 'read', 'list', 'search', 'filter', 'me', 'status', 'health', 'count', 'check'] as const;
 const MUTATION_PREFIXES = ['create', 'add', 'new'] as const;
 const UPDATE_PREFIXES = ['update', 'edit', 'patch', 'modify'] as const;
 const REPLACE_PREFIXES = ['replace', 'set', 'put'] as const;

@@ -259,4 +259,52 @@ describe('generateRoutes', () => {
     const r = generateRoutes(reg);
     expect(r).toContainEqual({ method: 'POST', path: '/auth/login', capability: 'auth.login' });
   });
+
+  it('me → GET /auth/me', () => {
+    const reg = compileRegistry({
+      auth: { me: capability(() => null) },
+    });
+    const r = generateRoutes(reg);
+    expect(r).toContainEqual({ method: 'GET', path: '/auth/me', capability: 'auth.me' });
+  });
+
+  it('status/health/count/check → GET /group/key', () => {
+    const reg = compileRegistry({
+      system: {
+        status:  capability(() => null),
+        health:  capability(() => null),
+        count:   capability(() => null),
+        check:   capability(() => null),
+      },
+    });
+    const r = generateRoutes(reg);
+    expect(r).toContainEqual({ method: 'GET', path: '/system/status',  capability: 'system.status' });
+    expect(r).toContainEqual({ method: 'GET', path: '/system/health',  capability: 'system.health' });
+    expect(r).toContainEqual({ method: 'GET', path: '/system/count',   capability: 'system.count' });
+    expect(r).toContainEqual({ method: 'GET', path: '/system/check',   capability: 'system.check' });
+  });
+
+  it('un* prefix → DELETE /group/:id/verb', () => {
+    const reg = compileRegistry({
+      users: { unfollow: capability(z.object({ id: z.string() }), () => null) },
+    });
+    const r = generateRoutes(reg);
+    expect(r).toContainEqual({ method: 'DELETE', path: '/users/:id/follow', capability: 'users.unfollow' });
+  });
+
+  it('un* camelCase verb → kebab sub-resource path', () => {
+    const reg = compileRegistry({
+      users: { unblockUser: capability(z.object({}), () => null) },
+    });
+    const r = generateRoutes(reg);
+    expect(r).toContainEqual({ method: 'DELETE', path: '/users/:id/block-user', capability: 'users.unblockUser' });
+  });
+
+  it('un* at root level → DELETE /:id/verb', () => {
+    const reg = compileRegistry({
+      unlikePost: capability(z.object({ id: z.string() }), () => null),
+    });
+    const r = generateRoutes(reg);
+    expect(r).toContainEqual({ method: 'DELETE', path: '/:id/like-post', capability: 'unlikePost' });
+  });
 });

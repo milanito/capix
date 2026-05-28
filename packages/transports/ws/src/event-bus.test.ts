@@ -131,4 +131,76 @@ describe('createEventBus', () => {
     });
     bus.publish('order:paid', { orderId: 'o1', amount: 100 });
   });
+
+  // --- filter predicate ---
+
+  it('filter: handler is called when predicate returns true', () => {
+    const bus = createEventBus<TestEvents>();
+    const h = vi.fn();
+    bus.subscribe('c1', 'task:updated', h, { filter: (d) => d.status === 'done' });
+    bus.publish('task:updated', { id: '1', status: 'done' });
+    expect(h).toHaveBeenCalledWith({ id: '1', status: 'done' });
+  });
+
+  it('filter: handler is NOT called when predicate returns false', () => {
+    const bus = createEventBus<TestEvents>();
+    const h = vi.fn();
+    bus.subscribe('c1', 'task:updated', h, { filter: (d) => d.status === 'done' });
+    bus.publish('task:updated', { id: '1', status: 'pending' });
+    expect(h).not.toHaveBeenCalled();
+  });
+
+  it('filter: only matching clients receive the event (privacy isolation)', () => {
+    const bus = createEventBus<TestEvents>();
+    const alice = vi.fn();
+    const bob = vi.fn();
+    bus.subscribe('alice', 'task:updated', alice, { filter: (d) => d.id === 'alice-task' });
+    bus.subscribe('bob', 'task:updated', bob, { filter: (d) => d.id === 'bob-task' });
+    bus.publish('task:updated', { id: 'alice-task', status: 'done' });
+    expect(alice).toHaveBeenCalledOnce();
+    expect(bob).not.toHaveBeenCalled();
+  });
+
+  it('filter: unfiltered subscribers still receive all events', () => {
+    const bus = createEventBus<TestEvents>();
+    const filtered = vi.fn();
+    const unfiltered = vi.fn();
+    bus.subscribe('c1', 'task:updated', filtered, { filter: (d) => d.status === 'done' });
+    bus.subscribe('c2', 'task:updated', unfiltered);
+    bus.publish('task:updated', { id: '1', status: 'pending' });
+    expect(filtered).not.toHaveBeenCalled();
+    expect(unfiltered).toHaveBeenCalledOnce();
+  });
+
+  // --- server-internal (2-arg) subscribe ---
+
+  it('internal subscribe (no clientId) receives published events', () => {
+    const bus = createEventBus<TestEvents>();
+    const h = vi.fn();
+    bus.subscribe('task:updated', h);
+    bus.publish('task:updated', { id: '1', status: 'done' });
+    expect(h).toHaveBeenCalledWith({ id: '1', status: 'done' });
+  });
+
+  it('internal subscribe is not removed by unsubscribeAll', () => {
+    const bus = createEventBus<TestEvents>();
+    const internal = vi.fn();
+    const client = vi.fn();
+    bus.subscribe('task:updated', internal);
+    bus.subscribe('c1', 'task:updated', client);
+    bus.unsubscribeAll('c1');
+    bus.publish('task:updated', { id: '1', status: 'done' });
+    expect(internal).toHaveBeenCalledOnce();
+    expect(client).not.toHaveBeenCalled();
+  });
+
+  it('internal subscribe with filter only fires when predicate passes', () => {
+    const bus = createEventBus<TestEvents>();
+    const h = vi.fn();
+    bus.subscribe('task:updated', h, { filter: (d) => d.status === 'done' });
+    bus.publish('task:updated', { id: '1', status: 'pending' });
+    bus.publish('task:updated', { id: '2', status: 'done' });
+    expect(h).toHaveBeenCalledTimes(1);
+    expect(h).toHaveBeenCalledWith({ id: '2', status: 'done' });
+  });
 });

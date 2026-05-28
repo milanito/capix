@@ -150,7 +150,20 @@ export function withRateLimit(options: RateLimitOptions): Enhancer {
 // withRollback
 // ---------------------------------------------------------------------------
 
-type RollbackFn = () => void | Promise<void>;
+export type RollbackFn = () => unknown;
+
+/**
+ * Extends a context type with the `onRollback` method added by {@link withRollback}.
+ * Use this to type capabilities that need compensation actions.
+ *
+ * @example
+ * const cap = capability(schema, async (input, ctx: WithRollback<AppContext>) => {
+ *   ctx.onRollback(() => cleanup());
+ * }).enhance(withRollback);
+ */
+export type WithRollback<T> = T & {
+  readonly onRollback: (fn: RollbackFn) => void;
+};
 
 /**
  * Adds explicit rollback support to a capability.

@@ -50,6 +50,8 @@ export type {
   RateLimitOptions,
   MetricsCollector,
   CircuitBreakerOptions,
+  RollbackFn,
+  WithRollback,
 } from './enhancers.js';
 
 // Execution engine
@@ -69,3 +71,7 @@ export type { Plugin, MergedPlugins } from './plugin.js';
 // Server
 export { createServer, defineConfig } from './server.js';
 export type { Transport, MountOptions, ServerConfig, Server } from './server.js';
+
+// Event bus
+export { createEventBus } from './event-bus.js';
+export type { EventBus, EventMap, SubscribeOptions } from './event-bus.js';

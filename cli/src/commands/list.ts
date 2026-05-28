@@ -26,13 +26,22 @@ export function registerList(program: Command): void {
       // Calculate column widths
       const rows = [...registry].map(([name, cap]) => {
         const route = routeMap.get(name);
+        const guardCount = cap.guards.length;
+        const inputGuardCount = cap.inputGuards.length;
+        let guardsLabel: string;
+        if (guardCount === 0 && inputGuardCount === 0) {
+          guardsLabel = 'public';
+        } else {
+          const parts: string[] = [];
+          if (guardCount > 0) parts.push(`${guardCount} guard${guardCount > 1 ? 's' : ''}`);
+          if (inputGuardCount > 0) parts.push(`${inputGuardCount} inputGuard${inputGuardCount > 1 ? 's' : ''}`);
+          guardsLabel = parts.join(', ');
+        }
         return {
           name,
           method: route?.method ?? '?',
           path:   route?.path   ?? '(no route)',
-          guards: cap.guards.length > 0
-            ? `${cap.guards.length} guard${cap.guards.length > 1 ? 's' : ''}`
-            : 'public',
+          guards: guardsLabel,
         };
       });
 

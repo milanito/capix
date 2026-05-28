@@ -263,6 +263,13 @@ function inferRoutes(
       if (isCreate) {
         return [{ method: 'POST', path: groupPath || '/', capability: dotPath }];
       }
+      // un* → DELETE /group/:id/verb (inverse sub-resource action)
+      const unMatch = /^un([A-Za-z].*)/.exec(key);
+      if (unMatch) {
+        const verb = applyUrlCase(unMatch[1]!, urlCase);
+        const basePath = groupSegments.length > 0 ? groupPath : '';
+        return [{ method: 'DELETE', path: basePath + '/:id/' + verb, capability: dotPath }];
+      }
       // Named action → POST /group/key
       const actionPath = groupSegments.length > 0 ? '/' + [...groupSegments, urlKey].join('/') : '/' + urlKey;
       return [{ method: 'POST', path: actionPath, capability: dotPath }];

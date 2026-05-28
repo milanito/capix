@@ -21,12 +21,27 @@ describe('inferIntent', () => {
     expect(inferIntent('filterResults')).toBe('query');
   });
 
-  it('maps create/add/register/new to mutation', () => {
+  it('maps me/status/health/count/check to query', () => {
+    expect(inferIntent('me')).toBe('query');
+    expect(inferIntent('status')).toBe('query');
+    expect(inferIntent('health')).toBe('query');
+    expect(inferIntent('healthCheck')).toBe('query');
+    expect(inferIntent('count')).toBe('query');
+    expect(inferIntent('countUsers')).toBe('query');
+    expect(inferIntent('check')).toBe('query');
+    expect(inferIntent('checkPermission')).toBe('query');
+  });
+
+  it('maps create/add/new to mutation', () => {
     expect(inferIntent('create')).toBe('mutation');
     expect(inferIntent('createUser')).toBe('mutation');
     expect(inferIntent('add')).toBe('mutation');
-    expect(inferIntent('register')).toBe('mutation');
     expect(inferIntent('newItem')).toBe('mutation');
+  });
+
+  it('register and login are default mutations (named actions)', () => {
+    expect(inferIntent('register')).toBe('mutation');
+    expect(inferIntent('login')).toBe('mutation');
   });
 
   it('maps update/edit/patch/modify to update', () => {

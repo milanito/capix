@@ -53,8 +53,18 @@ export type NarrowContext<
 /**
  * Pass-through for type inference.
  * Wrap your guard function with this for proper TypeScript narrowing.
+ *
+ * Two forms:
+ *  - `defineGuard(fn)` — infers types from the function signature (common case)
+ *  - `defineGuard<TContext, TNarrowed>(fn)` — explicit narrowing when TypeScript
+ *    can't infer the asserted type (e.g. guards stored in variables before use)
  */
-export function defineGuard<TFn extends AnyGuard>(fn: TFn): TFn {
+export function defineGuard<
+  TContext extends BaseContext,
+  TNarrowed extends TContext,
+>(fn: (ctx: TContext) => asserts ctx is TNarrowed): (ctx: TContext) => asserts ctx is TNarrowed;
+export function defineGuard<TFn extends AnyGuard>(fn: TFn): TFn;
+export function defineGuard(fn: AnyGuard): AnyGuard {
   return fn;
 }
 
