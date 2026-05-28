@@ -92,6 +92,11 @@ export type Capability<
   /** True when intent was explicitly passed to capability(); false when defaulted. */
   readonly _intentExplicit: boolean;
   readonly http?: HttpOverride;
+  /**
+   * Set by compileRegistry when inputSchema is a z.object({}) with no keys.
+   * The execution engine skips input validation entirely — there is nothing to validate.
+   */
+  readonly _skipValidation: boolean;
   readonly resolve: Resolver<TInput, TOutput, TContext>;
 
   /**
@@ -141,6 +146,7 @@ type CapabilityBase = {
   intent: Intent;
   _intentExplicit: boolean;
   http?: HttpOverride;
+  _skipValidation: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   resolve: (...args: any[]) => any;
 };
@@ -291,6 +297,7 @@ export function capability(...args: any[]): AnyCapability {
       _intentExplicit: explicitIntent !== undefined,
       intent: explicitIntent ?? 'mutation',
       ...(noSchemaOpts?.http ? { http: noSchemaOpts.http } : {}),
+      _skipValidation: false,
       resolve: first as (...a: unknown[]) => unknown,
     });
   }
@@ -314,6 +321,7 @@ export function capability(...args: any[]): AnyCapability {
     _intentExplicit: thirdIntent !== undefined,
     intent: thirdIntent ?? 'mutation',
     ...(schemaOpts?.http ? { http: schemaOpts.http } : {}),
+    _skipValidation: false,
     resolve: second as (...a: unknown[]) => unknown,
   });
 }
@@ -376,6 +384,14 @@ export function compileRegistry(tree: GroupTree, prefix = ''): CapabilityRegistr
     }
 
     if (isCapability(value)) {
+      // True when inputSchema is z.object({}) — execution engine skips safeParse entirely.
+      const skipVal =
+        value.inputSchema !== null &&
+        'shape' in value.inputSchema &&
+        typeof (value.inputSchema as Record<string, unknown>).shape === 'object' &&
+        (value.inputSchema as Record<string, unknown>).shape !== null &&
+        Object.keys((value.inputSchema as { shape: object }).shape).length === 0;
+
       // Create a named copy by building a fresh capability base with the correct name
       const base: CapabilityBase = {
         _capix: true,
@@ -391,6 +407,7 @@ export function compileRegistry(tree: GroupTree, prefix = ''): CapabilityRegistr
         intent: value.intent,
         _intentExplicit: value._intentExplicit,
         ...(value.http ? { http: value.http } : {}),
+        _skipValidation: skipVal,
         resolve: value.resolve,
       };
       map.set(path, makeCapability(base));

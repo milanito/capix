@@ -36,7 +36,9 @@
   },
   "dependencies": {
     "busboy": "^1.6.0",
-    "zod": "^3.23.0"
+    "fast-json-stringify": "^6.4.0",
+    "zod": "^3.23.0",
+    "zod-to-json-schema": "^3.25.2"
   },
   "peerDependencies": {
     "capix": ">=0.1.0"

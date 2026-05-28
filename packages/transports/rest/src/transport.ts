@@ -15,6 +15,8 @@ import { compileRouter, generateRoutes } from './router.js';
 import type { Router } from './router.js';
 import { parseMultipart } from './multipart-parser.js';
 import type { MultipartOptions } from './multipart.js';
+import { buildSerializers, defaultSerializer } from './serializer.js';
+import type { ResponseSerializer } from './serializer.js';
 
 const DEFAULT_MAX_BODY_SIZE = 1024 * 1024; // 1MB
 const EMPTY_INPUT: Record<string, unknown> = {};
@@ -53,6 +55,7 @@ export function restTransport(options: RestTransportOptions): Transport {
   let server: http.Server | null = null;
   let router: Router | null = null;
   let invokeFn: InvokeFn | null = null;
+  let serializers: Map<string, ResponseSerializer> | null = null;
 
   const corsOriginOpt = options.cors?.origin ?? '*';
   const maxBodySize = options.maxBodySize ?? DEFAULT_MAX_BODY_SIZE;
@@ -273,8 +276,8 @@ export function restTransport(options: RestTransportOptions): Transport {
           res.writeHead(204, _preflightHeaders ?? undefined);
           res.end();
         } else {
-          // String concat avoids allocating a { data: output } wrapper object.
-          const json = '{"data":' + JSON.stringify(response.data) + '}';
+          const serialize = serializers?.get(match.capability) ?? defaultSerializer;
+          const json = serialize(response.data);
           res.writeHead(200, _jsonHeaders200 ?? { 'Content-Type': 'application/json' });
           res.end(json);
         }
@@ -300,6 +303,7 @@ export function restTransport(options: RestTransportOptions): Transport {
       const routeOpts = options.urlCase !== undefined ? { urlCase: options.urlCase } : {};
       const routes = generateRoutes(mountOptions.registry, routeOpts);
       router = compileRouter(routes);
+      serializers = buildSerializers(mountOptions.registry);
 
       console.log('\nCapix REST transport starting...');
       for (const route of routes) {

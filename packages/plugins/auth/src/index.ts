@@ -1,6 +1,11 @@
 import jwt from 'jsonwebtoken';
 import { defineGuard, defaultErrors, defineContext } from 'capix';
 import type { BaseContext, RawRequest, ContextBuilder } from 'capix';
+import { JWTCache } from './jwt-cache.js';
+import type { JWTCacheOptions } from './jwt-cache.js';
+
+export { JWTCache };
+export type { JWTCacheOptions };
 
 // ---------------------------------------------------------------------------
 // Types
@@ -16,6 +21,19 @@ export type JWTAuthOptions<TUser> = {
    * Return null to reject the token (treated as unauthenticated).
    */
   readonly userFromToken: (payload: jwt.JwtPayload) => TUser | null | Promise<TUser | null>;
+  /**
+   * Enable in-memory caching of JWT verification results.
+   *
+   * **Security tradeoff**: A revoked token remains accepted for the TTL duration
+   * (default 30s). Only enable this when `userFromToken` does no I/O (pure
+   * in-memory lookup). For database-backed lookups, the DB round-trip dominates —
+   * caching helps less and the revocation risk increases. Use a blocklist for
+   * immediate revocation.
+   *
+   * Pass `true` for defaults (TTL: 30s, maxSize: 1000), or a {@link JWTCacheOptions}
+   * object to configure TTL and max entries.
+   */
+  readonly cache?: boolean | JWTCacheOptions;
 };
 
 /** Shape added to the context by authPlugin. */
@@ -40,8 +58,14 @@ export type JWTHelpers<TUser> = {
   /**
    * Verify a token string. Returns the user (via `userFromToken`) or null if
    * the token is invalid, expired, or userFromToken returns null.
+   * Results are served from cache when `cache` is configured.
    */
   verify(token: string): Promise<TUser | null>;
+  /**
+   * The verification cache, if `cache` was configured. Useful for testing
+   * or manual cache invalidation (e.g. on logout).
+   */
+  readonly cache: JWTCache<TUser | null> | null;
 };
 
 /**
@@ -55,6 +79,10 @@ export type JWTHelpers<TUser> = {
 export function createJWTHelpers<TUser>(options: JWTAuthOptions<TUser>): JWTHelpers<TUser> {
   const { secret, expiresIn = '7d', userFromToken } = options;
 
+  const verifyCache: JWTCache<TUser | null> | null = options.cache
+    ? new JWTCache<TUser | null>(typeof options.cache === 'object' ? options.cache : {})
+    : null;
+
   return {
     sign(payload) {
       if (expiresIn !== undefined) {
@@ -64,13 +92,22 @@ export function createJWTHelpers<TUser>(options: JWTAuthOptions<TUser>): JWTHelp
     },
 
     async verify(token) {
+      if (verifyCache !== null) {
+        const cached = verifyCache.get(token);
+        if (cached !== undefined) return cached;
+      }
       try {
         const payload = jwt.verify(token, secret) as jwt.JwtPayload;
-        return await userFromToken(payload);
+        const user = await userFromToken(payload);
+        verifyCache?.set(token, user);
+        return user;
       } catch {
+        verifyCache?.set(token, null);
         return null;
       }
     },
+
+    cache: verifyCache,
   };
 }
 
@@ -172,6 +209,11 @@ export type JWTContextBuilderOptions<TUser, TExtra extends Record<string, unknow
   readonly userFromToken: (payload: jwt.JwtPayload) => TUser | null | Promise<TUser | null>;
   /** Build additional context fields from the raw request. Called once per request. */
   readonly extraContext?: (req: RawRequest) => TExtra | Promise<TExtra>;
+  /**
+   * Enable in-memory caching of JWT verification results. See {@link JWTAuthOptions.cache}
+   * for the full security tradeoff documentation.
+   */
+  readonly cache?: boolean | JWTCacheOptions;
 };
 
 /**

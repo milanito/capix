@@ -111,7 +111,12 @@ export function createExecutionEngine(options: ExecutionEngineOptions): InvokeFn
     try {
       for (const guard of cap.guards) {
         try {
-          await guard(ctx);
+          // Avoid microtask tick for sync guards (void return). Only await when the guard
+          // actually returns a Promise (async guards or explicit return Promise<void>).
+          const r = guard(ctx);
+          if (r !== undefined && r !== null && typeof (r as { then?: unknown }).then === 'function') {
+            await r;
+          }
         } catch (err) {
           if (isDevelopment && !isFrameworkError(err)) {
             const name = (guard as { name?: string }).name || '(anonymous)';
@@ -126,7 +131,10 @@ export function createExecutionEngine(options: ExecutionEngineOptions): InvokeFn
 
     // 4. Validate input
     let validatedInput: unknown;
-    if (cap.inputSchema !== null) {
+    if (cap._skipValidation) {
+      // z.object({}) — nothing to validate; pass through as empty object.
+      validatedInput = req.input ?? {};
+    } else if (cap.inputSchema !== null) {
       // Try sync parse first (no Promise overhead for the common case).
       // Falls back to safeParseAsync only when the schema has async refinements.
       let result: Awaited<ReturnType<typeof cap.inputSchema.safeParseAsync>>;
@@ -202,8 +210,9 @@ export function createExecutionEngine(options: ExecutionEngineOptions): InvokeFn
       };
     }
 
-    // 9. Validate output (internal error if schema fails)
-    if (cap.outputSchema !== null) {
+    // 9. Validate output — development only. In production, TypeScript types and the
+    //    compiled fjs serializer enforce the shape; Zod's runtime parse is redundant overhead.
+    if (cap.outputSchema !== null && isDevelopment) {
       let result: { success: true; data: unknown } | { success: false; error: { issues: unknown[] } };
       try {
         result = cap.outputSchema.safeParse(output) as typeof result;
@@ -211,16 +220,14 @@ export function createExecutionEngine(options: ExecutionEngineOptions): InvokeFn
         result = await cap.outputSchema.safeParseAsync(output) as typeof result;
       }
       if (!result.success) {
-        if (isDevelopment) {
-          console.error(`[capix] Output validation failed for '${req.capability}':`, result.error.issues);
-        }
+        console.error(`[capix] Output validation failed for '${req.capability}':`, result.error.issues);
         return {
           ok: false,
           error: {
             status: 500,
             error: 'Internal',
             message: `Capability '${req.capability}' returned invalid output`,
-            ...(isDevelopment ? { meta: { issues: result.error.issues } } : {}),
+            meta: { issues: result.error.issues },
           },
         };
       }
