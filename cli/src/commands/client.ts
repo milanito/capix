@@ -33,8 +33,9 @@ function zodTypeToTs(def: unknown): string {
     case 'ZodObject': {
       const shapeFn = (d._def as unknown as { shape?: () => Record<string, unknown> })?.shape;
       const shape: Record<string, unknown> = typeof shapeFn === 'function' ? shapeFn() : {};
-      const fields = Object.entries(shape).map(([k, v]) => `${k}: ${zodTypeToTs(v)}`).join('; ');
-      return `{ ${fields} }`;
+      const entries = Object.entries(shape);
+      if (entries.length === 0) return 'Record<string, never>';
+      return `{ ${renderFields(entries)} }`;
     }
     case 'ZodUnion': {
       const opts = ((d._def as { options?: unknown[] })?.options ?? []).map(zodTypeToTs);
@@ -45,20 +46,41 @@ function zodTypeToTs(def: unknown): string {
   }
 }
 
-function renderInputType(cap: AnyCapability): string {
-  if (!cap.inputSchema) return 'Record<string, never>';
-  const schema = cap.inputSchema as { shape?: Record<string, unknown> };
-  const shape = schema.shape;
-  if (!shape) return 'unknown';
-  const fields = Object.entries(shape).map(([k, v]) => `${k}: ${zodTypeToTs(v)}`);
-  return `{ ${fields.join('; ')} }`;
+/**
+ * Renders object fields as TypeScript property declarations.
+ * ZodOptional fields use the `key?: T` syntax rather than `key: T | undefined`.
+ */
+function renderFields(entries: Array<[string, unknown]>): string {
+  return entries.map(([k, v]) => {
+    const d = v as { _def?: { typeName?: string; innerType?: unknown } };
+    if (d._def?.typeName === 'ZodOptional') {
+      return `${k}?: ${zodTypeToTs(d._def?.innerType)}`;
+    }
+    return `${k}: ${zodTypeToTs(v)}`;
+  }).join('; ');
+}
+
+/** Extracts `:param` names from a route path like `/projects/:id/tasks/:taskId`. */
+function extractPathParams(routePath: string): string[] {
+  const params: string[] = [];
+  for (const segment of routePath.split('/')) {
+    if (segment.startsWith(':')) params.push(segment.slice(1));
+  }
+  return params;
+}
+
+/** Returns the Zod schema's shape, or an empty object if not available. */
+function getShape(cap: AnyCapability): Record<string, unknown> {
+  const schema = cap.inputSchema as { _def?: { shape?: () => Record<string, unknown> } } | null;
+  const shapeFn = schema?._def?.shape;
+  return typeof shapeFn === 'function' ? shapeFn() : {};
 }
 
 function capNameToFn(name: string): string {
   return name.replace(/\./g, '_').replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
 }
 
-function generateClient(registry: CapabilityRegistry, baseUrl: string): string {
+export function generateClient(registry: CapabilityRegistry, baseUrl: string): string {
   let routes: RouteDefinition[] = [];
   try {
     routes = generateRoutes(registry);
@@ -94,44 +116,50 @@ function generateClient(registry: CapabilityRegistry, baseUrl: string): string {
     if (!route) continue;
 
     const fnName = capNameToFn(name);
-    const inputType = renderInputType(cap);
-    const hasInput = cap.inputSchema !== null;
-    const isBodyMethod = !['GET', 'DELETE', 'HEAD'].includes(route.method);
+    const isReadOnly = ['GET', 'HEAD', 'DELETE'].includes(route.method);
+    const pathParams = extractPathParams(route.path);
+    const pathParamSet = new Set(pathParams);
+    const shape = cap.inputSchema !== null ? getShape(cap) : {};
 
-    // Extract path param names from route pattern (e.g. /projects/:id → ['id'])
-    const pathParams = [...route.path.matchAll(/:([a-zA-Z]+)/g)].map((m) => m[1] ?? '');
-    const pathWithTypes = route.path.replace(/:([a-zA-Z]+)/g, '${input.$1}');
-    const useTemplatePath = pathWithTypes !== route.path;
+    // Non-path fields go into body (writes) or query string (reads)
+    const remainingEntries = Object.entries(shape).filter(([k]) => !pathParamSet.has(k));
+    const hasRemaining = remainingEntries.length > 0;
 
-    const inputParam = hasInput ? `input: ${inputType}` : '';
-    const pathExpr = useTemplatePath ? `\`${pathWithTypes}\`` : `'${route.path}'`;
+    // Build function parameter list
+    const fnParams: string[] = [];
 
-    // Build the body argument:
-    // - GET/DELETE: no body, pass input as query params via request()
-    // - body method, no path params: pass full input as body
-    // - body method, with path params: extract non-path fields and pass as body
-    let bodyArg = '';
-    if (hasInput) {
-      if (!isBodyMethod) {
-        bodyArg = ', input'; // query params
-      } else if (!useTemplatePath) {
-        bodyArg = ', input'; // full input as body
+    // One typed arg per path param
+    for (const p of pathParams) {
+      const typeDef = shape[p];
+      fnParams.push(`${p}: ${typeDef !== undefined ? zodTypeToTs(typeDef) : 'string'}`);
+    }
+
+    // Body or query param for remaining fields
+    if (hasRemaining) {
+      const allOptional = remainingEntries.every(([, v]) => {
+        const d = v as { _def?: { typeName?: string } };
+        return d._def?.typeName === 'ZodOptional';
+      });
+      const fieldsType = `{ ${renderFields(remainingEntries)} }`;
+      if (isReadOnly) {
+        // Query params are always optional — callers may omit them
+        fnParams.push(`query?: ${fieldsType}`);
       } else {
-        // body method with path params: pass only non-path fields
-        const schema = cap.inputSchema as { _def?: { shape?: () => Record<string, unknown> } };
-        const shapeFn = schema._def?.shape;
-        const shape = typeof shapeFn === 'function' ? shapeFn() : null;
-        const bodyFields = shape
-          ? Object.keys(shape).filter((k) => !pathParams.includes(k))
-          : [];
-        if (bodyFields.length > 0) {
-          bodyArg = `, { ${bodyFields.map((f) => `${f}: input.${f}`).join(', ')} }`;
-        }
+        fnParams.push(allOptional ? `body?: ${fieldsType}` : `body: ${fieldsType}`);
       }
     }
 
-    lines.push(`export async function ${fnName}(${inputParam}): Promise<unknown> {`);
-    lines.push(`  return request('${route.method}', ${pathExpr}${bodyArg});`);
+    // Path expression: template literal for routes with params, plain string otherwise
+    const pathExpr = pathParams.length > 0
+      ? `\`${route.path.replace(/:([a-zA-Z]+)/g, '${$1}')}\``
+      : `'${route.path}'`;
+
+    // Third arg to request(): body for write methods, query for read methods
+    // Only provided when there are remaining (non-path) fields
+    const thirdArg = hasRemaining ? (isReadOnly ? ', query' : ', body') : '';
+
+    lines.push(`export async function ${fnName}(${fnParams.join(', ')}): Promise<unknown> {`);
+    lines.push(`  return request('${route.method}', ${pathExpr}${thirdArg});`);
     lines.push(`}`);
     lines.push('');
   }

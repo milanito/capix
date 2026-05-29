@@ -1,6 +1,6 @@
 {
   "name": "capix-plugin-helmet",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha.1",
   "description": "Security headers plugin for Capix",
   "license": "MIT",
   "type": "module",
