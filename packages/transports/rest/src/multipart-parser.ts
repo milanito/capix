@@ -34,7 +34,6 @@ export function parseMultipart(
   return new Promise((resolve, reject) => {
     const fields: Record<string, string> = {};
     const files: Record<string, UploadedFile> = {};
-    let fileCount = 0;
     let settled = false;
 
     function fail(err: ParseError): void {
@@ -58,9 +57,6 @@ export function parseMultipart(
     });
 
     busboy.on('file', (fieldName, stream, info) => {
-      fileCount++;
-      void fileCount; // counted for potential future use
-
       const chunks: Buffer[] = [];
       let truncated = false;
 

@@ -35,7 +35,32 @@ export type Server = {
   readonly invoke: InvokeFn;
 };
 
-/** Creates a Capix server from a config object. */
+/**
+ * Creates a Capix server from a config object.
+ *
+ * Compiles the capability tree into a registry, wires plugins, and returns a
+ * server with `start()` / `stop()` lifecycle methods and a direct `invoke()`
+ * entry point (useful for testing without HTTP).
+ *
+ * @throws {Error} At construction time if a plugin capability name collides with
+ *   a user capability name.
+ *
+ * @example
+ * const server = createServer({
+ *   context: buildContext,
+ *   capabilities: { users: { getUser, createUser } },
+ *   transports: [restTransport({ port: 3000 })],
+ * });
+ * await server.start();
+ *
+ * // Direct invocation (no HTTP round-trip, useful in tests):
+ * const res = await server.invoke({
+ *   capability: 'users.getUser',
+ *   input: { id: '1' },
+ *   headers: {},
+ *   signal: AbortSignal.timeout(5000),
+ * });
+ */
 export function createServer(config: ServerConfig): Server {
   const plugins = config.plugins ?? [];
   const { wrapContext, additionalCapabilities } = mergePlugins(plugins);

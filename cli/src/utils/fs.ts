@@ -39,19 +39,3 @@ export function findProjectRoot(from: string = process.cwd()): string | null {
     dir = parent;
   }
 }
-
-export function resolveCapixRoot(from: string = process.cwd()): string {
-  // Check for pnpm-workspace.yaml to find monorepo root
-  let dir = path.resolve(from);
-  while (true) {
-    if (fileExists(path.join(dir, 'pnpm-workspace.yaml'))) return dir;
-    if (fileExists(path.join(dir, 'package.json'))) {
-      const pkg = readJsonFile<{ workspaces?: string[] }>(path.join(dir, 'package.json'));
-      if (pkg.workspaces) return dir;
-    }
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-  return process.cwd();
-}

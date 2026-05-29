@@ -212,6 +212,36 @@ function makeCapability<TInput, TOutput, TContext extends BaseContext>(
 // capability() overloads
 // ---------------------------------------------------------------------------
 
+/**
+ * Defines a capability — the unit of server-side logic in Capix.
+ *
+ * Wraps a resolver function with optional input validation (Zod schema), guards,
+ * and enhancers. Capabilities are the building blocks registered in createServer().
+ *
+ * @example No-input capability
+ * const ping = capability(() => ({ pong: true }));
+ *
+ * @example With Zod input schema
+ * const getUser = capability(
+ *   z.object({ id: z.string() }),
+ *   async (input, ctx) => db.users.find(input.id),
+ * );
+ *
+ * @example With explicit intent (overrides key-based inference in inferRoutes)
+ * const deletePost = capability(
+ *   z.object({ id: z.string() }),
+ *   async (input, ctx) => db.posts.delete(input.id),
+ *   'delete',
+ * );
+ *
+ * @example Adding guards and enhancers
+ * const createPost = capability(schema, resolver)
+ *   .guard(mustBeAuthenticated)
+ *   .enhance(withTimeout(5000));
+ *
+ * Use {@link capability.withContext} to pre-bind the context type when all
+ * capabilities in a module share the same application context.
+ */
 /** No-input capability. */
 export function capability<TOutput, TContext extends BaseContext = BaseContext>(
   resolver: (input: undefined, ctx: TContext) => TOutput | Promise<TOutput>,
@@ -364,8 +394,17 @@ export interface GroupTree {
 }
 
 /**
- * Walks a group tree recursively, builds a flat Map with dot-path keys,
- * and names each capability from its path.
+ * Flattens a nested capability tree into a registry Map keyed by dot-path names.
+ *
+ * `createServer` calls this automatically — use it directly only when building
+ * custom transports or tooling that needs the registry before the server starts.
+ *
+ * Each capability is named from its path in the tree (`users.getUser`, `posts.create`).
+ * Capabilities with an empty `z.object({})` input schema have `_skipValidation` set so
+ * the execution engine bypasses Zod entirely for those routes.
+ *
+ * @throws {Error} If any key is not a camelCase identifier (letters and digits only,
+ *   must start with a letter). Dashes, underscores, and leading digits are rejected.
  */
 const VALID_KEY = /^[a-zA-Z][a-zA-Z0-9]*$/;
 
