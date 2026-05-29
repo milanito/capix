@@ -41,7 +41,7 @@ export function registerDocs(program: Command): void {
   program
     .command('docs')
     .description('print capability documentation as Markdown')
-    .option('--config <path>', 'path to capabilities file', 'src/capabilities.ts')
+    .option('--config <path>', 'path to capabilities file')
     .option('--output <file>', 'write to file instead of stdout')
     .action(async (opts: { config: string; output?: string }) => {
       const { registry } = await loadRegistry(opts.config);

@@ -8,7 +8,7 @@ export function registerCall(program: Command): void {
   program
     .command('call <capability> [input]')
     .description('invoke a capability directly (bypasses transport, uses minimal context)')
-    .option('--config <path>', 'path to capabilities file', 'src/capabilities.ts')
+    .option('--config <path>', 'path to capabilities file')
     .option('--json', 'output raw JSON (no formatting)')
     .action(async (capName: string, inputArg: string | undefined, opts: { config: string; json?: boolean }) => {
       const { registry } = await loadRegistry(opts.config);

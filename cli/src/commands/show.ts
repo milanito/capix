@@ -6,7 +6,7 @@ export function registerShow(program: Command): void {
   program
     .command('show <capability>')
     .description('show details for a single capability')
-    .option('--config <path>', 'path to capabilities file', 'src/capabilities.ts')
+    .option('--config <path>', 'path to capabilities file')
     .action(async (capName: string, opts: { config: string }) => {
       const { registry } = await loadRegistry(opts.config);
 
@@ -27,10 +27,6 @@ export function registerShow(program: Command): void {
       print.blank();
       print.item('intent', cap.intent);
       print.item('guards', String(cap.guards.length));
-
-      if (cap.http) {
-        print.item('http', `${cap.http.method} ${cap.http.path}`);
-      }
 
       if (cap.inputSchema) {
         print.blank();

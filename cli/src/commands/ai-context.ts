@@ -51,7 +51,7 @@ export function registerAiContext(program: Command): void {
   program
     .command('ai-context')
     .description('generate a machine-readable context document for AI assistants')
-    .option('--config <path>', 'path to capabilities file', 'src/capabilities.ts')
+    .option('--config <path>', 'path to capabilities file')
     .option('--output <file>', 'output file path (default: .capix-context.json)')
     .option('--name <name>', 'project name (default: directory name)')
     .action(async (opts: { config: string; output?: string; name?: string }) => {
@@ -68,7 +68,7 @@ export function registerAiContext(program: Command): void {
   program
     .command('sync-ai-context')
     .description('refresh .capix-context.json in place (alias for ai-context)')
-    .option('--config <path>', 'path to capabilities file', 'src/capabilities.ts')
+    .option('--config <path>', 'path to capabilities file')
     .option('--name <name>', 'project name')
     .action(async (opts: { config: string; name?: string }) => {
       const { registry } = await loadRegistry(opts.config);

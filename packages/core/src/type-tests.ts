@@ -300,10 +300,6 @@ void _t11a;
 const _t11b = minCap(() => 42, 'query');
 void _t11b;
 
-// no-schema + intent + opts
-const _t11c = minCap(() => 42, 'query', { http: { method: 'GET', path: '/test' } });
-void _t11c;
-
 // schema + resolver
 const _t11d = minCap(z.object({ id: z.string() }), ({ id }) => id);
 void _t11d;
@@ -311,12 +307,3 @@ void _t11d;
 // schema + resolver + intent
 const _t11e = minCap(z.object({ id: z.string() }), ({ id }) => id, 'query');
 void _t11e;
-
-// schema + resolver + intent + opts
-const _t11f = minCap(
-  z.object({ id: z.string() }),
-  ({ id }) => id,
-  'query',
-  { http: { method: 'GET', path: '/test/:id' } },
-);
-void _t11f;

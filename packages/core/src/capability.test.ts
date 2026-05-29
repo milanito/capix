@@ -283,3 +283,57 @@ describe('compileRegistry', () => {
     ).rejects.toBeDefined();
   });
 });
+
+describe('resolveUnchecked', () => {
+  it('invokes resolver with any BaseContext subtype', async () => {
+    const cap = capability(
+      z.object({ x: z.number() }),
+      async ({ x }) => x * 2,
+    );
+    const result = await cap.resolveUnchecked({ x: 5 }, baseCtx);
+    expect(result).toBe(10);
+  });
+
+  it('return type matches capability output', async () => {
+    const cap = capability(
+      z.object({ name: z.string() }),
+      async ({ name }) => ({ greeting: `Hello, ${name}!` }),
+    );
+    const result = await cap.resolveUnchecked({ name: 'Alice' }, baseCtx);
+    expect(result).toEqual({ greeting: 'Hello, Alice!' });
+  });
+
+  it('guards do not re-run when using resolveUnchecked', async () => {
+    const guardSpy = vi.fn();
+    const cap = capability(() => 1).guard(() => guardSpy());
+    await cap.resolveUnchecked(undefined, baseCtx);
+    expect(guardSpy).not.toHaveBeenCalled();
+  });
+
+  it('resolver receives the passed context at runtime', async () => {
+    const cap = capability(
+      z.object({}),
+      async (_input, ctx) => (ctx as typeof baseCtx).requestId,
+    );
+    const result = await cap.resolveUnchecked({}, { requestId: 'my-id' });
+    expect(result).toBe('my-id');
+  });
+
+  it('no-input capability resolves with undefined input', async () => {
+    const cap = capability(() => 42);
+    const result = await cap.resolveUnchecked(undefined, baseCtx);
+    expect(result).toBe(42);
+  });
+});
+
+describe('Capability has no http field', () => {
+  it('capability object has no http property', () => {
+    const cap = capability(() => 1);
+    expect('http' in cap).toBe(false);
+  });
+
+  it('capability factory accepts no http option (3-arg max)', () => {
+    const cap = capability(z.object({ id: z.string() }), async (i) => i, 'query');
+    expect(cap.intent).toBe('query');
+  });
+});

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
 import { capability, compileRegistry } from 'capix';
+import type { HttpOverride } from 'capix-transport-rest';
 import { generateClient } from './client.js';
 
 // ---------------------------------------------------------------------------
@@ -11,8 +12,11 @@ function makeRegistry(caps: Record<string, Record<string, ReturnType<typeof capa
   return compileRegistry(caps);
 }
 
-function clientFor(caps: Record<string, Record<string, ReturnType<typeof capability>>>) {
-  return generateClient(makeRegistry(caps), 'http://localhost:3000');
+function clientFor(
+  caps: Record<string, Record<string, ReturnType<typeof capability>>>,
+  overrides: Record<string, HttpOverride> = {},
+) {
+  return generateClient(makeRegistry(caps), 'http://localhost:3000', overrides);
 }
 
 // ---------------------------------------------------------------------------
@@ -226,16 +230,18 @@ describe('client generator — path templates', () => {
   });
 
   it('multiple path params are all referenced directly', () => {
-    const out = clientFor({
-      orgs: {
-        getOrgProject: capability(
-          z.object({ orgId: z.string(), projectId: z.string() }),
-          async (i) => i,
-          'query',
-          { http: { method: 'GET', path: '/orgs/:orgId/projects/:projectId' } },
-        ),
+    const out = clientFor(
+      {
+        orgs: {
+          getOrgProject: capability(
+            z.object({ orgId: z.string(), projectId: z.string() }),
+            async (i) => i,
+            'query',
+          ),
+        },
       },
-    });
+      { 'orgs.getOrgProject': { method: 'GET', path: '/orgs/:orgId/projects/:projectId' } },
+    );
     expect(out).toContain('${orgId}');
     expect(out).toContain('${projectId}');
     expect(out).not.toContain('${input.');

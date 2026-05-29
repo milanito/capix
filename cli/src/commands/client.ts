@@ -3,7 +3,7 @@ import * as path from 'node:path';
 import * as print from '../utils/print.js';
 import { loadRegistry } from '../utils/loader.js';
 import { generateRoutes } from 'capix-transport-rest';
-import type { RouteDefinition } from 'capix-transport-rest';
+import type { RouteDefinition, HttpOverride } from 'capix-transport-rest';
 import type { AnyCapability, CapabilityRegistry } from 'capix';
 
 function zodTypeToTs(def: unknown): string {
@@ -80,10 +80,14 @@ function capNameToFn(name: string): string {
   return name.replace(/\./g, '_').replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
 }
 
-export function generateClient(registry: CapabilityRegistry, baseUrl: string): string {
+export function generateClient(
+  registry: CapabilityRegistry,
+  baseUrl: string,
+  overrides: Record<string, HttpOverride> = {},
+): string {
   let routes: RouteDefinition[] = [];
   try {
-    routes = generateRoutes(registry);
+    routes = generateRoutes(registry, { overrides });
   } catch {
     routes = [];
   }
@@ -171,7 +175,7 @@ export function registerClient(program: Command): void {
   program
     .command('client')
     .description('generate a typed fetch client from capabilities')
-    .option('--config <path>', 'path to capabilities file', 'src/capabilities.ts')
+    .option('--config <path>', 'path to capabilities file')
     .option('--output <file>', 'output file path (default: src/client.ts)')
     .option('--base-url <url>', 'base URL for the client', 'http://localhost:3000')
     .action(async (opts: { config: string; output?: string; baseUrl: string }) => {

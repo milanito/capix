@@ -18,7 +18,6 @@ export type { Guard, NarrowingGuard, AnyGuard, NarrowContext, InputGuard, AnyInp
 export { capability, isCapability, compileRegistry, inferIntent } from './capability.js';
 export type {
   Intent,
-  HttpOverride,
   Enhancer,
   Resolver,
   Capability,

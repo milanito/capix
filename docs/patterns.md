@@ -171,8 +171,21 @@ export const stripeWebhook = cap(
     return { received: true };
   },
   'mutation',
-  { http: { method: 'POST', path: '/webhooks/stripe' } },
 ).guard(mustBeValidStripeSignature);
+```
+
+Register the override in `restTransport`:
+```ts
+createServer({
+  context: buildContext,
+  capabilities,
+  transports: [restTransport({
+    port: 3000,
+    overrides: {
+      'payments.stripeWebhook': { method: 'POST', path: '/webhooks/stripe' },
+    },
+  })],
+}).start();
 ```
 
 The key insight: include `rawBody: req.rawBody` in your context in `buildContext`.
@@ -257,6 +270,81 @@ return order; // returns immediately — job runs in background
 
 For production, replace `setImmediate` with a real queue (BullMQ, Faktory, etc.)
 without changing the capability code — just swap the `enqueue` implementation.
+
+---
+
+## Enhancers that require guards
+
+**KNOWN LIMITATION:** TypeScript cannot enforce that a specific guard was applied
+before an enhancer. If your enhancer accesses context fields that are only non-null
+after a guard runs (e.g. `ctx.org`, `ctx.user`), the compiler accepts the enhancer
+applied to any capability — a missing guard fails silently at runtime.
+
+**Recommended mitigations:**
+
+1. **Fail fast in the enhancer** — check the field and throw an internal error
+   rather than letting a null dereference produce an opaque crash:
+
+```ts
+export const withUsageTracking = (resource: string) =>
+  defineEnhancer((cap) => ({
+    ...cap,
+    resolve: async (input: unknown, ctx: unknown) => {
+      const appCtx = ctx as AppContext;
+
+      if (!appCtx.org) {
+        // Guards were not applied in the right order.
+        throw new Error(`[withUsageTracking] ctx.org is null — apply mustBeAuthenticated before withUsageTracking`);
+      }
+
+      const limit = planLimit(appCtx.org.plan, resource);
+      const current = appCtx.db.usage.get(appCtx.org.id, currentPeriod(), resource);
+      if (current >= limit) throw errors.QuotaExceeded({ resource, limit, current });
+
+      const result = await (cap as AnyCapability).resolve(input, ctx);
+      appCtx.db.usage.increment(appCtx.org.id, currentPeriod(), resource);
+      return result;
+    },
+  })) as ReturnType<typeof defineEnhancer>;
+```
+
+2. **Document the dependency** — add a JSDoc comment to the enhancer factory:
+
+```ts
+/**
+ * Checks and increments quota for the given resource.
+ *
+ * KNOWN LIMITATION: TypeScript does not enforce ordering — the compiler will not
+ * warn if this enhancer is applied without a prior `mustBeAuthenticated` guard.
+ * `ctx.org` will be null at runtime if the guard is missing.
+ *
+ * Always apply guards before this enhancer:
+ * ```ts
+ * cap(schema, resolver, 'mutation')
+ *   .guard(mustBeAuthenticated)
+ *   .enhance(withUsageTracking('projects'));  // ← ctx.org is now guaranteed non-null
+ * ```
+ */
+export const withUsageTracking = (resource: string) => defineEnhancer(/* ... */);
+```
+
+3. **Use a typed factory pattern** — pass the narrowed context type as a type
+   parameter and cast at call sites:
+
+```ts
+function withUsageTracking<TCtx extends { org: Org; db: DB }>(resource: string) {
+  return defineEnhancer((cap) => ({
+    ...cap,
+    resolve: async (input: unknown, ctx: unknown) => {
+      const appCtx = ctx as TCtx;
+      // ctx.org is typed non-null here — the assertion is still runtime-only
+      // but the type parameter communicates the requirement
+    },
+  })) as ReturnType<typeof defineEnhancer>;
+}
+```
+
+This documents intent but still doesn't prevent misuse at compile time.
 
 ---
 

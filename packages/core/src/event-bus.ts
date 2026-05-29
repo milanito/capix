@@ -25,6 +25,22 @@ export type EventBus<TEvents extends EventMap> = {
     /**
      * Server-internal subscription (no client context).
      * Not removed by unsubscribeAll — use the returned unsubscribe fn to clean up.
+     *
+     * @param handler - Called synchronously when the event is published.
+     *   If the handler is async, the returned Promise is NOT awaited by `publish()`.
+     *   This is intentional fire-and-forget behavior — suitable for webhooks and
+     *   notifications where failures should be handled independently.
+     *
+     *   Always wrap async subscriber logic in try/catch:
+     *   ```ts
+     *   eventBus.subscribe('order:completed', async (data) => {
+     *     try {
+     *       await sendWebhook(data);
+     *     } catch (err) {
+     *       logger.error('Webhook delivery failed', err);
+     *     }
+     *   });
+     *   ```
      */
     <K extends keyof TEvents & string>(
       event: K,
@@ -33,6 +49,9 @@ export type EventBus<TEvents extends EventMap> = {
     ): () => void;
     /**
      * Client subscription — removed when unsubscribeAll(clientId) is called on disconnect.
+     *
+     * @param handler - Called synchronously when the event is published.
+     *   Async handlers are fire-and-forget — errors do not propagate to the publisher.
      */
     <K extends keyof TEvents & string>(
       clientId: string,

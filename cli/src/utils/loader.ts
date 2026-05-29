@@ -4,11 +4,15 @@
  * The file should export its capabilities as named exports or a default export
  * of a GroupTree. It must NOT call server.start() — keep that in server.ts.
  *
- * Convention:
- *   src/capabilities.ts  — named exports or default GroupTree (default for CLI)
- *   src/server.ts        — imports capabilities and starts the server
+ * Convention (checked in order):
+ *   src/capabilities/index.ts  — directory structure (common for larger projects)
+ *   src/capabilities.ts        — single file (scaffold default)
+ *   capabilities/index.ts      — without src/ prefix
+ *   capabilities.ts            — without src/ prefix
+ *   src/server.ts              — imports capabilities and starts the server
  */
 import * as path from 'node:path';
+import * as fs from 'node:fs';
 import type { GroupTree } from 'capix';
 import { compileRegistry, isCapability } from 'capix';
 import type { CapabilityRegistry } from 'capix';
@@ -23,15 +27,48 @@ export type LoadedRegistry = {
   registry: CapabilityRegistry;
 };
 
-export async function loadRegistry(configPath: string): Promise<LoadedRegistry> {
-  const abs = path.resolve(process.cwd(), configPath);
+const CAPABILITY_CANDIDATES = [
+  'src/capabilities/index.ts',
+  'src/capabilities.ts',
+  'capabilities/index.ts',
+  'capabilities.ts',
+];
+
+/**
+ * Searches common locations for a capabilities file, returning the first found path.
+ * Returns null if none is found.
+ */
+export function findCapabilitiesFile(cwd: string): string | null {
+  for (const candidate of CAPABILITY_CANDIDATES) {
+    if (fs.existsSync(path.join(cwd, candidate))) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
+export async function loadRegistry(configPath?: string): Promise<LoadedRegistry> {
+  let resolvedConfig = configPath;
+  if (!resolvedConfig) {
+    const found = findCapabilitiesFile(process.cwd());
+    if (!found) {
+      print.fatal(
+        `[capix] Could not find capabilities file. Checked:\n` +
+        CAPABILITY_CANDIDATES.map((c) => `  - ${c}`).join('\n') +
+        `\n\nRun this command from your project root, or specify the path:\n` +
+        `  capix list --config src/my-capabilities.ts`,
+      );
+    }
+    resolvedConfig = found!;
+  }
+  const abs = path.resolve(process.cwd(), resolvedConfig);
   let mod: unknown;
 
   try {
     mod = await import(abs);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    print.fatal(`Failed to load ${configPath}: ${msg}`);
+    print.fatal(`Failed to load ${resolvedConfig}: ${msg}`);
   }
 
   const m = mod as Record<string, unknown>;
@@ -63,7 +100,7 @@ export async function loadRegistry(configPath: string): Promise<LoadedRegistry> 
   }
 
   print.fatal(
-    `${configPath} does not export a Capix GroupTree.\n` +
+    `${resolvedConfig} does not export a Capix GroupTree.\n` +
     `  Expected: export const capabilities = { group: { capability } }\n` +
     `  Or:       export default { group: { capability } }`,
   );

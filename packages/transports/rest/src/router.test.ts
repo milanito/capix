@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { z } from 'zod';
 import { capability, compileRegistry } from 'capix';
 import { compileRouter, generateRoutes } from './router.js';
@@ -236,12 +236,18 @@ describe('generateRoutes', () => {
     expect(r).toContainEqual({ method: 'DELETE', path: '/users/:id', capability: 'users.deleteUser' });
   });
 
-  it('http override takes precedence over inference', () => {
-    const cap = capability(z.object({}), () => null);
-    (cap as unknown as Record<string, unknown>)['http'] = { method: 'GET', path: '/custom' };
-    const reg = compileRegistry({ createFoo: cap });
-    const r = generateRoutes(reg);
+  it('transport-level override takes precedence over inference', () => {
+    const reg = compileRegistry({ createFoo: capability(z.object({}), () => null) });
+    const r = generateRoutes(reg, { overrides: { createFoo: { method: 'GET', path: '/custom' } } });
     expect(r).toContainEqual({ method: 'GET', path: '/custom', capability: 'createFoo' });
+  });
+
+  it('unknown override key logs a warning', () => {
+    const reg = compileRegistry({ createFoo: capability(z.object({}), () => null) });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    generateRoutes(reg, { overrides: { 'nonexistent.cap': { method: 'GET', path: '/x' } } });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("nonexistent.cap"));
+    warn.mockRestore();
   });
 
   it('get* without id → GET /group', () => {

@@ -3,7 +3,7 @@ import * as print from '../utils/print.js';
 import { loadRegistry } from '../utils/loader.js';
 import type { CapabilityRegistry } from 'capix';
 
-type CapSnap = { intent: string; guards: number; hasInput: boolean; hasOutput: boolean; http: string | null };
+type CapSnap = { intent: string; guards: number; hasInput: boolean; hasOutput: boolean };
 
 function registrySnapshot(registry: CapabilityRegistry): Map<string, CapSnap> {
   const snap = new Map<string, CapSnap>();
@@ -13,7 +13,6 @@ function registrySnapshot(registry: CapabilityRegistry): Map<string, CapSnap> {
       guards: cap.guards.length,
       hasInput: cap.inputSchema !== null,
       hasOutput: cap.outputSchema !== null,
-      http: cap.http ? `${cap.http.method} ${cap.http.path}` : null,
     });
   }
   return snap;
@@ -50,7 +49,6 @@ export function registerDiff(program: Command): void {
         if (a.guards !== b.guards) diffs.push(`guards: ${a.guards} → ${b.guards}`);
         if (a.hasInput !== b.hasInput) diffs.push(`input: ${a.hasInput} → ${b.hasInput}`);
         if (a.hasOutput !== b.hasOutput) diffs.push(`output: ${a.hasOutput} → ${b.hasOutput}`);
-        if (a.http !== b.http) diffs.push(`http: ${a.http ?? 'none'} → ${b.http ?? 'none'}`);
         if (diffs.length > 0) changed.push([name, diffs.join(', ')]);
       }
 

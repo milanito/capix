@@ -8,7 +8,7 @@ export function registerList(program: Command): void {
     .command('list')
     .alias('ls')
     .description('list all registered capabilities')
-    .option('--config <path>', 'path to capabilities file', 'src/capabilities.ts')
+    .option('--config <path>', 'path to capabilities file')
     .action(async (opts: { config: string }) => {
       const { registry } = await loadRegistry(opts.config);
 

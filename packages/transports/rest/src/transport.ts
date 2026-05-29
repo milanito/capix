@@ -12,7 +12,7 @@ import * as http from 'node:http';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { Transport, MountOptions, InvokeFn, CapabilityResponse } from 'capix';
 import { compileRouter, generateRoutes } from './router.js';
-import type { Router } from './router.js';
+import type { Router, HttpOverride } from './router.js';
 import { parseMultipart } from './multipart-parser.js';
 import type { MultipartOptions } from './multipart.js';
 import { buildSerializers, defaultSerializer } from './serializer.js';
@@ -48,6 +48,17 @@ export type RestTransportOptions = {
    * and resources indefinitely, causing connection exhaustion under load.
    */
   readonly timeout?: number | false;
+  /**
+   * HTTP route overrides keyed by capability dot-path.
+   * Use for nested resource routes that URL inference cannot produce.
+   *
+   * @example
+   * overrides: {
+   *   'tasks.listProjectTasks': { method: 'GET', path: '/v1/projects/:projectId/tasks' },
+   *   'tasks.createProjectTask': { method: 'POST', path: '/v1/projects/:projectId/tasks' },
+   * }
+   */
+  readonly overrides?: Record<string, HttpOverride>;
 };
 
 /** Creates a REST transport using node:http. */
@@ -310,7 +321,10 @@ export function restTransport(options: RestTransportOptions): Transport {
   return {
     async mount(invoke: InvokeFn, mountOptions: MountOptions): Promise<void> {
       invokeFn = invoke;
-      const routeOpts = options.urlCase !== undefined ? { urlCase: options.urlCase } : {};
+      const routeOpts = {
+        ...(options.urlCase !== undefined ? { urlCase: options.urlCase } : {}),
+        ...(options.overrides !== undefined ? { overrides: options.overrides } : {}),
+      };
       const routes = generateRoutes(mountOptions.registry, routeOpts);
       router = compileRouter(routes);
       serializers = buildSerializers(mountOptions.registry);

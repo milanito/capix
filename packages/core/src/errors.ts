@@ -19,12 +19,18 @@ export type ErrorFactory = (meta?: Record<string, unknown>) => FrameworkError;
 
 /**
  * Derives a PascalCase error name from a human-readable message.
- * 'Not found' → 'NotFound', 'Internal server error' → 'InternalServerError'
+ * - Natural language: 'Not found' → 'NotFound', 'Too many requests' → 'TooManyRequests'
+ * - Already PascalCase (no spaces, starts with uppercase): returned as-is
+ *   e.g. 'QuotaExceeded' → 'QuotaExceeded'
  */
 function deriveErrorName(message: string): string {
+  if (!message.includes(' ') && /^[A-Z]/.test(message)) {
+    return message;
+  }
   return message
     .split(/\s+/)
-    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
     .join('');
 }
 
@@ -34,6 +40,13 @@ function deriveErrorName(message: string): string {
  * @param status  HTTP status code
  * @param message Human-readable error message
  * @param code    Machine-readable PascalCase error code (defaults to message-derived)
+ *
+ * The error code in responses is derived from the message:
+ * - Natural language: 'Not found' → 'NotFound'
+ * - Already PascalCase: 'QuotaExceeded' → 'QuotaExceeded' (preserved as-is)
+ *
+ * For full control over the error code, pass it explicitly:
+ * `defineError(429, 'Quota exceeded for this resource', 'QuotaExceeded')`
  *
  * @example
  * // Explicit code — predictable, easy to test against:

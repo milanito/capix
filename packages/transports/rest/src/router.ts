@@ -21,9 +21,16 @@ export type Router = {
   readonly routes: ReadonlyArray<RouteDefinition>;
 };
 
+export type HttpOverride = {
+  readonly method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD' | 'OPTIONS';
+  readonly path: string;
+};
+
 export type GenerateRoutesOptions = {
   /** Case style for URL path segments. Default: 'kebab' (bulkStatus → bulk-status). */
   urlCase?: 'kebab' | 'camel' | 'snake';
+  /** Per-capability HTTP route overrides keyed by dot-path. Takes full precedence over URL inference. */
+  overrides?: Record<string, HttpOverride>;
 };
 
 // ---------------------------------------------------------------------------
@@ -210,22 +217,28 @@ function applyUrlCase(s: string, urlCase: 'kebab' | 'camel' | 'snake'): string {
 
 /**
  * Generates route definitions from a compiled capability registry.
- * Applies HTTP override if cap.http is set; otherwise infers from intent and key name.
+ * Transport-level overrides take full precedence over URL inference.
  */
 export function generateRoutes(
   registry: CapabilityRegistry,
   options: GenerateRoutesOptions = {},
 ): RouteDefinition[] {
   const urlCase = options.urlCase ?? 'kebab';
+  const overrides = options.overrides ?? {};
   const routes: RouteDefinition[] = [];
 
+  for (const key of Object.keys(overrides)) {
+    if (!registry.has(key)) {
+      console.warn(`[capix] REST transport: override for '${key}' does not match any registered capability.`);
+    }
+  }
+
   for (const [dotPath, cap] of registry) {
-    // HTTP override takes full precedence
-    if (cap.http !== undefined) {
-      routes.push({ method: cap.http.method, path: cap.http.path, capability: dotPath });
+    const override = overrides[dotPath];
+    if (override !== undefined) {
+      routes.push({ method: override.method, path: override.path, capability: dotPath });
       continue;
     }
-
     routes.push(...inferRoutes(dotPath, cap, urlCase));
   }
 

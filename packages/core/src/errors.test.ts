@@ -140,3 +140,29 @@ describe('defaultErrors', () => {
     expect(defaultErrors.Timeout().status).toBe(504);
   });
 });
+
+describe('deriveErrorName — PascalCase handling', () => {
+  it('natural language: "Not found" → "NotFound"', () => {
+    expect(defineError(404, 'Not found')().error).toBe('NotFound');
+  });
+
+  it('natural language: "Too many requests" → "TooManyRequests"', () => {
+    expect(defineError(429, 'Too many requests')().error).toBe('TooManyRequests');
+  });
+
+  it('natural language: "Bad request" → "BadRequest"', () => {
+    expect(defineError(400, 'Bad request')().error).toBe('BadRequest');
+  });
+
+  it('already PascalCase: "QuotaExceeded" → "QuotaExceeded"', () => {
+    expect(defineError(429, 'QuotaExceeded')().error).toBe('QuotaExceeded');
+  });
+
+  it('already PascalCase: "NotFound" → "NotFound"', () => {
+    expect(defineError(404, 'NotFound')().error).toBe('NotFound');
+  });
+
+  it('natural language: "Internal server error" → "InternalServerError"', () => {
+    expect(defineError(500, 'Internal server error')().error).toBe('InternalServerError');
+  });
+});

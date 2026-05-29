@@ -99,8 +99,7 @@ const createProject = capability(
   },
 );
 
-// Nested routes — explicit http override
-// The REST transport merges :projectId from the URL path with query/body fields.
+// Nested routes — capabilities are transport-agnostic; routes configured in restTransport()
 
 const listTasks = capability(
   z.object({
@@ -124,7 +123,6 @@ const listTasks = capability(
     };
   },
   'query',
-  { http: { method: 'GET', path: '/projects/:projectId/tasks' } },
 );
 
 const getTask = capability(
@@ -135,7 +133,6 @@ const getTask = capability(
     return task;
   },
   'query',
-  { http: { method: 'GET', path: '/projects/:projectId/tasks/:id' } },
 );
 
 const createTask = capability(
@@ -149,7 +146,6 @@ const createTask = capability(
     return task;
   },
   'mutation',
-  { http: { method: 'POST', path: '/projects/:projectId/tasks' } },
 );
 
 const updateTask = capability(
@@ -167,7 +163,6 @@ const updateTask = capability(
     return task;
   },
   'update',
-  { http: { method: 'PATCH', path: '/projects/:projectId/tasks/:id' } },
 );
 
 const deleteTask = capability(
@@ -179,7 +174,6 @@ const deleteTask = capability(
     return null;
   },
   'delete',
-  { http: { method: 'DELETE', path: '/projects/:projectId/tasks/:id' } },
 );
 
 // ---------------------------------------------------------------------------
@@ -192,5 +186,14 @@ createServer({
     projects: { listProjects, getProject, createProject },
     tasks:    { listTasks, getTask, createTask, updateTask, deleteTask },
   },
-  transports: [restTransport({ port: 3000 })],
+  transports: [restTransport({
+    port: 3000,
+    overrides: {
+      'tasks.listTasks':  { method: 'GET',    path: '/projects/:projectId/tasks' },
+      'tasks.getTask':    { method: 'GET',    path: '/projects/:projectId/tasks/:id' },
+      'tasks.createTask': { method: 'POST',   path: '/projects/:projectId/tasks' },
+      'tasks.updateTask': { method: 'PATCH',  path: '/projects/:projectId/tasks/:id' },
+      'tasks.deleteTask': { method: 'DELETE', path: '/projects/:projectId/tasks/:id' },
+    },
+  })],
 }).start();

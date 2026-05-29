@@ -7,7 +7,7 @@ export function registerCheck(program: Command): void {
   program
     .command('check')
     .description('validate server config: duplicate routes, naming, schema issues')
-    .option('--config <path>', 'path to capabilities file', 'src/capabilities.ts')
+    .option('--config <path>', 'path to capabilities file')
     .action(async (opts: { config: string }) => {
       const { registry } = await loadRegistry(opts.config);
 
@@ -56,16 +56,16 @@ export function registerCheck(program: Command): void {
         }
       }
 
-      // 5. Detect nested-resource patterns without an http override
+      // 5. Detect nested-resource patterns that may need a transport-level override
       // Keys like listProjectTasks, getProjectTask suggest /projects/:id/tasks hierarchy
       const NESTED_PATTERN = /^(list|get|create|update|delete|find|add|remove)[A-Z][a-z]+[A-Z]/;
       for (const [name, cap] of registry) {
         const key = name.split('.').pop() ?? name;
-        if (NESTED_PATTERN.test(key) && !cap.http) {
+        if (NESTED_PATTERN.test(key)) {
           print.warn(
             `${name}: key "${key}" suggests a nested resource route.\n` +
-            `  The inferred route may be unexpected. Consider:\n` +
-            `  { http: { method: 'GET', path: '/resources/:resourceId/subresources' } }`,
+            `  The inferred route may be unexpected. Consider adding an override to restTransport():\n` +
+            `  overrides: { '${name}': { method: 'GET', path: '/resources/:resourceId/subresources' } }`,
           );
           warnings++;
         }

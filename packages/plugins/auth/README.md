@@ -149,6 +149,49 @@ Creates `{ plugin, mustBeAuthenticated, helpers }` as a unit.
 
 Guard that asserts `ctx.user` is non-null. Throws `401 Unauthorized` when no valid token is present. Pair with `authCap` (the narrowed factory) so `ctx.user` is typed as non-null in the resolver.
 
+## Dual auth: JWT + API key
+
+For APIs that accept both user sessions (JWT Bearer tokens) and machine-to-machine auth (API keys), write `buildContext` manually using `createJWTHelpers` and inspect the incoming headers yourself:
+
+```ts
+// src/context.ts
+import { defineContext } from 'capix';
+import { createJWTHelpers } from 'capix-plugin-auth';
+import { db } from './db.js';
+
+export type AppUser = { id: string; email: string; role: 'customer' | 'admin' };
+
+const jwtHelpers = createJWTHelpers<AppUser>({
+  secret: process.env.JWT_SECRET!,
+  userFromToken: async (payload) => db.users.get(payload['sub'] as string),
+});
+
+export const buildContext = defineContext(async (req) => {
+  const requestId = crypto.randomUUID();
+  let user: AppUser | null = null;
+
+  const authHeader = req.headers['authorization'] ?? '';
+  const apiKeyHeader = req.headers['x-api-key'];
+
+  if (apiKeyHeader) {
+    // API key auth — look up the associated service account
+    user = await db.apiKeys.findUser(String(apiKeyHeader));
+  } else if (authHeader.startsWith('Bearer ')) {
+    // JWT auth
+    user = await jwtHelpers.verify(authHeader.slice(7));
+  }
+
+  return { requestId, user, db };
+});
+```
+
+Both paths produce the same `user` shape, so the rest of your capabilities — guards, resolvers — work identically regardless of which auth method was used.
+
+**When to use this pattern vs `jwtContextBuilder`:**
+
+- Use `jwtContextBuilder` when all your clients use JWT Bearer tokens (the common case).
+- Use manual `defineContext` when you need a second auth path (API keys, session cookies, service-to-service tokens) that `jwtContextBuilder` can't express.
+
 ## License
 
 MIT

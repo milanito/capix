@@ -43,15 +43,6 @@ export function inferIntent(key: string): Intent {
 }
 
 // ---------------------------------------------------------------------------
-// HTTP override
-// ---------------------------------------------------------------------------
-
-export type HttpOverride = {
-  readonly method: string;
-  readonly path: string;
-};
-
-// ---------------------------------------------------------------------------
 // Enhancer
 // ---------------------------------------------------------------------------
 
@@ -91,13 +82,22 @@ export type Capability<
   readonly intent: Intent;
   /** True when intent was explicitly passed to capability(); false when defaulted. */
   readonly _intentExplicit: boolean;
-  readonly http?: HttpOverride;
   /**
    * Set by compileRegistry when inputSchema is a z.object({}) with no keys.
    * The execution engine skips input validation entirely — there is nothing to validate.
    */
   readonly _skipValidation: boolean;
   readonly resolve: Resolver<TInput, TOutput, TContext>;
+
+  /**
+   * Invoke the capability's resolver directly, bypassing TypeScript context
+   * type checking. Use only for server-side capability composition where the
+   * calling context is known to satisfy the required guards at runtime.
+   *
+   * Note: guards do NOT re-run when using resolveUnchecked. You are
+   * responsible for ensuring the context satisfies guard preconditions.
+   */
+  resolveUnchecked(input: TInput, ctx: BaseContext): Promise<TOutput>;
 
   /**
    * Adds a guard to this capability.
@@ -145,7 +145,6 @@ type CapabilityBase = {
   inputGuards: ReadonlyArray<AnyInputGuard>;
   intent: Intent;
   _intentExplicit: boolean;
-  http?: HttpOverride;
   _skipValidation: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   resolve: (...args: any[]) => any;
@@ -203,6 +202,14 @@ function makeCapability<TInput, TOutput, TContext extends BaseContext>(
       enumerable: false,
       configurable: false,
     },
+    resolveUnchecked: {
+      value(input: TInput, ctx: BaseContext): Promise<TOutput> {
+        return Promise.resolve(base.resolve(input, ctx as TContext));
+      },
+      writable: false,
+      enumerable: false,
+      configurable: false,
+    },
   });
 
   return cap;
@@ -253,13 +260,6 @@ export function capability<TOutput, TContext extends BaseContext = BaseContext>(
   intent: Intent,
 ): Capability<undefined, TOutput, TContext>;
 
-/** No-input capability with explicit intent and HTTP override. */
-export function capability<TOutput, TContext extends BaseContext = BaseContext>(
-  resolver: (input: undefined, ctx: TContext) => TOutput | Promise<TOutput>,
-  intent: Intent,
-  opts: { http: HttpOverride },
-): Capability<undefined, TOutput, TContext>;
-
 /** With typed input schema. */
 export function capability<
   TSchema extends ZodTypeAny,
@@ -281,25 +281,12 @@ export function capability<
   intent: Intent,
 ): Capability<TSchema['_output'], TOutput, TContext>;
 
-/** With typed input schema, explicit intent, and HTTP override. */
-export function capability<
-  TSchema extends ZodTypeAny,
-  TOutput,
-  TContext extends BaseContext = BaseContext,
->(
-  schema: TSchema,
-  resolver: Resolver<TSchema['_output'], TOutput, TContext>,
-  intent: Intent,
-  opts: { http: HttpOverride },
-): Capability<TSchema['_output'], TOutput, TContext>;
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function capability(...args: any[]): AnyCapability {
-  const [first, second, thirdArg, fourthOpts] = args as [
+  const [first, second, thirdArg] = args as [
     ZodTypeAny | ((...a: unknown[]) => unknown),
     ((...a: unknown[]) => unknown) | Intent | undefined,
-    Intent | { http: HttpOverride } | undefined,
-    { http: HttpOverride } | undefined,
+    Intent | undefined,
   ];
 
   const isZodSchema =
@@ -308,11 +295,8 @@ export function capability(...args: any[]): AnyCapability {
     '_def' in (first as object);
 
   if (!isZodSchema) {
-    // No-schema overloads: capability(resolver) | capability(resolver, intent) | capability(resolver, intent, opts)
+    // No-schema overloads: capability(resolver) | capability(resolver, intent)
     const explicitIntent = typeof second === 'string' ? (second as Intent) : undefined;
-    const noSchemaOpts =
-      typeof thirdArg === 'object' && thirdArg !== null ? (thirdArg as { http: HttpOverride }) : fourthOpts;
-
     return makeCapability<undefined, unknown, BaseContext>({
       _capix: true,
       [CAPABILITY_BRAND]: true,
@@ -326,16 +310,13 @@ export function capability(...args: any[]): AnyCapability {
       inputGuards: [],
       _intentExplicit: explicitIntent !== undefined,
       intent: explicitIntent ?? 'mutation',
-      ...(noSchemaOpts?.http ? { http: noSchemaOpts.http } : {}),
       _skipValidation: false,
       resolve: first as (...a: unknown[]) => unknown,
     });
   }
 
-  // Schema overloads: capability(schema, resolver) | capability(schema, resolver, intent) | capability(schema, resolver, intent, opts)
+  // Schema overloads: capability(schema, resolver) | capability(schema, resolver, intent)
   const thirdIntent = typeof thirdArg === 'string' ? (thirdArg as Intent) : undefined;
-  const schemaOpts =
-    typeof thirdArg === 'object' && thirdArg !== null ? (thirdArg as { http: HttpOverride }) : fourthOpts;
 
   return makeCapability<unknown, unknown, BaseContext>({
     _capix: true,
@@ -350,7 +331,6 @@ export function capability(...args: any[]): AnyCapability {
     inputGuards: [],
     _intentExplicit: thirdIntent !== undefined,
     intent: thirdIntent ?? 'mutation',
-    ...(schemaOpts?.http ? { http: schemaOpts.http } : {}),
     _skipValidation: false,
     resolve: second as (...a: unknown[]) => unknown,
   });
@@ -445,7 +425,6 @@ export function compileRegistry(tree: GroupTree, prefix = ''): CapabilityRegistr
         inputGuards: value.inputGuards,
         intent: value.intent,
         _intentExplicit: value._intentExplicit,
-        ...(value.http ? { http: value.http } : {}),
         _skipValidation: skipVal,
         resolve: value.resolve,
       };
@@ -477,11 +456,6 @@ export type ScopedCapabilityFactory<TContext extends BaseContext> = {
     resolver: (input: undefined, ctx: TContext) => TOutput | Promise<TOutput>,
     intent: Intent,
   ): Capability<undefined, TOutput, TContext>;
-  <TOutput>(
-    resolver: (input: undefined, ctx: TContext) => TOutput | Promise<TOutput>,
-    intent: Intent,
-    opts: { http: HttpOverride },
-  ): Capability<undefined, TOutput, TContext>;
   <TSchema extends ZodTypeAny, TOutput>(
     schema: TSchema,
     resolver: Resolver<TSchema['_output'], TOutput, TContext>,
@@ -490,12 +464,6 @@ export type ScopedCapabilityFactory<TContext extends BaseContext> = {
     schema: TSchema,
     resolver: Resolver<TSchema['_output'], TOutput, TContext>,
     intent: Intent,
-  ): Capability<TSchema['_output'], TOutput, TContext>;
-  <TSchema extends ZodTypeAny, TOutput>(
-    schema: TSchema,
-    resolver: Resolver<TSchema['_output'], TOutput, TContext>,
-    intent: Intent,
-    opts: { http: HttpOverride },
   ): Capability<TSchema['_output'], TOutput, TContext>;
 };
 

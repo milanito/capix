@@ -227,7 +227,16 @@ The REST transport infers routes from capability names. No annotations required:
 | `deleteUser` | `DELETE /users/:id` |
 | `uploadAvatar` | `POST /users/uploadAvatar` |
 
-Override with `{ http: { method, path } }` when needed.
+To override a route, pass `overrides` to `restTransport` — routing is a transport concern and does not belong in capability definitions:
+
+```ts
+restTransport({
+  port: 3000,
+  overrides: {
+    'tasks.listTasks': { method: 'GET', path: '/projects/:projectId/tasks' },
+  },
+})
+```
 
 ### Plugins
 
@@ -249,21 +258,31 @@ createServer({
 
 ## Nested resource routes
 
-For URLs like `/projects/:projectId/tasks`, use an explicit HTTP override — the inference engine handles flat groups but not hierarchies:
+For URLs like `/projects/:projectId/tasks`, pass `overrides` to `restTransport` — the inference engine handles flat groups but not hierarchies:
 
 ```ts
+// src/capabilities/tasks/list.ts — no routing info here
 const listTasks = capability(
   z.object({
-    projectId: z.string(),          // ← extracted from :projectId in the URL
-    page:      z.coerce.number().default(1), // ← from query string
+    projectId: z.string(),
+    page:      z.coerce.number().default(1),
     status:    z.enum(['todo', 'done']).optional(),
   }),
   async ({ projectId, page, status }, ctx) => {
     return ctx.db.tasks.list({ projectId, page, status });
   },
   'query',
-  { http: { method: 'GET', path: '/projects/:projectId/tasks' } },
 ).guard(mustBeUser);
+```
+
+```ts
+// src/server.ts — routing lives here
+restTransport({
+  port: 3000,
+  overrides: {
+    'tasks.listTasks': { method: 'GET', path: '/projects/:projectId/tasks' },
+  },
+})
 ```
 
 The REST transport merges URL params, query string, and body into a single typed input object. See [`examples/nested-routes`](./examples/nested-routes) for a full working example.

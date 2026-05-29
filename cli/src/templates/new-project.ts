@@ -243,6 +243,20 @@ export const cap     = capability.withContext<AppContext>();  // public endpoint
 export const authCap = capability.withContext<AuthContext>(); // authenticated endpoints
 \`\`\`
 
+## Transport boundary
+
+Capabilities have no knowledge of how they are exposed. Transport concerns live in the
+transport packages — NOT in capability definitions:
+
+| Import from | What |
+|---|---|
+| \`capix\` | \`capability\`, \`defineGuard\`, \`defineContext\`, \`defineError\`, \`defineEnhancer\`, \`withRollback\` |
+| \`capix-transport-rest\` | \`restTransport\`, \`HttpOverride\` |
+| \`capix-transport-ws\` | \`wsTransport\` |
+| \`capix-transport-graphql\` | \`graphqlTransport\` |
+
+Never import transport packages inside capability files.
+
 ## REST route inference
 
 | Key pattern | Intent | HTTP route |
@@ -252,7 +266,23 @@ export const authCap = capability.withContext<AuthContext>(); // authenticated e
 | \`updateItem\` | mutation | PATCH /items/:id |
 | \`deleteItem\` | mutation | DELETE /items/:id |
 
-To override: \`.http({ method: 'PUT', path: '/custom/:id' })\`
+To override a route, pass \`overrides\` to \`restTransport\` — do NOT put routing info
+inside capability definitions:
+
+\`\`\`ts
+// src/server.ts
+restTransport({
+  port: 3000,
+  overrides: {
+    'tasks.listTasks':  { method: 'GET',  path: '/projects/:projectId/tasks' },
+    'tasks.createTask': { method: 'POST', path: '/projects/:projectId/tasks' },
+  },
+})
+\`\`\`
+
+HTTP overrides only apply to \`restTransport\`. GraphQL and WebSocket transports
+derive their own schema or message routing from the capability registry and do not
+use \`overrides\`.
 
 ## Errors
 
