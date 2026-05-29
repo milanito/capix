@@ -1,0 +1,64 @@
+{
+  "name": "capix-transport-queue",
+  "version": "0.1.0-alpha.1",
+  "description": "Message queue transport for Capix (BullMQ + in-memory)",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./memory": {
+      "import": "./dist/adapters/memory.js",
+      "types": "./dist/adapters/memory.d.ts"
+    },
+    "./bullmq": {
+      "import": "./dist/adapters/bullmq.js",
+      "types": "./dist/adapters/bullmq.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE"
+  ],
+  "keywords": [
+    "capix",
+    "queue",
+    "bullmq",
+    "redis",
+    "transport",
+    "background-jobs",
+    "typescript"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "capix": ">=0.1.0"
+  },
+  "peerDependenciesMeta": {
+    "bullmq": {
+      "optional": true
+    },
+    "ioredis": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "bullmq": "^5.0.0",
+    "capix": "workspace:*",
+    "ioredis": "^5.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^1.6.0",
+    "zod": "^3.23.0"
+  }
+}
