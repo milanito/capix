@@ -5,9 +5,6 @@
 
 import type { AnyCapability } from './capability.js';
 import type { BaseContext, ContextBuilder, RawRequest } from './context.js';
-import type { ErrorFactory } from './errors.js';
-import type { Enhancer } from './capability.js';
-import type { AnyGuard } from './guards.js';
 
 export type Plugin = {
   readonly name: string;
@@ -17,10 +14,11 @@ export type Plugin = {
    * read headers, URLs, etc. May be async.
    */
   readonly context?: (base: BaseContext, req: RawRequest) => BaseContext | Promise<BaseContext>;
-  readonly errors?: Record<string, ErrorFactory>;
-  readonly enhancers?: Record<string, Enhancer | ((...args: unknown[]) => Enhancer)>;
   readonly capabilities?: Record<string, AnyCapability>;
-  readonly guards?: Record<string, AnyGuard>;
+  // NOTE: errors, enhancers, and guards fields were removed before 1.0 because
+  // mergePlugins did not implement them. Declaring fields that have no effect
+  // confuses plugin authors. If implemented in the future, they will be added
+  // back with working behavior.
 };
 
 /** Pass-through for type inference. */
@@ -56,6 +54,9 @@ export function mergePlugins(plugins: Plugin[]): MergedPlugins {
     .map((p) => p.context!);
 
   function wrapContext(builder: ContextBuilder): ContextBuilder {
+    // Fast path: no plugin context extensions to apply
+    if (contextExtensions.length === 0) return builder;
+
     return async (req) => {
       let ctx = await builder(req);
       for (const extend of contextExtensions) {

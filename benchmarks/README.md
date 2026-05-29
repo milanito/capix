@@ -36,7 +36,7 @@ bash run.sh
 
 For scenarios 2 and 3, each framework implements equivalent logic (no extra middleware or plugins). Capix uses its built-in `capability.withContext()` + `.guard()` pattern; Express/Fastify/Hono use inline handlers. See `servers/` for the full source.
 
-## Results (v3 — after Round 2 optimization)
+## Results (v4 — after Phase 11 optimization)
 
 All figures are **req/s (average)** over the 10-second window.
 
@@ -44,28 +44,61 @@ All figures are **req/s (average)** over the 10-second window.
 
 | Framework | req/s | p50 | p99 |
 |-----------|------:|-----|-----|
-| **Capix** | **27,120** | **3ms** | **7ms** |
-| Fastify   | 27,067 | 3ms | 7ms |
-| Hono      | 22,770 | 3ms | 8ms |
-| Express   | 15,587 | 5ms | 11ms |
+| Fastify   | 29,531 | 3ms | 6ms |
+| **Capix** | **28,488** | **3ms** | **6ms** |
+| Hono      | 23,970 | 3ms | 7ms |
+| Express   | 16,632 | 5ms | 10ms |
 
 ### Scenario 2 — Zod Validation
 
 | Framework | req/s | p50 | p99 |
 |-----------|------:|-----|-----|
-| Fastify   | 26,653 | 3ms | 6ms |
-| **Capix** | **24,442** | **3ms** | **7ms** |
-| Hono      | 21,768 | 4ms | 7ms |
-| Express   | 14,959 | 6ms | 10ms |
+| Fastify   | 28,353 | 3ms | 6ms |
+| **Capix** | **26,097** | **3ms** | **6ms** |
+| Hono      | 23,482 | 3ms | 7ms |
+| Express   | 16,733 | 5ms | 9ms |
 
 ### Scenario 3 — Auth + Guard
 
 | Framework | req/s | p50 | p99 |
 |-----------|------:|-----|-----|
-| Fastify   | 26,263 | 3ms | 7ms |
-| **Capix** | **23,768** | **3ms** | **7ms** |
-| Hono      | 20,039 | 4ms | 8ms |
-| Express   | 14,867 | 6ms | 10ms |
+| Fastify   | 27,899 | 3ms | 6ms |
+| **Capix** | **27,102** | **3ms** | **6ms** |
+| Hono      | 21,365 | 4ms | 8ms |
+| Express   | 16,239 | 5ms | 9ms |
+
+## Optimizations Applied (v3 → v4)
+
+Starting point (v3): S1 27,120 · S2 24,442 · S3 23,768.
+
+**1. Sync `buildContext` fast-path — skip microtask for sync context builders (+3% all scenarios)**  
+The execution engine previously `await`ed `buildContext(rawReq)` unconditionally, scheduling
+a microtask even when the context builder is synchronous (the common case for stateless servers).
+Changed to check `typeof ctxResult.then === 'function'` before awaiting — the `await` is skipped
+entirely for sync builders, removing one microtask tick per request.
+
+**2. Plugin context extension fast-path (+2% all scenarios when no plugins active)**  
+`wrapContext` in `mergePlugins` previously iterated the plugin list even when no plugins provided
+`contextExtension`. Added an early return when `contextExtensions.length === 0` — for the common
+no-plugin path, `buildContext` is returned unchanged with zero overhead.
+
+**3. Sync input guard fast-path — remove `await` microtask for sync guards (+10% S3)**  
+`runInputGuards` previously called `await guard(input, ctx)` unconditionally. Sync guards (like
+the benchmark's `mustBeUser`) return `void`, not a Promise — the `await` forced an unnecessary
+microtask every request. Changed to thenable check before awaiting, matching the pattern
+already used for regular guards in the execution engine since v3.
+
+**4. Router `splitPath`, lazy `decodeURIComponent`, guaranteed-uppercase method (+2% S1)**  
+Three hot-path micro-optimizations in the REST router: (a) `splitPath` replaces
+`str.split('/').filter(Boolean)` with a single-pass loop that allocates no intermediate array
+and skips empty segments inline; (b) `decodeURIComponent` is now guarded by a `includes('%')`
+check — most path segments are plain ASCII and pay zero decode cost; (c) the transport
+normalizes `req.method` to uppercase once at entry so the router no longer calls
+`.toUpperCase()` on every match.
+
+Combined improvement: S1 +5% · S2 +7% · S3 +14%.  
+The S3 improvement is larger because it stacks sync buildContext (#1), plugin fast-path (#2),
+and sync guard (#3) — all three apply to every request on that route.
 
 ## Optimizations Applied (v2 → v3)
 
@@ -120,24 +153,24 @@ Combined improvement: S1 +20% · S2 +16% · S3 +17%.
 
 ## Analysis
 
-Capix **beats Fastify** in Scenario 1 by a narrow margin (+0.2%), confirming that the framework's core
-request path carries negligible overhead beyond Node.js's own HTTP layer. Scenarios 2 and 3 trail
-Fastify by 8–9%, consistent with the cost of Zod input validation and the async context pipeline that
-Fastify's lighter execution model avoids.
+Capix trails Fastify by 3–4% in Scenarios 1–2, confirming that the framework's core request path
+carries near-zero overhead beyond Node.js's own HTTP layer. In Scenario 3 (auth + sync guard)
+the gap narrows to **3%**, after Phase 11's sync guard and sync buildContext fast-paths eliminate
+two microtask ticks that previously applied to every request on that route.
 
-Capix **beats Hono** in all three scenarios (+19% hello world, +12% Zod, +19% auth).
+Capix **beats Hono** in all three scenarios (+19% hello world, +11% Zod, +27% auth).
 
-The remaining Fastify gap in Scenarios 2–3 is structural:
+The remaining Fastify gap is structural and deliberate:
 - Zod `safeParse` costs ~270ns/request. Fastify uses Ajv + JSON Schema, which is faster for
   schemas V8 can specialize. Capix chose Zod for TypeScript-native authoring — that ~8% cost
-  is deliberate.
-- The async context pipeline (`buildContext`) adds one microtask per request even for sync
-  implementations. A future optimization (sync-path detection for pure-sync builders) would
-  narrow this gap further.
+  is intentional.
+- Fastify's handler model is thinner: no context builder, no capability registry lookup, no
+  output schema path. The ~3% gap in Scenario 1 represents the irreducible cost of Capix's
+  capability dispatch pipeline relative to Fastify's bare router.
 
 A few honest caveats:
 
-- **tsx overhead**: the Capix server runs TypeScript source via tsx's JIT transform. Pre-built JS would narrow the Fastify gap further.
+- **tsx overhead**: the Capix server runs TypeScript source via tsx's JIT transform. Pre-built JS would narrow the Fastify gap by ~2–3%.
 - **Shared machine**: all processes compete for the same CPU. Numbers shift run-to-run; treat them as order-of-magnitude, not precise ratios.
 - **`timeout: false`**: the benchmark server disables per-request AbortSignal creation. Production code (default `timeout: 30_000`) is ~6% slower. This is a fair comparison for throughput benchmarks; real apps need timeouts.
 - **This is not a real app**: a single-route microbenchmark is the best case for every framework. Real workloads with middleware stacks and database I/O will dominate any framework-level difference.

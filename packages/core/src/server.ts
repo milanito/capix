@@ -42,7 +42,16 @@ export function createServer(config: ServerConfig): Server {
 
   const wrappedContext = wrapContext(config.context);
 
-  // Merge plugin capabilities into the tree under a 'plugins' namespace
+  // Detect collisions between user capabilities and plugin capabilities at startup
+  for (const key of Object.keys(additionalCapabilities)) {
+    if (key in config.capabilities) {
+      throw new Error(
+        `[capix] Capability name collision: '${key}' is defined by both the user and a plugin. ` +
+        `Plugin capabilities must use unique top-level names.`,
+      );
+    }
+  }
+
   const tree = {
     ...config.capabilities,
     ...additionalCapabilities,

@@ -169,7 +169,8 @@ export function restTransport(options: RestTransportOptions): Transport {
     }
 
     const url = req.url ?? '/';
-    const method = req.method ?? 'GET';
+    // Node.js provides uppercase methods per RFC 7230; explicit toUpperCase() documents the contract.
+    const method = (req.method ?? 'GET').toUpperCase();
 
     const match = router.match(method, url);
 
@@ -235,10 +236,15 @@ export function restTransport(options: RestTransportOptions): Transport {
       // Merge: query params < body params < path params (path wins).
       // Router returns null for params when no path params exist (avoids allocation).
       // For the common case (GET with no query and no path params), reuse EMPTY_INPUT.
-      const input: Record<string, unknown> =
-        pathParams === null && noBody && queryParams === null
-          ? EMPTY_INPUT
-          : { ...(queryParams ?? {}), ...bodyParams, ...(pathParams ?? {}) };
+      let input: Record<string, unknown>;
+      if (pathParams === null && noBody && queryParams === null) {
+        input = EMPTY_INPUT;
+      } else {
+        input = {};
+        if (queryParams !== null) Object.assign(input, queryParams);
+        Object.assign(input, bodyParams);
+        if (pathParams !== null) Object.assign(input, pathParams);
+      }
 
       // Build flat headers map using for..in (avoids Object.entries array allocation).
       const headers: Record<string, string> = {};
@@ -285,6 +291,10 @@ export function restTransport(options: RestTransportOptions): Transport {
         const { status, error, message, meta } = response.error;
         const body: Record<string, unknown> = { error, message };
         if (meta !== undefined) body['meta'] = meta;
+        // Add Retry-After header for rate limit responses per RFC 6585
+        if (status === 429 && typeof (meta as { retryAfter?: unknown } | undefined)?.retryAfter === 'number') {
+          res.setHeader('Retry-After', String((meta as { retryAfter: number }).retryAfter));
+        }
         sendJson(res, status, body);
       }
     };

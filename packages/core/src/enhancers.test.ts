@@ -12,8 +12,6 @@ import {
   withMetrics,
   withCircuitBreaker,
   consoleMetricsCollector,
-  rateLimitStore,
-  cacheStore,
 } from './enhancers.js';
 import type { MetricsCollector } from './enhancers.js';
 
@@ -69,7 +67,7 @@ describe('withLogging', () => {
 // ---------------------------------------------------------------------------
 
 describe('withCache', () => {
-  beforeEach(() => { cacheStore.clear(); vi.useFakeTimers(); });
+  beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
 
   it('caches result for TTL seconds', async () => {
@@ -108,14 +106,20 @@ describe('withTimeout', () => {
     await expect(promise).resolves.toBe('done');
   });
 
-  it('rejects when resolver exceeds timeout', async () => {
+  it('rejects with status 504 when resolver exceeds timeout', async () => {
     const cap = capability(async () => {
       await new Promise((r) => setTimeout(r, 500));
       return 'late';
     }).enhance(withTimeout(100));
     const promise = cap.resolve(undefined, ctx);
     vi.advanceTimersByTime(150);
-    await expect(promise).rejects.toThrow(/timed out/i);
+    await expect(promise).rejects.toMatchObject({ status: 504 });
+  });
+
+  it('clears timer when resolver completes before timeout', async () => {
+    const cap = capability(async () => 'fast').enhance(withTimeout(1000));
+    await cap.resolve(undefined, ctx);
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
 
@@ -161,11 +165,22 @@ describe('withRetry', () => {
 // withRateLimit
 // ---------------------------------------------------------------------------
 
-describe('withRateLimit', () => {
-  beforeEach(() => {
-    rateLimitStore.clear();
-    vi.useFakeTimers();
+describe('withCache isolation', () => {
+  it('two withCache enhancers do not share state', async () => {
+    const cache1 = withCache(60);
+    const cache2 = withCache(60);
+    const cap1 = capability(async () => 'a').enhance(cache1);
+    const cap2 = capability(async () => 'b').enhance(cache2);
+
+    await cap1.resolve(undefined, ctx);
+    const result = await cap2.resolve(undefined, ctx);
+
+    expect(result).toBe('b');
   });
+});
+
+describe('withRateLimit', () => {
+  beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
 
   it('allows requests under the limit', async () => {
@@ -407,5 +422,19 @@ describe('withRollback', () => {
     const cap = capability(() => { throw new Error('plain fail'); }).enhance(withRollback);
     const err = await tryResolve(cap);
     expect((err as Error).message).toBe('plain fail');
+  });
+});
+
+describe('withRateLimit isolation', () => {
+  it('two withRateLimit enhancers do not share counters', async () => {
+    const rl1 = withRateLimit({ limit: 1, windowMs: 60_000 });
+    const rl2 = withRateLimit({ limit: 1, windowMs: 60_000 });
+    const cap1 = capability(async () => 'ok').enhance(rl1);
+    const cap2 = capability(async () => 'ok').enhance(rl2);
+
+    await cap1.resolve(undefined, ctx); // exhausts rl1's counter
+
+    // rl2 must still have its own counter at zero
+    await expect(cap2.resolve(undefined, ctx)).resolves.toBe('ok');
   });
 });

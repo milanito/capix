@@ -1,5 +1,5 @@
 import pino from 'pino';
-import { defineEnhancer } from 'capix';
+import { defineEnhancer, isFrameworkError } from 'capix';
 import type { Enhancer, AnyCapability } from 'capix';
 
 export type LoggingOptions = {
@@ -55,14 +55,8 @@ export function loggingEnhancer(options: LoggingOptions = {}): Enhancer {
         } catch (err) {
           const ms = Date.now() - start;
 
-          const isFramework =
-            err !== null &&
-            typeof err === 'object' &&
-            '_capix' in (err as object) &&
-            (err as Record<string, unknown>)['_capix'] === 'FrameworkError';
-
-          if (isFramework) {
-            const fe = err as { status: number; error: string; message: string };
+          if (isFrameworkError(err)) {
+            const fe = err;
             child.info({ ms, status: fe.status, error: fe.error }, fe.message);
           } else {
             child.error({ ms, err }, 'unhandled error');

@@ -106,6 +106,19 @@ describe('createServer', () => {
     warn.mockRestore();
   });
 
+  it('throws when plugin capability name collides with user capability', () => {
+    const health = capability(() => ({ status: 'ok' }));
+    const plugin = definePlugin({ name: 'health', capabilities: { ping: health } });
+    expect(() =>
+      createServer({
+        context: buildCtx,
+        capabilities: { ping },
+        transports: [],
+        plugins: [plugin],
+      }),
+    ).toThrow(/Capability name collision.*ping/);
+  });
+
   it('isDevelopment defaults to !NODE_ENV=production', async () => {
     const old = process.env['NODE_ENV'];
     process.env['NODE_ENV'] = 'production';

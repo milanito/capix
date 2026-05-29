@@ -325,15 +325,24 @@ npm install -g capix-cli
 ```ts
 import { mockContext, testServer } from 'capix-testing';
 
-// Unit test: invoke capability directly
+// Unit test: invoke capability directly (no server needed)
 const ctx = mockContext({ user: { id: '1', admin: true } });
 const result = await getUser.resolve({ id: '1' }, ctx);
 expect(result.name).toBe('Alice');
 
-// Integration test: real HTTP server on a random port
-const server = await testServer({ capabilities: { users: { getUser } } });
-const res = await fetch(`${server.url}/users/1`);
-await server.stop();
+// Integration test: real execution engine, no HTTP server
+const server = testServer({
+  context: buildContext,
+  capabilities: { users: { getUser } },
+});
+
+const response = await server.call({
+  capability: 'users.getUser',
+  input: { id: '1' },
+  headers: { authorization: 'Bearer test-token' },
+});
+expect(response.ok).toBe(true);
+expect(response.status).toBe(200);
 ```
 
 ## Development

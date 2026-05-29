@@ -43,8 +43,6 @@ export {
   withMetrics,
   withCircuitBreaker,
   consoleMetricsCollector,
-  rateLimitStore,
-  cacheStore,
 } from './enhancers.js';
 export type {
   RateLimitOptions,

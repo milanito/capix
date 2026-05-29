@@ -47,9 +47,23 @@ function newNode(): RadixNode {
   return { handlers: new Map(), staticChildren: new Map() };
 }
 
+/** Splits a URL path into segments in a single pass (no intermediate array from filter). */
+function splitPath(path: string): string[] {
+  const segments: string[] = [];
+  let start = path.charCodeAt(0) === 47 ? 1 : 0; // skip leading /
+  for (let i = start; i <= path.length; i++) {
+    if (i === path.length || path.charCodeAt(i) === 47) { // 47 = '/'
+      if (i > start) segments.push(path.slice(start, i));
+      start = i + 1;
+    }
+  }
+  return segments;
+}
+
 function insertRoute(root: RadixNode, method: string, path: string, capability: string): void {
-  const segments = path.split('/').filter((s) => s.length > 0);
-  const upperMethod = method.toUpperCase();
+  const segments = splitPath(path);
+  // method is already uppercase — compileRouter calls toUpperCase() before insertRoute
+  const upperMethod = method;
   let node = root;
 
   for (const seg of segments) {
@@ -118,7 +132,8 @@ function matchRoute(
 
   // Param match — look up the param name for the current method
   if (root.paramChild !== undefined) {
-    const decoded = decodeURIComponent(seg);
+    // Conditional decode: skip when there are no percent-encoded chars
+    const decoded = seg.includes('%') ? decodeURIComponent(seg) : seg;
     const paramName =
       root.paramChild.methodNames.get(method) ??
       root.paramChild.methodNames.values().next().value ??
@@ -157,13 +172,14 @@ export function compileRouter(routes: RouteDefinition[]): Router {
 
   return {
     routes,
+    // Callers must pass method in uppercase — transport guarantees this via req.method.
     match(method: string, rawPath: string): RouterMatch {
       // Strip query string without creating an intermediate array.
       const qIdx = rawPath.indexOf('?');
       const pathOnly = qIdx !== -1 ? rawPath.slice(0, qIdx) : rawPath;
-      const segments = pathOnly.split('/').filter((s) => s.length > 0);
+      const segments = splitPath(pathOnly);
       // Start with null params; allocate only if a route param is matched.
-      return matchRoute(root, method.toUpperCase(), segments, 0, null);
+      return matchRoute(root, method, segments, 0, null);
     },
   };
 }

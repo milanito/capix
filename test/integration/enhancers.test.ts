@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import * as net from 'node:net';
 import {
   capability,
@@ -9,8 +9,6 @@ import {
   withCircuitBreaker,
   withTimeout,
   withMetrics,
-  cacheStore,
-  rateLimitStore,
 } from 'capix';
 import { z } from 'zod';
 import { restTransport } from 'capix-transport-rest';
@@ -41,55 +39,65 @@ async function post(url: string, body: Record<string, unknown> = {}): Promise<Re
 // withCache
 // ---------------------------------------------------------------------------
 
-describe('withCache — HTTP integration', () => {
-  let server: Server;
-  let baseUrl: string;
+async function makeCacheServer() {
   let callCount = 0;
-
   // getItem → query with id → GET /data/:id
   const getItem = capability(
     z.object({ id: z.string() }),
     ({ id }) => { callCount++; return { id, seq: callCount }; },
   ).enhance(withCache(10));
 
-  beforeAll(async () => {
-    const port = await getFreePort();
-    baseUrl = `http://localhost:${port}`;
-    server = createServer({
-      context: buildContext,
-      capabilities: { data: { getItem } },
-      transports: [restTransport({ port })],
-    });
-    await server.start();
+  const port = await getFreePort();
+  const srv = createServer({
+    context: buildContext,
+    capabilities: { data: { getItem } },
+    transports: [restTransport({ port })],
   });
+  await srv.start();
 
-  afterAll(async () => { await server.stop(); });
+  return {
+    baseUrl: `http://localhost:${port}`,
+    getCallCount: () => callCount,
+    stop: () => srv.stop(),
+  };
+}
 
-  beforeEach(() => {
-    cacheStore.clear();
-    callCount = 0;
-  });
-
+describe('withCache — HTTP integration', () => {
   it('first call hits the resolver', async () => {
-    const res = await fetch(`${baseUrl}/data/one`);
-    expect(res.status).toBe(200);
-    const body = await res.json() as { data: { seq: number } };
-    expect(body.data.seq).toBe(1);
-    expect(callCount).toBe(1);
+    const { baseUrl, getCallCount, stop } = await makeCacheServer();
+    try {
+      const res = await fetch(`${baseUrl}/data/one`);
+      expect(res.status).toBe(200);
+      const body = await res.json() as { data: { seq: number } };
+      expect(body.data.seq).toBe(1);
+      expect(getCallCount()).toBe(1);
+    } finally {
+      await stop();
+    }
   });
 
   it('second call with same id returns cached result — resolver not called again', async () => {
-    await fetch(`${baseUrl}/data/one`);
-    const res = await fetch(`${baseUrl}/data/one`);
-    const body = await res.json() as { data: { seq: number } };
-    expect(body.data.seq).toBe(1); // cached seq from first call
-    expect(callCount).toBe(1);    // resolver ran only once
+    const { baseUrl, getCallCount, stop } = await makeCacheServer();
+    try {
+      await fetch(`${baseUrl}/data/one`);
+      const res = await fetch(`${baseUrl}/data/one`);
+      const body = await res.json() as { data: { seq: number } };
+      expect(body.data.seq).toBe(1); // cached seq from first call
+      expect(getCallCount()).toBe(1); // resolver ran only once
+    } finally {
+      await stop();
+    }
   });
 
   it('different ids hit the resolver separately', async () => {
-    await fetch(`${baseUrl}/data/a`);
-    await fetch(`${baseUrl}/data/b`);
-    expect(callCount).toBe(2);
+    const { baseUrl, getCallCount, stop } = await makeCacheServer();
+    try {
+      await fetch(`${baseUrl}/data/a`);
+      await fetch(`${baseUrl}/data/b`);
+      expect(getCallCount()).toBe(2);
+    } finally {
+      await stop();
+    }
   });
 });
 
@@ -97,43 +105,50 @@ describe('withCache — HTTP integration', () => {
 // withRateLimit
 // ---------------------------------------------------------------------------
 
-describe('withRateLimit — HTTP integration', () => {
-  let server: Server;
-  let baseUrl: string;
-
+async function makeRateLimitServer(limit: number, windowMs: number) {
   // Named mutation → POST /api/ping
   const ping = capability(() => ({ pong: true }))
-    .enhance(withRateLimit({ limit: 2, windowMs: 60_000 }));
+    .enhance(withRateLimit({ limit, windowMs }));
 
-  beforeAll(async () => {
-    const port = await getFreePort();
-    baseUrl = `http://localhost:${port}`;
-    server = createServer({
-      context: buildContext,
-      capabilities: { api: { ping } },
-      transports: [restTransport({ port })],
-    });
-    await server.start();
+  const port = await getFreePort();
+  const srv = createServer({
+    context: buildContext,
+    capabilities: { api: { ping } },
+    transports: [restTransport({ port })],
   });
+  await srv.start();
 
-  afterAll(async () => { await server.stop(); });
+  return {
+    url: `http://localhost:${port}/api/ping`,
+    stop: () => srv.stop(),
+  };
+}
 
-  beforeEach(() => { rateLimitStore.clear(); });
-
+describe('withRateLimit — HTTP integration', () => {
   it('requests within limit succeed', async () => {
-    const r1 = await post(`${baseUrl}/api/ping`);
-    const r2 = await post(`${baseUrl}/api/ping`);
-    expect(r1.status).toBe(200);
-    expect(r2.status).toBe(200);
+    const { url, stop } = await makeRateLimitServer(2, 60_000);
+    try {
+      const r1 = await post(url);
+      const r2 = await post(url);
+      expect(r1.status).toBe(200);
+      expect(r2.status).toBe(200);
+    } finally {
+      await stop();
+    }
   });
 
   it('request exceeding limit returns 429', async () => {
-    await post(`${baseUrl}/api/ping`);
-    await post(`${baseUrl}/api/ping`);
-    const r3 = await post(`${baseUrl}/api/ping`);
-    expect(r3.status).toBe(429);
-    const body = await r3.json() as { error: string };
-    expect(body.error).toBe('TooManyRequests');
+    const { url, stop } = await makeRateLimitServer(2, 60_000);
+    try {
+      await post(url);
+      await post(url);
+      const r3 = await post(url);
+      expect(r3.status).toBe(429);
+      const body = await r3.json() as { error: string };
+      expect(body.error).toBe('TooManyRequests');
+    } finally {
+      await stop();
+    }
   });
 });
 
@@ -225,9 +240,9 @@ describe('withTimeout — HTTP integration', () => {
     expect(res.status).toBe(200);
   });
 
-  it('operation exceeding timeout returns 500', async () => {
+  it('operation exceeding timeout returns 504', async () => {
     const res = await post(`${baseUrl}/ops/run`, { delay: 200 });
-    expect(res.status).toBe(500);
+    expect(res.status).toBe(504);
   });
 });
 

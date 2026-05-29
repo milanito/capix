@@ -129,13 +129,17 @@ export function defineInputGuard<TInput, TContext extends BaseContext>(
   return fn;
 }
 
-/** Runs input guards in order. */
+/** Runs input guards in order. Skips microtask tick for synchronous guards. */
 export async function runInputGuards(
   guards: ReadonlyArray<AnyInputGuard>,
   input: unknown,
   ctx: BaseContext,
 ): Promise<void> {
   for (const guard of guards) {
-    await guard(input, ctx);
+    const result = guard(input, ctx);
+    if (result !== undefined && result !== null &&
+        typeof (result as { then?: unknown }).then === 'function') {
+      await result;
+    }
   }
 }

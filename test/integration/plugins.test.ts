@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import * as net from 'node:net';
-import { capability, defineContext, createServer } from 'capix';
+import { capability, defineContext, createServer, defaultErrors } from 'capix';
 import { restTransport } from 'capix-transport-rest';
 import { cors } from 'capix-plugin-cors';
 import { helmet, mergeHooks } from 'capix-plugin-helmet';
@@ -225,6 +225,78 @@ describe('logging plugin', () => {
     const loggedPing = ping.enhance(loggingEnhancer({ logger }));
     const result = await loggedPing.resolve(undefined, { requestId: 'test' });
     expect(result).toEqual({ ok: true });
+  });
+
+  it('logs FrameworkErrors at info level, not error', async () => {
+    let infoCount = 0;
+    let errorCount = 0;
+    const mockChild = {
+      info: () => { infoCount++; },
+      error: () => { errorCount++; },
+    };
+    const mockLogger = { child: () => mockChild } as unknown as ReturnType<typeof createLogger>;
+
+    const cap = capability(() => { throw defaultErrors.Unauthorized(); })
+      .enhance(loggingEnhancer({ logger: mockLogger }));
+
+    try { await cap.resolve(undefined, { requestId: 'test' }); } catch { /* expected */ }
+
+    expect(infoCount).toBe(1);
+    expect(errorCount).toBe(0);
+  });
+
+  it('logs 401 Unauthorized at info level', async () => {
+    let infoCount = 0;
+    let errorCount = 0;
+    const mockChild = {
+      info: () => { infoCount++; },
+      error: () => { errorCount++; },
+    };
+    const mockLogger = { child: () => mockChild } as unknown as ReturnType<typeof createLogger>;
+
+    const cap = capability(() => { throw defaultErrors.Unauthorized(); })
+      .enhance(loggingEnhancer({ logger: mockLogger }));
+
+    try { await cap.resolve(undefined, { requestId: 'test' }); } catch { /* expected */ }
+
+    expect(infoCount).toBe(1);
+    expect(errorCount).toBe(0);
+  });
+
+  it('logs 404 Not Found at info level', async () => {
+    let infoCount = 0;
+    let errorCount = 0;
+    const mockChild = {
+      info: () => { infoCount++; },
+      error: () => { errorCount++; },
+    };
+    const mockLogger = { child: () => mockChild } as unknown as ReturnType<typeof createLogger>;
+
+    const cap = capability(() => { throw defaultErrors.NotFound(); })
+      .enhance(loggingEnhancer({ logger: mockLogger }));
+
+    try { await cap.resolve(undefined, { requestId: 'test' }); } catch { /* expected */ }
+
+    expect(infoCount).toBe(1);
+    expect(errorCount).toBe(0);
+  });
+
+  it('logs unknown errors at error level', async () => {
+    let infoCount = 0;
+    let errorCount = 0;
+    const mockChild = {
+      info: () => { infoCount++; },
+      error: () => { errorCount++; },
+    };
+    const mockLogger = { child: () => mockChild } as unknown as ReturnType<typeof createLogger>;
+
+    const cap = capability(() => { throw new Error('unexpected'); })
+      .enhance(loggingEnhancer({ logger: mockLogger }));
+
+    try { await cap.resolve(undefined, { requestId: 'test' }); } catch { /* expected */ }
+
+    expect(infoCount).toBe(0);
+    expect(errorCount).toBe(1);
   });
 });
 

@@ -32,20 +32,20 @@ export const withLogging = defineEnhancer((cap) => ({
   },
 })) as Enhancer;
 
-export const cacheStore = new Map<string, { value: unknown; expiresAt: number }>();
-
 /** In-memory cache. Key = capabilityName:JSON(input). TTL in seconds. */
 export function withCache(ttlSeconds: number): Enhancer {
+  const store = new Map<string, { value: unknown; expiresAt: number }>();
+
   return defineEnhancer((cap) => ({
     ...cap,
     resolve: async (input: unknown, ctx: unknown) => {
       const key = `${cap.name}:${JSON.stringify(input)}`;
-      const cached = cacheStore.get(key);
+      const cached = store.get(key);
       if (cached !== undefined && cached.expiresAt > Date.now()) {
         return cached.value;
       }
       const result = await (cap as AnyCapability).resolve(input, ctx);
-      cacheStore.set(key, { value: result, expiresAt: Date.now() + ttlSeconds * 1000 });
+      store.set(key, { value: result, expiresAt: Date.now() + ttlSeconds * 1000 });
       return result;
     },
   })) as Enhancer;
@@ -56,12 +56,21 @@ export function withTimeout(ms: number): Enhancer {
   return defineEnhancer((cap) => ({
     ...cap,
     resolve: (input: unknown, ctx: unknown) => {
+      let handle: ReturnType<typeof setTimeout> | undefined;
+
+      const timeoutPromise = new Promise<never>((_, reject) => {
+        handle = setTimeout(
+          () => reject(defaultErrors.Timeout({ capability: cap.name, ms })),
+          ms,
+        );
+      });
+
       return Promise.race([
         (cap as AnyCapability).resolve(input, ctx),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error(`Capability '${cap.name}' timed out after ${ms}ms`)), ms),
-        ),
-      ]);
+        timeoutPromise,
+      ]).finally(() => {
+        if (handle !== undefined) clearTimeout(handle);
+      });
     },
   })) as Enhancer;
 }
@@ -112,10 +121,10 @@ export type RateLimitOptions = {
 };
 
 /** Sliding-window in-memory rate limiter. Throws 429 when limit exceeded. */
-export const rateLimitStore = new Map<string, number[]>();
-
 export function withRateLimit(options: RateLimitOptions): Enhancer {
   const { limit, windowMs, keyFn } = options;
+  const store = new Map<string, number[]>();
+
   return defineEnhancer((cap) => ({
     ...cap,
     resolve: async (input: unknown, ctx: unknown) => {
@@ -123,7 +132,7 @@ export function withRateLimit(options: RateLimitOptions): Enhancer {
       const now = Date.now();
       const windowStart = now - windowMs;
 
-      let timestamps = rateLimitStore.get(key) ?? [];
+      let timestamps = store.get(key) ?? [];
       timestamps = timestamps.filter((t) => t > windowStart);
 
       if (timestamps.length >= limit) {
@@ -139,7 +148,7 @@ export function withRateLimit(options: RateLimitOptions): Enhancer {
       }
 
       timestamps.push(now);
-      rateLimitStore.set(key, timestamps);
+      store.set(key, timestamps);
 
       return (cap as AnyCapability).resolve(input, ctx);
     },

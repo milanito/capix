@@ -4,7 +4,7 @@
  */
 
 import type { CapabilityRegistry } from './capability.js';
-import type { ContextBuilder, RawRequest } from './context.js';
+import type { BaseContext, ContextBuilder, RawRequest } from './context.js';
 import { runGuards, runInputGuards } from './guards.js';
 import { isFrameworkError, defaultErrors } from './errors.js';
 
@@ -86,16 +86,21 @@ export function createExecutionEngine(options: ExecutionEngineOptions): InvokeFn
     }
 
     // 2. Build context
-    let ctx: ReturnType<ContextBuilder>;
+    let ctx: BaseContext;
     try {
       const rawReq: RawRequest = {
         headers: req.headers,
         method: 'POST',
-        url: `/${req.capability.replace(/\./g, '/')}`,
+        url: `/${req.capability.replaceAll('.', '/')}`,
         signal: req.signal,
         ...(req.rawBody !== undefined ? { rawBody: req.rawBody } : {}),
       };
-      ctx = await buildContext(rawReq);
+      // Async-detect: skip microtask tick for sync buildContext (common case)
+      const ctxResult = buildContext(rawReq);
+      ctx = (typeof ctxResult === 'object' && ctxResult !== null &&
+        typeof (ctxResult as { then?: unknown }).then === 'function')
+        ? await (ctxResult as Promise<BaseContext>)
+        : ctxResult as BaseContext;
     } catch (err) {
       if (isFrameworkError(err)) {
         return toErrorResponse(err, isDevelopment);
