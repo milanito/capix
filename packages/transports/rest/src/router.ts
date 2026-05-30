@@ -275,11 +275,41 @@ function inferRoutes(
         // get* with id → GET /group/:id
         return [{ method: 'GET', path: groupPath + '/:id', capability: dotPath }];
       }
-      // Standard collection prefixes (list*, get*, find*, etc.) → GET /group
-      if (/^(list|get|find|fetch|read|search|filter|all)/i.test(key)) {
+      // list*, find*, fetch*, read*, search*, filter*, all* → always collection → GET /group
+      if (/^(list|find|fetch|read|search|filter|all)/i.test(key)) {
         return [{ method: 'GET', path: groupPath || '/', capability: dotPath }];
       }
-      // Named query (me, status, health, etc.) → GET /group/key
+      {
+        // get* without id field: collection only when the remainder matches the parent
+        // group name. getMe → GET /group/me, getStats → GET /group/stats,
+        // getUsers (in users group) → GET /group.
+        const getMatch = /^get([A-Z].*)?/.exec(key);
+        if (getMatch) {
+          const remainder = getMatch[1] ?? '';
+          const lastGroup = groupSegments[groupSegments.length - 1] ?? '';
+          const rLow = remainder.toLowerCase();
+          const gLow = lastGroup.toLowerCase();
+          const matchesGroup =
+            !remainder ||
+            rLow === gLow ||
+            rLow === gLow.replace(/s$/, '') ||  // "User" matches "users"
+            gLow === rLow.replace(/s$/, '');     // "Users" matches "user"
+
+          if (matchesGroup) {
+            return [{ method: 'GET', path: groupPath || '/', capability: dotPath }];
+          }
+          // Named: getMe → /group/me, getStats → /group/stats
+          const namedKey = applyUrlCase(remainder || key, urlCase);
+          const namedPath =
+            groupSegments.length > 0
+              ? '/' + [...groupSegments, namedKey].join('/')
+              : remainder
+                ? '/' + namedKey
+                : '/' + applyUrlCase(key, urlCase);
+          return [{ method: 'GET', path: namedPath, capability: dotPath }];
+        }
+      }
+      // Named query (me, status, health, etc.) — no collection prefix → GET /group/key
       {
         const namedPath = groupSegments.length > 0 ? '/' + [...groupSegments, urlKey].join('/') : '/' + urlKey;
         return [{ method: 'GET', path: namedPath, capability: dotPath }];

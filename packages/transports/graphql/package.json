@@ -13,6 +13,7 @@
     }
   },
   "files": [
+    "README.md",
     "dist",
     "LICENSE"
   ],
@@ -35,7 +36,7 @@
     "graphql-http": "^1.22.0"
   },
   "peerDependencies": {
-    "capix": ">=0.1.0"
+    "capix": ">=0.1.0-0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

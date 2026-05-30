@@ -37,7 +37,7 @@
     "jsonwebtoken": "^9.0.0"
   },
   "peerDependencies": {
-    "capix": ">=0.1.0"
+    "capix": ">=0.1.0-0"
   },
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.0",

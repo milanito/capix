@@ -1,5 +1,13 @@
+function toCamelIdentifier(name: string): string {
+  // Split on any separator (/, ., -, _) and join as camelCase
+  const parts = name.split(/[/._-]+/).filter(Boolean);
+  return parts
+    .map((p, i) => (i === 0 ? p.toLowerCase() : p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()))
+    .join('');
+}
+
 export function renderCapabilityTs(name: string, withInput: boolean): string {
-  const camel = name.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+  const camel = toCamelIdentifier(name);
 
   if (!withInput) {
     return `import { capability } from 'capix';
@@ -26,14 +34,14 @@ export const ${camel} = capability(inputSchema, async (input) => {
 }
 
 export function renderGroupTs(name: string, capabilities: string[]): string {
-  const camel = name.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+  const camel = toCamelIdentifier(name);
   const capImports = capabilities.map((c) => {
-    const cc = c.replace(/-([a-z])/g, (_: string, ch: string) => ch.toUpperCase());
+    const cc = toCamelIdentifier(c);
     return `import { ${cc} } from './${c}.js';`;
   });
 
   const capEntries = capabilities.map((c) => {
-    const cc = c.replace(/-([a-z])/g, (_: string, ch: string) => ch.toUpperCase());
+    const cc = toCamelIdentifier(c);
     return `  ${cc},`;
   });
 

@@ -32,7 +32,7 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "capix-transport-rest": ">=0.1.0"
+    "capix-transport-rest": ">=0.1.0-0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

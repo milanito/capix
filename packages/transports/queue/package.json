@@ -21,6 +21,7 @@
     }
   },
   "files": [
+    "README.md",
     "dist",
     "LICENSE"
   ],
@@ -42,7 +43,7 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "capix": ">=0.1.0"
+    "capix": ">=0.1.0-0"
   },
   "peerDependenciesMeta": {
     "bullmq": {
