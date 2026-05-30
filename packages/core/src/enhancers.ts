@@ -22,7 +22,7 @@ export const withLogging = defineEnhancer((cap) => ({
         ? (ctx['logger'] as { info: (msg: string) => void; error: (msg: string) => void })
         : { info: console.info, error: console.error };
     try {
-      const result = await (cap as AnyCapability).resolve(input, ctx);
+      const result = await (cap as AnyCapability)._resolverOnly(input, ctx);
       logger.info(`[capix] ${cap.name} ok (${Date.now() - start}ms)`);
       return result;
     } catch (err) {
@@ -44,7 +44,7 @@ export function withCache(ttlSeconds: number): Enhancer {
       if (cached !== undefined && cached.expiresAt > Date.now()) {
         return cached.value;
       }
-      const result = await (cap as AnyCapability).resolve(input, ctx);
+      const result = await (cap as AnyCapability)._resolverOnly(input, ctx);
       store.set(key, { value: result, expiresAt: Date.now() + ttlSeconds * 1000 });
       return result;
     },
@@ -66,7 +66,7 @@ export function withTimeout(ms: number): Enhancer {
       });
 
       return Promise.race([
-        (cap as AnyCapability).resolve(input, ctx),
+        (cap as AnyCapability)._resolverOnly(input, ctx),
         timeoutPromise,
       ]).finally(() => {
         if (handle !== undefined) clearTimeout(handle);
@@ -83,7 +83,7 @@ export function withRetry(maxAttempts: number, delayMs = 100): Enhancer {
       let lastError: unknown;
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
-          return await (cap as AnyCapability).resolve(input, ctx);
+          return await (cap as AnyCapability)._resolverOnly(input, ctx);
         } catch (err) {
           // Don't retry FrameworkErrors — they are intentional
           if (isFrameworkError(err)) throw err;
@@ -150,7 +150,7 @@ export function withRateLimit(options: RateLimitOptions): Enhancer {
       timestamps.push(now);
       store.set(key, timestamps);
 
-      return (cap as AnyCapability).resolve(input, ctx);
+      return (cap as AnyCapability)._resolverOnly(input, ctx);
     },
   })) as Enhancer;
 }
@@ -208,7 +208,7 @@ export const withRollback = defineEnhancer((cap) => ({
     };
 
     try {
-      return await (cap as AnyCapability).resolve(input, txCtx);
+      return await (cap as AnyCapability)._resolverOnly(input, txCtx);
     } catch (err) {
       for (const rollback of rollbacks.reverse()) {
         try {
@@ -249,7 +249,7 @@ export function withMetrics(collector: MetricsCollector): Enhancer {
       const start = Date.now();
       const tags = { capability: cap.name };
       try {
-        const result = await (cap as AnyCapability).resolve(input, ctx);
+        const result = await (cap as AnyCapability)._resolverOnly(input, ctx);
         collector.histogram('capability.duration', Date.now() - start, tags);
         collector.increment('capability.success', tags);
         return result;
@@ -303,7 +303,7 @@ export function withCircuitBreaker(options: CircuitBreakerOptions): Enhancer {
         }
 
         try {
-          const result = await (cap as AnyCapability).resolve(input, ctx);
+          const result = await (cap as AnyCapability)._resolverOnly(input, ctx);
           if (state === 'half-open') {
             successes++;
             if (successes >= successThreshold) {

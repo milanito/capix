@@ -284,45 +284,72 @@ describe('compileRegistry', () => {
   });
 });
 
-describe('resolveUnchecked', () => {
-  it('invokes resolver with any BaseContext subtype', async () => {
+describe('capability composition via .resolve()', () => {
+  it('guards re-run when called via .resolve()', async () => {
+    const guardSpy = vi.fn();
+    const cap = capability(() => 1).guard(() => guardSpy());
+    await cap.resolve(undefined, baseCtx);
+    expect(guardSpy).toHaveBeenCalledOnce();
+  });
+
+  it('succeeds when context satisfies guard requirements at runtime', async () => {
     const cap = capability(
       z.object({ x: z.number() }),
       async ({ x }) => x * 2,
-    );
-    const result = await cap.resolveUnchecked({ x: 5 }, baseCtx);
+    ).guard((ctx) => {
+      if (!(ctx as { requestId: string }).requestId) throw defaultErrors.Unauthorized();
+    });
+    const result = await cap.resolve({ x: 5 }, baseCtx);
     expect(result).toBe(10);
   });
 
-  it('return type matches capability output', async () => {
-    const cap = capability(
-      z.object({ name: z.string() }),
-      async ({ name }) => ({ greeting: `Hello, ${name}!` }),
-    );
-    const result = await cap.resolveUnchecked({ name: 'Alice' }, baseCtx);
-    expect(result).toEqual({ greeting: 'Hello, Alice!' });
+  it('throws when context does not satisfy guard requirements', async () => {
+    const cap = capability(() => 1).guard((ctx) => {
+      if (!('user' in ctx)) throw defaultErrors.Forbidden();
+    });
+    await expect(cap.resolve(undefined, baseCtx)).rejects.toMatchObject({ error: 'Forbidden' });
   });
 
-  it('guards do not re-run when using resolveUnchecked', async () => {
+  it('parallel .resolve() calls work correctly', async () => {
+    const cap = capability(
+      z.object({ id: z.number() }),
+      async ({ id }) => id * 2,
+    );
+    const results = await Promise.all(
+      Array.from({ length: 10 }, (_, i) => cap.resolve({ id: i }, baseCtx)),
+    );
+    expect(results).toEqual([0, 2, 4, 6, 8, 10, 12, 14, 16, 18]);
+  });
+
+  it('accepts a broader context type without TypeScript error', async () => {
+    type AppCtx = { requestId: string; user: { id: string } };
+    const mustHaveUser = (ctx: AppCtx): asserts ctx is AppCtx => {
+      if (!ctx.user) throw defaultErrors.Unauthorized();
+    };
+    const cap = capability.withContext<AppCtx>()(
+      z.object({ id: z.string() }),
+      async ({ id }, ctx) => `${ctx.user.id}:${id}`,
+    ).guard(mustHaveUser);
+
+    // resolve accepts BaseContext — no TS error even though ctx has extra fields
+    const richerCtx = { requestId: 'r1', user: { id: 'u1' } };
+    const result = await cap.resolve({ id: 'item1' }, richerCtx);
+    expect(result).toBe('u1:item1');
+  });
+
+  it('resolveUnchecked does not exist on Capability', () => {
+    const cap = capability(() => 1);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect('resolveUnchecked' in cap).toBe(false);
+  });
+
+  it('_resolverOnly skips guard execution', async () => {
     const guardSpy = vi.fn();
-    const cap = capability(() => 1).guard(() => guardSpy());
-    await cap.resolveUnchecked(undefined, baseCtx);
-    expect(guardSpy).not.toHaveBeenCalled();
-  });
-
-  it('resolver receives the passed context at runtime', async () => {
-    const cap = capability(
-      z.object({}),
-      async (_input, ctx) => (ctx as typeof baseCtx).requestId,
-    );
-    const result = await cap.resolveUnchecked({}, { requestId: 'my-id' });
-    expect(result).toBe('my-id');
-  });
-
-  it('no-input capability resolves with undefined input', async () => {
-    const cap = capability(() => 42);
-    const result = await cap.resolveUnchecked(undefined, baseCtx);
+    const cap = capability(() => 42).guard(() => guardSpy());
+    // _resolverOnly bypasses guards — used internally by execution engine
+    const result = await cap._resolverOnly(undefined, baseCtx as never);
     expect(result).toBe(42);
+    expect(guardSpy).not.toHaveBeenCalled();
   });
 });
 

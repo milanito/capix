@@ -39,7 +39,7 @@ export function loggingEnhancer(options: LoggingOptions = {}): Enhancer {
         const child = logger.child({ capability: cap.name });
 
         try {
-          const result = await (cap as AnyCapability).resolve(input, ctx);
+          const result = await (cap as AnyCapability)._resolverOnly(input, ctx);
           const ms = Date.now() - start;
 
           child.info(

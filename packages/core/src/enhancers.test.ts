@@ -19,7 +19,7 @@ const ctx = { requestId: 'test' };
 
 async function tryResolve(cap: AnyCapability, c: unknown = ctx): Promise<unknown> {
   try {
-    return await (cap as AnyCapability).resolve(undefined, c);
+    return await (cap as AnyCapability).resolve(undefined, c as { requestId: string });
   } catch (err) {
     return err;
   }

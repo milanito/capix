@@ -5,6 +5,7 @@
 
 import type { ZodSchema, ZodTypeAny } from 'zod';
 import type { BaseContext } from './context.js';
+import { runGuards, runInputGuards } from './guards.js';
 import type { AnyGuard, AnyInputGuard, Guard, InputGuard, NarrowContext } from './guards.js';
 
 const CAPABILITY_BRAND = Symbol.for('capix.Capability');
@@ -87,17 +88,38 @@ export type Capability<
    * The execution engine skips input validation entirely — there is nothing to validate.
    */
   readonly _skipValidation: boolean;
-  readonly resolve: Resolver<TInput, TOutput, TContext>;
 
   /**
-   * Invoke the capability's resolver directly, bypassing TypeScript context
-   * type checking. Use only for server-side capability composition where the
-   * calling context is known to satisfy the required guards at runtime.
+   * Invoke this capability's guards and resolver directly.
    *
-   * Note: guards do NOT re-run when using resolveUnchecked. You are
-   * responsible for ensuring the context satisfies guard preconditions.
+   * Guards always re-run — this is safe to call from any context.
+   * If the context does not satisfy the guards, they throw as normal.
+   *
+   * TypeScript does not verify at the call site that the provided context
+   * satisfies this capability's guard requirements — guards enforce this
+   * at runtime. This enables capability composition without escape hatches:
+   *
+   * ```ts
+   * const getDashboard = cap(z.object({}), async (_, ctx) => {
+   *   const [log, projects] = await Promise.all([
+   *     listAuditLog.resolve({ limit: 10 }, ctx),  // mustBeAdmin runs — throws if not admin
+   *     listProjects.resolve({ limit: 5 },  ctx),  // mustBeAuthenticated runs
+   *   ]);
+   *   return { log, projects };
+   * }, 'query').guard(mustBeAuthenticated);
+   * ```
+   *
+   * For HTTP/GraphQL/queue invocation, the execution engine uses _resolverOnly
+   * after running guards itself — guards run exactly once per external request.
    */
-  resolveUnchecked(input: TInput, ctx: BaseContext): Promise<TOutput>;
+  resolve: (input: TInput, ctx: BaseContext) => Promise<TOutput>;
+
+  /**
+   * Raw resolver — no guards. Used by the execution engine after it has
+   * already run guards. Also used internally by enhancers wrapping the resolver.
+   * Do not call this from application code — use resolve() instead.
+   */
+  _resolverOnly: (input: TInput, ctx: TContext) => Promise<TOutput>;
 
   /**
    * Adds a guard to this capability.
@@ -146,17 +168,59 @@ type CapabilityBase = {
   intent: Intent;
   _intentExplicit: boolean;
   _skipValidation: boolean;
+  // Raw resolver — enumerable so it copies through spread in chaining methods.
+  // Named _fn to avoid name collision with the non-enumerable .resolve() method
+  // added by makeCapability via Object.defineProperties.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  resolve: (...args: any[]) => any;
+  _fn: (...args: any[]) => any;
 };
 
 function makeCapability<TInput, TOutput, TContext extends BaseContext>(
   base: CapabilityBase,
 ): Capability<TInput, TOutput, TContext> {
   const cap = base as unknown as Capability<TInput, TOutput, TContext>;
+  const rawFn = base._fn;
 
-  // Attach chaining methods as non-enumerable properties so spread doesn't copy them
+  // Attach methods as non-enumerable properties so spread in chaining doesn't copy them,
+  // and so enhancers returning { ...cap, resolve: wrappedFn } can set a plain enumerable
+  // resolve that enhance() picks up as the new _fn.
   Object.defineProperties(base, {
+    // _resolverOnly: raw resolver, no guards. Used by the execution engine (guards already ran).
+    // Also called by enhancers to wrap the resolver without re-running guards.
+    _resolverOnly: {
+      value: rawFn,
+      writable: false,
+      enumerable: false,
+      configurable: false,
+    },
+    // resolve: runs all guards, then calls the raw resolver.
+    // Accepts BaseContext — safe for composition from any calling context.
+    // Non-async fast path when no guards: avoids extra microtask tick so fake-timer
+    // tests and hot-path callers see no overhead vs the old direct-fn assignment.
+    resolve: {
+      value: (input: TInput, ctx: BaseContext): Promise<TOutput> => {
+        if (base.guards.length === 0 && base.inputGuards.length === 0) {
+          const r = rawFn(input, ctx as TContext);
+          return (r instanceof Promise ? r : Promise.resolve(r)) as Promise<TOutput>;
+        }
+        const run = async (): Promise<TOutput> => {
+          for (const guard of base.guards) {
+            const gr = guard(ctx);
+            if (gr !== undefined && gr !== null && typeof (gr as { then?: unknown }).then === 'function') {
+              await (gr as Promise<void>);
+            }
+          }
+          if (base.inputGuards.length > 0) {
+            await runInputGuards(base.inputGuards, input, ctx as TContext);
+          }
+          return rawFn(input, ctx as TContext) as Promise<TOutput>;
+        };
+        return run();
+      },
+      writable: false,
+      enumerable: false,
+      configurable: false,
+    },
     guard: {
       value<G extends (ctx: TContext) => any>(g: G): Capability<TInput, TOutput, NarrowContext<TContext, G>> {
         return makeCapability<TInput, TOutput, NarrowContext<TContext, G>>({
@@ -182,9 +246,13 @@ function makeCapability<TInput, TOutput, TContext extends BaseContext>(
     enhance: {
       value(e: Enhancer): Capability<TInput, TOutput, TContext> {
         const enhanced = e(cap);
+        // enhanced.resolve is the plain enumerable property set by the enhancer:
+        //   (cap) => ({ ...cap, resolve: wrappedFn })
+        // This wrappedFn calls cap._resolverOnly internally, so guards don't double-run.
+        // We use it as the new raw resolver for the returned capability.
         return makeCapability<TInput, TOutput, TContext>({
           ...base,
-          resolve: enhanced.resolve,
+          _fn: enhanced.resolve as (...args: unknown[]) => unknown,
         });
       },
       writable: false,
@@ -197,14 +265,6 @@ function makeCapability<TInput, TOutput, TContext extends BaseContext>(
           ...base,
           outputSchema: schema,
         });
-      },
-      writable: false,
-      enumerable: false,
-      configurable: false,
-    },
-    resolveUnchecked: {
-      value(input: TInput, ctx: BaseContext): Promise<TOutput> {
-        return Promise.resolve(base.resolve(input, ctx as TContext));
       },
       writable: false,
       enumerable: false,
@@ -311,7 +371,7 @@ export function capability(...args: any[]): AnyCapability {
       _intentExplicit: explicitIntent !== undefined,
       intent: explicitIntent ?? 'mutation',
       _skipValidation: false,
-      resolve: first as (...a: unknown[]) => unknown,
+      _fn: first as (...a: unknown[]) => unknown,
     });
   }
 
@@ -332,7 +392,7 @@ export function capability(...args: any[]): AnyCapability {
     _intentExplicit: thirdIntent !== undefined,
     intent: thirdIntent ?? 'mutation',
     _skipValidation: false,
-    resolve: second as (...a: unknown[]) => unknown,
+    _fn: second as (...a: unknown[]) => unknown,
   });
 }
 
@@ -411,7 +471,8 @@ export function compileRegistry(tree: GroupTree, prefix = ''): CapabilityRegistr
         (value.inputSchema as Record<string, unknown>).shape !== null &&
         Object.keys((value.inputSchema as { shape: object }).shape).length === 0;
 
-      // Create a named copy by building a fresh capability base with the correct name
+      // Create a named copy by building a fresh capability base with the correct name.
+      // _resolverOnly is the raw resolver (= base._fn on the original capability).
       const base: CapabilityBase = {
         _capix: true,
         [CAPABILITY_BRAND]: true,
@@ -426,7 +487,8 @@ export function compileRegistry(tree: GroupTree, prefix = ''): CapabilityRegistr
         intent: value.intent,
         _intentExplicit: value._intentExplicit,
         _skipValidation: skipVal,
-        resolve: value.resolve,
+        // _resolverOnly === base._fn on the original capability (direct reference, no wrapping).
+        _fn: (value as unknown as { _resolverOnly: (...args: unknown[]) => unknown })._resolverOnly,
       };
       map.set(path, makeCapability(base));
     } else {

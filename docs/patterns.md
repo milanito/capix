@@ -273,6 +273,38 @@ without changing the capability code — just swap the `enqueue` implementation.
 
 ---
 
+## Capability composition
+
+Call `.resolve(input, ctx)` to compose capabilities server-side.
+Guards always re-run — composition is safe from any calling context.
+If the context does not satisfy the composed capability's guards, they throw
+exactly as they would for an external request.
+
+```ts
+// listAuditLog guarded by mustBeAdmin
+export const listAuditLog = cap(
+  z.object({ limit: z.coerce.number().default(20) }),
+  async ({ limit }, ctx) => ctx.db.auditLog.findByOrg(ctx.org.id, { limit }),
+  'query'
+).guard(mustBeAdmin);
+
+// getDashboard composes directly — no escape hatch needed
+export const getDashboard = cap(z.object({}), async (_, ctx) => {
+  const [auditLog, projects] = await Promise.all([
+    listAuditLog.resolve({ limit: 10 }, ctx),  // mustBeAdmin runs — throws if not admin
+    listProjects.resolve({ limit: 5 },  ctx),  // mustBeAuthenticated runs
+  ]);
+  return { auditLog, projects };
+}, 'query').guard(mustBeAuthenticated);
+```
+
+TypeScript does not verify at the call site that `ctx` satisfies the composed
+capability's guard requirements — that is enforced at runtime. This means a
+composition that looks valid at compile time can still throw `403 Forbidden` at
+runtime if the calling capability's guards are weaker than the composed capability's.
+
+---
+
 ## Enhancers that require guards
 
 **KNOWN LIMITATION:** TypeScript cannot enforce that a specific guard was applied
@@ -280,10 +312,11 @@ before an enhancer. If your enhancer accesses context fields that are only non-n
 after a guard runs (e.g. `ctx.org`, `ctx.user`), the compiler accepts the enhancer
 applied to any capability — a missing guard fails silently at runtime.
 
-**Recommended mitigations:**
+**Required mitigation — fail fast with a clear error:**
 
-1. **Fail fast in the enhancer** — check the field and throw an internal error
-   rather than letting a null dereference produce an opaque crash:
+Enhancers should call `cap._resolverOnly(input, ctx)` internally (not `cap.resolve`)
+to wrap the resolver without re-running guards. And they must check any required
+context fields before calling the resolver:
 
 ```ts
 export const withUsageTracking = (resource: string) =>
@@ -293,58 +326,41 @@ export const withUsageTracking = (resource: string) =>
       const appCtx = ctx as AppContext;
 
       if (!appCtx.org) {
-        // Guards were not applied in the right order.
-        throw new Error(`[withUsageTracking] ctx.org is null — apply mustBeAuthenticated before withUsageTracking`);
+        // Guards were not applied in the right order — fail with an actionable message.
+        throw new Error(
+          `[capix] withUsageTracking('${resource}') requires ctx.org to be non-null.\n` +
+          `Apply mustBeAuthenticated (or equivalent) before this enhancer.\n` +
+          `Capability: ${(cap as { name?: string }).name ?? '(unnamed)'}`,
+        );
       }
 
       const limit = planLimit(appCtx.org.plan, resource);
       const current = appCtx.db.usage.get(appCtx.org.id, currentPeriod(), resource);
       if (current >= limit) throw errors.QuotaExceeded({ resource, limit, current });
 
-      const result = await (cap as AnyCapability).resolve(input, ctx);
+      const result = await (cap as AnyCapability)._resolverOnly(input, ctx);
       appCtx.db.usage.increment(appCtx.org.id, currentPeriod(), resource);
       return result;
     },
   })) as ReturnType<typeof defineEnhancer>;
 ```
 
-2. **Document the dependency** — add a JSDoc comment to the enhancer factory:
+**Document the dependency in the JSDoc:**
 
 ```ts
 /**
  * Checks and increments quota for the given resource.
  *
- * KNOWN LIMITATION: TypeScript does not enforce ordering — the compiler will not
- * warn if this enhancer is applied without a prior `mustBeAuthenticated` guard.
- * `ctx.org` will be null at runtime if the guard is missing.
- *
- * Always apply guards before this enhancer:
+ * KNOWN LIMITATION: TypeScript does not enforce ordering.
+ * Always apply mustBeAuthenticated before this enhancer:
  * ```ts
  * cap(schema, resolver, 'mutation')
  *   .guard(mustBeAuthenticated)
- *   .enhance(withUsageTracking('projects'));  // ← ctx.org is now guaranteed non-null
+ *   .enhance(withUsageTracking('projects'));
  * ```
  */
 export const withUsageTracking = (resource: string) => defineEnhancer(/* ... */);
 ```
-
-3. **Use a typed factory pattern** — pass the narrowed context type as a type
-   parameter and cast at call sites:
-
-```ts
-function withUsageTracking<TCtx extends { org: Org; db: DB }>(resource: string) {
-  return defineEnhancer((cap) => ({
-    ...cap,
-    resolve: async (input: unknown, ctx: unknown) => {
-      const appCtx = ctx as TCtx;
-      // ctx.org is typed non-null here — the assertion is still runtime-only
-      // but the type parameter communicates the requirement
-    },
-  })) as ReturnType<typeof defineEnhancer>;
-}
-```
-
-This documents intent but still doesn't prevent misuse at compile time.
 
 ---
 

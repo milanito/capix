@@ -8,6 +8,15 @@ JWT authentication plugin for Capix. Reads the `Authorization: Bearer <token>` h
 npm install capix-plugin-auth jsonwebtoken
 ```
 
+## Choosing your auth pattern
+
+| Situation | Use |
+|---|---|
+| JWT only | `jwtContextBuilder` |
+| JWT + custom context fields (`db`, `jobs`, etc.) | `jwtContextBuilder` with `extraContext` |
+| JWT + API key fallback | `defineContext` + `createJWTHelpers` |
+| Sessions, OAuth, or custom auth | `defineContext` directly |
+
 ## Recommended: `jwtContextBuilder`
 
 The simplest approach — one function that handles JWT verification AND your custom context fields with full type safety:

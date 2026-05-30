@@ -177,10 +177,10 @@ export function createExecutionEngine(options: ExecutionEngineOptions): InvokeFn
       }
     }
 
-    // 6. Resolve
+    // 6. Resolve — use _resolverOnly since guards already ran in step 3
     let output: unknown;
     try {
-      output = await cap.resolve(validatedInput, ctx);
+      output = await cap._resolverOnly(validatedInput, ctx as never);
     } catch (err) {
       return toErrorResponse(err, isDevelopment);
     }
