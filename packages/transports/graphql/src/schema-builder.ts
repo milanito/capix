@@ -21,6 +21,7 @@ import {
   GraphQLNonNull,
   GraphQLScalarType,
   GraphQLEnumType,
+  Kind,
 } from 'graphql';
 import type { GraphQLOutputType, GraphQLInputType, GraphQLFieldConfig } from 'graphql';
 import type { CapabilityRegistry, InvokeFn } from 'capix';
@@ -30,7 +31,16 @@ export const JSONScalar = new GraphQLScalarType({
   description: 'Arbitrary JSON value',
   serialize: (v) => v,
   parseValue: (v) => v,
-  parseLiteral: () => null,
+  parseLiteral: (ast) => {
+    switch (ast.kind) {
+      case Kind.INT:     return parseInt(ast.value, 10);
+      case Kind.FLOAT:   return parseFloat(ast.value);
+      case Kind.STRING:  return ast.value;
+      case Kind.BOOLEAN: return ast.value;
+      case Kind.NULL:    return null;
+      default:           return null;
+    }
+  },
 });
 
 type GQLContext = { readonly headers: Record<string, string> };
@@ -39,6 +49,7 @@ type InputTypeCache = Map<string, GraphQLInputObjectType>;
 type ZodDef = {
   typeName?: string;
   innerType?: unknown;
+  schema?: unknown;   // ZodEffects inner schema
   shape?: (() => Record<string, unknown>) | Record<string, unknown>;
   type?: unknown;
   values?: string[];
@@ -58,6 +69,14 @@ function zodToGqlOutput(schema: unknown, typeName: string, cache: OutputTypeCach
     case 'ZodString': return new GraphQLNonNull(GraphQLString);
     case 'ZodNumber': return new GraphQLNonNull(GraphQLFloat);
     case 'ZodBoolean': return new GraphQLNonNull(GraphQLBoolean);
+    case 'ZodDefault': {
+      // Unwrap default — value is optional in GraphQL (no NonNull)
+      const inner = zodToGqlOutput(d.innerType, typeName, cache);
+      return inner instanceof GraphQLNonNull ? (inner.ofType as GraphQLOutputType) : inner;
+    }
+    case 'ZodEffects':
+      // z.coerce.* and z.preprocess() — unwrap to inner schema
+      return zodToGqlOutput(d.schema, typeName, cache);
     case 'ZodOptional':
     case 'ZodNullable': {
       const inner = zodToGqlOutput(d.innerType, typeName, cache);
@@ -103,6 +122,14 @@ function zodToGqlInput(schema: unknown, typeName: string, cache: InputTypeCache)
     case 'ZodString': return new GraphQLNonNull(GraphQLString);
     case 'ZodNumber': return new GraphQLNonNull(GraphQLFloat);
     case 'ZodBoolean': return new GraphQLNonNull(GraphQLBoolean);
+    case 'ZodDefault': {
+      // Unwrap default — field is optional in GraphQL (no NonNull)
+      const inner = zodToGqlInput(d.innerType, typeName, cache);
+      return inner instanceof GraphQLNonNull ? (inner.ofType as GraphQLInputType) : inner;
+    }
+    case 'ZodEffects':
+      // z.coerce.* and z.preprocess() — unwrap to inner schema
+      return zodToGqlInput(d.schema, typeName, cache);
     case 'ZodOptional':
     case 'ZodNullable': {
       const inner = zodToGqlInput(d.innerType, typeName, cache);
