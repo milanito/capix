@@ -26,30 +26,51 @@ createServer({
 
 Routes are inferred from capability names — no decorators or annotations needed:
 
-| Capability name | Method | Path |
-|---|---|---|
-| `getUser` | GET | `/users/:id` |
-| `listUsers` | GET | `/users` |
-| `createUser` | POST | `/users` |
-| `addUser` | POST | `/users` |
-| `updateUser` | PATCH | `/users/:id` |
-| `replaceUser` | PUT | `/users/:id` |
-| `deleteUser` | DELETE | `/users/:id` |
-| `removeUser` | DELETE | `/users/:id` |
-| `bulkStatus` | POST | `/users/bulk-status` |
-| `register` | POST | `/auth/register` |
+| Capability | Group | Method | Path |
+|---|---|---|---|
+| `getUser` (with `id` field) | `users` | GET | `/users/:id` |
+| `listUsers` | `users` | GET | `/users` |
+| `getUsers` | `users` | GET | `/users` |
+| `getMe` | `users` | GET | `/users/me` |
+| `getStats` | `users` | GET | `/users/stats` |
+| `findByEmail` | `users` | GET | `/users` |
+| `searchUsers` | `users` | GET | `/users` |
+| `createUser` | `users` | POST | `/users` |
+| `addUser` | `users` | POST | `/users` |
+| `updateUser` | `users` | PATCH | `/users/:id` |
+| `replaceUser` | `users` | PUT | `/users/:id` |
+| `deleteUser` | `users` | DELETE | `/users/:id` |
+| `removeUser` | `users` | DELETE | `/users/:id` |
+| `unfollow` | `users` | DELETE | `/users/:id/follow` |
+| `bulkStatus` | `users` | POST | `/users/bulk-status` |
+| `register` | `auth` | POST | `/auth/register` |
 
 Rules:
-- The first path segment comes from the capability group key (e.g., `users`)
-- `get*` with an `id`-shaped input field → `GET /:group/:id`
-- `get*` without `id` / `list*` / `find*` / `search*` → `GET /:group`
-- `create*` / `add*` / `new*` → `POST /:group`
-- `update*` / `edit*` / `modify*` → `PATCH /:group/:id`
-- `replace*` / `set*` → `PUT /:group/:id`
-- `delete*` / `remove*` / `destroy*` → `DELETE /:group/:id`
-- Everything else → `POST /:group/:key` (key converted to kebab-case)
+- The path prefix comes from the capability's group key (`users`, `auth`, etc.)
+- `get*` with an `id` field in the input schema → `GET /group/:id`
+- `list*`, `find*`, `fetch*`, `read*`, `search*`, `filter*`, `all*` → `GET /group`
+- `get*` without `id` field → collection (`GET /group`) only when the remainder matches the group name (e.g. `getUsers` in `users`); otherwise named endpoint (`GET /group/remainder`)
+- `create*`, `add*`, `new*` → `POST /group`
+- `un*` → `DELETE /group/:id/verb` (inverse sub-resource)
+- `update*`, `edit*`, `patch*`, `modify*` → `PATCH /group/:id`
+- `replace*`, `set*`, `put*` → `PUT /group/:id`
+- `delete*`, `remove*`, `destroy*`, `cancel*` → `DELETE /group/:id`
+- Anything else with `query` intent → `GET /group/key`
+- Anything else with `mutation` intent → `POST /group/key`
 
-Capability keys are converted to kebab-case by default: `bulkStatus` → `bulk-status`, `listItems` → `list-items`. Override with `urlCase: 'camel' | 'snake'`.
+Capability keys are converted to kebab-case by default: `bulkStatus` → `bulk-status`. Override with `urlCase: 'camel' | 'snake'`.
+
+For nested resource routes (`/projects/:projectId/tasks`), use `overrides`:
+
+```ts
+restTransport({
+  port: 3000,
+  overrides: {
+    'tasks.listTasks':  { method: 'GET',  path: '/projects/:projectId/tasks' },
+    'tasks.createTask': { method: 'POST', path: '/projects/:projectId/tasks' },
+  },
+})
+```
 
 ## HTTP override
 
@@ -124,6 +145,22 @@ restTransport({
   onRequest: (req, res) => void,
   multipart: { maxFileSize, maxFiles, allowedMimeTypes },
 })
+```
+
+## Per-transport capabilities
+
+Pass `capabilities` directly to the transport to expose only a subset on REST, independent of other transports:
+
+```ts
+const publicAPI = { items: { list: listItems, get: getItem } };
+const memberAPI = { items: { create: createItem, update: updateItem } };
+
+createServer({
+  context: buildContext,
+  transports: [
+    restTransport({ port: 3000, capabilities: { ...publicAPI, ...memberAPI } }),
+  ],
+});
 ```
 
 ## Exports

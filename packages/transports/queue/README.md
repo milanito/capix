@@ -41,9 +41,42 @@ import { MemoryQueueAdapter } from 'capix-transport-queue';
 const adapter = new MemoryQueueAdapter();
 ```
 
+### BullMQ adapter (Redis)
+
+```ts
+import { Queue, Worker } from 'bullmq';
+import type { QueueAdapter, QueueMessage } from 'capix-transport-queue';
+
+class BullMQAdapter implements QueueAdapter {
+  private workers = new Map<string, Worker>();
+  private queues  = new Map<string, Queue>();
+
+  async start(queue: string, handler: (msg: QueueMessage) => Promise<unknown>): Promise<void> {
+    const worker = new Worker(queue, async (job) => handler(job.data as QueueMessage), {
+      connection: { host: 'localhost', port: 6379 },
+    });
+    this.workers.set(queue, worker);
+  }
+
+  async enqueue(queue: string, msg: QueueMessage): Promise<void> {
+    if (!this.queues.has(queue)) {
+      this.queues.set(queue, new Queue(queue, { connection: { host: 'localhost', port: 6379 } }));
+    }
+    await this.queues.get(queue)!.add(msg.capability, msg);
+  }
+
+  async stop(): Promise<void> {
+    await Promise.all([
+      ...[...this.workers.values()].map((w) => w.close()),
+      ...[...this.queues.values()].map((q) => q.close()),
+    ]);
+  }
+}
+```
+
 ### Custom adapters
 
-Implement the `QueueAdapter` interface to connect to BullMQ, SQS, Faktory, or any queue system:
+Implement the `QueueAdapter` interface to connect to SQS, Faktory, or any queue system:
 
 ```ts
 import type { QueueAdapter, QueueMessage } from 'capix-transport-queue';
@@ -94,6 +127,32 @@ createServer({
 | `queues` | `string[]` | Queue names to listen on |
 | `adapter` | `QueueAdapter` | Queue backend implementation |
 | `capabilities` | `GroupTree` | Per-transport capability registry (optional) |
+
+## Message format
+
+The wire format is the `QueueMessage` type. Any system that can enqueue a JSON object to your queue can trigger Capix capabilities:
+
+```ts
+type QueueMessage = {
+  capability: string;  // dot-path, e.g. 'jobs.processOrder'
+  input:      unknown; // passed to the capability's input validator
+};
+```
+
+## Security note
+
+The queue transport does **not** enforce authentication by default. Jobs arrive with a minimal context (just `requestId`) — there is no `Authorization` header. Guards using `ctx.user` will always see `null` for queue-originated jobs unless you explicitly populate the user field in your context builder by reading from the job input or a service account.
+
+For queue jobs that should run with service-account privileges, pattern the context builder to check for a job-specific header or trust flag:
+
+```ts
+const buildContext = defineContext(async (req) => ({
+  requestId: crypto.randomUUID(),
+  user: req.headers['x-service-account'] === process.env.QUEUE_SECRET
+    ? SERVICE_ACCOUNT
+    : await verifyJwt(req.headers.authorization),
+}));
+```
 
 ## License
 

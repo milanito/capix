@@ -39,13 +39,16 @@ No `req`/`res`. No `next()`. No middleware stack. The HTTP layer is an optional 
 
 | Package | Description |
 |---|---|
-| [`capix`](packages/core) | Core framework — `capability`, `createServer`, guards, enhancers |
+| [`capix`](packages/core) | Core framework — `capability`, `createServer`, guards, enhancers, event bus |
 | [`capix-transport-rest`](packages/transports/rest) | HTTP/1.1 REST transport with automatic route inference |
-| [`capix-transport-ws`](packages/transports/ws) | WebSocket transport for real-time capabilities |
-| [`capix-testing`](packages/testing) | Test utilities — `mockContext`, `testServer` |
+| [`capix-transport-ws`](packages/transports/ws) | WebSocket transport for real-time capabilities and server push |
+| [`capix-transport-graphql`](packages/transports/graphql) | GraphQL transport with auto-generated schema and GraphiQL playground |
+| [`capix-transport-queue`](packages/transports/queue) | Queue transport for background jobs via BullMQ, SQS, or any adapter |
+| [`capix-plugin-auth`](packages/plugins/auth) | JWT authentication — `jwtContextBuilder`, `createJWTHelpers`, `mustBeAuthenticated` |
 | [`capix-plugin-cors`](packages/plugins/cors) | CORS plugin |
 | [`capix-plugin-helmet`](packages/plugins/helmet) | Security headers plugin |
 | [`capix-plugin-logging`](packages/plugins/logging) | Structured request logging via pino |
+| [`capix-testing`](packages/testing) | Test utilities — `mockContext`, `testServer` |
 
 ## Quick start
 
@@ -358,6 +361,25 @@ Guard type narrowing applies to subsequent guards in the chain, but TypeScript c
 
 See [docs/ts-workarounds.md](./docs/ts-workarounds.md) for a full explanation, the two-factory pattern, and what a future fix would look like.
 
+## Performance
+
+Capix's REST transport trails Fastify by ~3% in a hello-world microbenchmark and beats Hono by ~19%. Zod validation and the capability dispatch pipeline add ~270ns/request relative to a bare handler. See [docs/benchmarks.md](docs/benchmarks.md) for the full results and methodology.
+
+| Framework | req/s (hello world) | req/s (auth + guard) |
+|---|---|---|
+| Fastify | 29,531 | 27,899 |
+| **Capix** | **28,488** | **27,102** |
+| Hono | 23,970 | 21,365 |
+| Express | 16,632 | 16,239 |
+
+> A uWS-based transport is planned — uWebSockets.js typically delivers 2–3× higher throughput than Node.js native `http`. See [docs/benchmarks.md](docs/benchmarks.md) for details.
+
+## 454 tests passing
+
+```
+pnpm -r test  →  454 tests, 0 failures
+```
+
 ## CLI
 
 ```bash
@@ -366,10 +388,38 @@ npm install -g capix-cli
 
 | Command | Description |
 |---|---|
-| `capix docs` | Print capability docs as Markdown |
-| `capix show <name>` | Show a single capability's schema |
+| `capix new <name>` | Scaffold a new project |
+| `capix dev` | Start dev server with file watching |
 | `capix list` | List all registered capabilities |
 | `capix routes` | Show HTTP route table |
+| `capix docs` | Print capability docs as Markdown |
+| `capix generate capability <group> <name>` | Generate a capability file |
+| `capix client` | Generate a typed fetch client |
+
+See [docs/cli.md](docs/cli.md) for all commands.
+
+## Documentation
+
+- [Quick start](docs/guide/quick-start.md)
+- [Capabilities](docs/guide/capabilities.md)
+- [Guards](docs/guide/guards.md)
+- [Context](docs/guide/context.md)
+- [Errors](docs/guide/errors.md)
+- [Enhancers](docs/guide/enhancers.md)
+- [Plugins](docs/guide/plugins.md)
+- [Testing](docs/guide/testing.md)
+- [Transports overview](docs/transports/overview.md)
+- [REST transport](docs/transports/rest.md)
+- [WebSocket transport](docs/transports/websocket.md)
+- [GraphQL transport](docs/transports/graphql.md)
+- [Queue transport](docs/transports/queue.md)
+- [Patterns: auth](docs/patterns/auth.md)
+- [Patterns: composition](docs/patterns/composition.md)
+- [Patterns: real-time](docs/patterns/real-time.md)
+- [Patterns: multi-step mutations](docs/patterns/multi-step.md)
+- [Migration from Express](docs/migration/from-express.md)
+- [CLI reference](docs/cli.md)
+- [API reference](docs/api/index.md)
 
 ## Examples
 

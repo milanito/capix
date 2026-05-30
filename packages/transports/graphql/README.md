@@ -82,6 +82,26 @@ createServer({
 });
 ```
 
+## Auth header forwarding
+
+The GraphQL transport forwards `Authorization` and other request headers to `buildContext` unchanged. Use `getHeader(req, 'authorization')` inside your context builder to read them:
+
+```ts
+import { defineContext, getHeader } from 'capix';
+
+const buildContext = defineContext(async (req) => ({
+  requestId: crypto.randomUUID(),
+  user: await verifyToken(getHeader(req, 'authorization')),
+}));
+```
+
+## Limitations
+
+- **No subscriptions**: the GraphQL transport is request/response only. For real-time updates, use `wsTransport` with an event bus alongside the GraphQL transport.
+- **`z.lazy` falls back to JSON scalar**: recursive schemas defined with `z.lazy()` cannot be statically typed in the generated GraphQL schema and are represented as the `JSON` scalar.
+- **No file uploads**: multipart file uploads are not supported in the GraphQL transport. Use the REST transport for file upload capabilities.
+- **No batching**: the transport handles one operation per request.
+
 ## License
 
 MIT

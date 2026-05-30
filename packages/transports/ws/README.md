@@ -25,25 +25,36 @@ createServer({
 
 ## Message protocol
 
-Clients send JSON frames:
+All messages are JSON. Clients send frames to the server:
 
 ```json
-{ "id": "1", "capability": "chat.sendMessage", "input": { "text": "hello" } }
+{ "id": "msg-1", "capability": "chat.sendMessage", "input": { "text": "hello" } }
 ```
 
-The server responds:
+With headers (for auth):
 
 ```json
-{ "id": "1", "ok": true, "data": { "messageId": "abc" } }
+{
+  "id": "msg-1",
+  "capability": "chat.sendMessage",
+  "input": { "text": "hello" },
+  "headers": { "authorization": "Bearer token" }
+}
 ```
 
-On error:
+The `id` field is optional but recommended — it is echoed back so clients can match responses to requests.
+
+**Capability response (success):**
 
 ```json
-{ "id": "1", "ok": false, "status": 403, "error": "Forbidden", "message": "Forbidden" }
+{ "id": "msg-1", "ok": true, "status": 200, "data": { "messageId": "abc" } }
 ```
 
-The `id` field is optional but echoed back so clients can match responses to requests.
+**Capability response (error):**
+
+```json
+{ "id": "msg-1", "ok": false, "status": 403, "error": "Forbidden", "message": "Forbidden" }
+```
 
 ## Server-push events with `createEventBus`
 
@@ -117,6 +128,20 @@ Unsubscribe:
 ```
 
 Client subscriptions are automatically cleaned up on disconnect.
+
+## Per-transport capabilities
+
+Pass `capabilities` directly to the transport to restrict which capabilities are available over WebSocket:
+
+```ts
+createServer({
+  context: buildContext,
+  transports: [
+    restTransport({ port: 3000, capabilities: publicCapabilities }),
+    wsTransport({ port: 3001, capabilities: realtimeCapabilities, eventBus }),
+  ],
+});
+```
 
 ## Options
 
