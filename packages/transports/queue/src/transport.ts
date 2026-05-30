@@ -1,14 +1,18 @@
-import type { Transport, MountOptions, InvokeFn } from 'capix';
-import type { QueueAdapter, QueueMessage }        from './types.js';
-import { randomUUID }                              from 'node:crypto';
+import type { Transport, MountOptions, InvokeFn, GroupTree, TransportWithCapabilities } from 'capix';
+import type { QueueAdapter, QueueMessage }                                               from './types.js';
+import { randomUUID }                                                                    from 'node:crypto';
 
 export type QueueTransportOptions = {
-  queues:  string[];
-  adapter: QueueAdapter;
+  queues:   string[];
+  adapter:  QueueAdapter;
+  /** Capability registry for this transport only. Overrides the server-level default. */
+  capabilities?: GroupTree;
 };
 
-export function queueTransport(options: QueueTransportOptions): Transport {
+export function queueTransport(options: QueueTransportOptions): TransportWithCapabilities {
   return {
+    ...(options.capabilities !== undefined ? { _capabilities: options.capabilities } : {}),
+
     async mount(invoke: InvokeFn, _mountOptions: MountOptions): Promise<void> {
       for (const queueName of options.queues) {
         await options.adapter.start(queueName, async (msg: QueueMessage) => {

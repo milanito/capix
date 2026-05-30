@@ -10,7 +10,7 @@
 
 import * as http from 'node:http';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { Transport, MountOptions, InvokeFn, CapabilityResponse } from 'capix';
+import type { Transport, MountOptions, InvokeFn, CapabilityResponse, GroupTree, TransportWithCapabilities } from 'capix';
 import { compileRouter, generateRoutes } from './router.js';
 import type { Router, HttpOverride } from './router.js';
 import { parseMultipart } from './multipart-parser.js';
@@ -59,10 +59,16 @@ export type RestTransportOptions = {
    * }
    */
   readonly overrides?: Record<string, HttpOverride>;
+  /**
+   * Capability registry for this transport only.
+   * When set, overrides the server-level `capabilities` default for REST routes.
+   * Use to prevent non-REST capabilities from getting HTTP endpoints.
+   */
+  readonly capabilities?: GroupTree;
 };
 
 /** Creates a REST transport using node:http. */
-export function restTransport(options: RestTransportOptions): Transport {
+export function restTransport(options: RestTransportOptions): TransportWithCapabilities {
   let server: http.Server | null = null;
   let router: Router | null = null;
   let invokeFn: InvokeFn | null = null;
@@ -319,6 +325,8 @@ export function restTransport(options: RestTransportOptions): Transport {
   }
 
   return {
+    ...(options.capabilities !== undefined ? { _capabilities: options.capabilities } : {}),
+
     async mount(invoke: InvokeFn, mountOptions: MountOptions): Promise<void> {
       invokeFn = invoke;
       const routeOpts = {

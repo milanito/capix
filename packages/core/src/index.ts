@@ -67,7 +67,7 @@ export type { Plugin, MergedPlugins } from './plugin.js';
 
 // Server
 export { createServer, defineConfig } from './server.js';
-export type { Transport, MountOptions, ServerConfig, Server } from './server.js';
+export type { Transport, TransportWithCapabilities, MountOptions, ServerConfig, Server } from './server.js';
 
 // Event bus
 export { createEventBus } from './event-bus.js';

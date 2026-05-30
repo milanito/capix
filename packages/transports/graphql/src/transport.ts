@@ -8,7 +8,7 @@
 import * as http from 'node:http';
 import { createHandler } from 'graphql-http/lib/use/node';
 import { buildGraphQLSchema } from './schema-builder.js';
-import type { Transport, MountOptions, InvokeFn } from 'capix';
+import type { Transport, MountOptions, InvokeFn, GroupTree, TransportWithCapabilities } from 'capix';
 
 export type GraphQLTransportOptions = {
   readonly port: number;
@@ -20,6 +20,8 @@ export type GraphQLTransportOptions = {
    * Set to false to disable in production.
    */
   readonly playground?: boolean;
+  /** Capability registry for this transport only. Overrides the server-level default. */
+  readonly capabilities?: GroupTree;
 };
 
 function playgroundHtml(endpoint: string): string {
@@ -47,7 +49,7 @@ function playgroundHtml(endpoint: string): string {
 </html>`;
 }
 
-export function graphqlTransport(options: GraphQLTransportOptions): Transport {
+export function graphqlTransport(options: GraphQLTransportOptions): TransportWithCapabilities {
   let server: http.Server | null = null;
 
   const gqlPath = options.path ?? '/graphql';
@@ -55,6 +57,8 @@ export function graphqlTransport(options: GraphQLTransportOptions): Transport {
   const showPlayground = options.playground !== false;
 
   return {
+    ...(options.capabilities !== undefined ? { _capabilities: options.capabilities } : {}),
+
     async mount(invoke: InvokeFn, mountOptions: MountOptions): Promise<void> {
       const schema = buildGraphQLSchema(mountOptions.registry, invoke);
 

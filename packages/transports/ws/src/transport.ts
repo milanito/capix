@@ -7,13 +7,15 @@ import { randomUUID } from 'node:crypto';
 import { WebSocketServer } from 'ws';
 import type { WebSocket, RawData } from 'ws';
 import type { IncomingMessage } from 'node:http';
-import type { Transport, MountOptions, InvokeFn } from 'capix';
+import type { Transport, MountOptions, InvokeFn, GroupTree, TransportWithCapabilities } from 'capix';
 import type { EventBus, EventMap } from './event-bus.js';
 
 export type WsTransportOptions = {
   readonly port: number;
   readonly host?: string;
   readonly eventBus?: EventBus<EventMap>;
+  /** Capability registry for this transport only. Overrides the server-level default. */
+  readonly capabilities?: GroupTree;
 };
 
 type IncomingMessage_ =
@@ -25,7 +27,7 @@ function isCapabilityMessage(msg: IncomingMessage_): msg is { id?: string; capab
 }
 
 /** Creates a WebSocket transport using the 'ws' package. */
-export function wsTransport(options: WsTransportOptions): Transport {
+export function wsTransport(options: WsTransportOptions): TransportWithCapabilities {
   let wss: WebSocketServer | null = null;
 
   function send(ws: WebSocket, payload: Record<string, unknown>): void {
@@ -112,6 +114,8 @@ export function wsTransport(options: WsTransportOptions): Transport {
   }
 
   return {
+    ...(options.capabilities !== undefined ? { _capabilities: options.capabilities } : {}),
+
     async mount(invoke: InvokeFn, _options: MountOptions): Promise<void> {
       return new Promise((resolve, reject) => {
         wss = new WebSocketServer({ port: options.port, host: options.host });

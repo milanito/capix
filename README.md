@@ -287,6 +287,52 @@ restTransport({
 
 The REST transport merges URL params, query string, and body into a single typed input object. See [`examples/nested-routes`](./examples/nested-routes) for a full working example.
 
+## Transport-specific capabilities
+
+By default, all capabilities are available on all transports. Pass `capabilities` directly to a transport to expose only a subset:
+
+```ts
+const publicAPI = { items: { list: listItems, get: getItem } };
+const memberAPI = { items: { create: createItem, update: updateItem } };
+const jobsOnly  = { jobs:  { processItem, generateReport } };
+
+createServer({
+  context: buildContext,
+  transports: [
+    // REST and GraphQL expose public + member capabilities
+    restTransport({ port: 3000, capabilities: { ...publicAPI, ...memberAPI } }),
+    graphqlTransport({ port: 4000, capabilities: { ...publicAPI, ...memberAPI } }),
+
+    // Queue only processes background jobs — never gets an HTTP endpoint
+    queueTransport({ queues: ['jobs'], adapter, capabilities: jobsOnly }),
+  ],
+});
+```
+
+Capabilities are plain objects — pass the same reference to multiple transports to share them without duplication.
+
+### Top-level default
+
+Providing `capabilities` at the top level sets the default for all transports that don't specify their own:
+
+```ts
+createServer({
+  context:      buildContext,
+  capabilities: publicAPI,              // default for REST + GraphQL
+  transports: [
+    restTransport({ port: 3000 }),      // uses publicAPI
+    graphqlTransport({ port: 4000 }),   // uses publicAPI
+    queueTransport({
+      queues:       ['jobs'],
+      adapter,
+      capabilities: jobsOnly,           // overrides publicAPI for queue only
+    }),
+  ],
+});
+```
+
+If every transport specifies its own `capabilities`, the top-level field can be omitted entirely. Capix throws at startup if a transport has no capabilities and no server-level default is provided.
+
 ## Real-time updates
 
 The WebSocket transport is request/response. For server-push (broadcasting mutations to connected WS clients), use a module-level `EventEmitter`:
