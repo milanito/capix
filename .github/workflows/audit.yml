@@ -41,7 +41,14 @@ jobs:
       # ─── TypeScript ───────────────────────────────────────────────────────
 
       - name: TypeScript check (all packages)
-        run: pnpm -r exec tsc --noEmit
+        run: |
+          for pkg in packages/core packages/transports/rest packages/transports/ws \
+                     packages/transports/graphql packages/transports/queue \
+                     packages/testing packages/plugins/cors packages/plugins/helmet \
+                     packages/plugins/logging packages/plugins/auth cli; do
+            echo "Checking $pkg..."
+            cd "$pkg" && npx tsc --noEmit && cd "$GITHUB_WORKSPACE"
+          done
 
       # ─── Package integrity ────────────────────────────────────────────────
 
