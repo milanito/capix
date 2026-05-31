@@ -11,12 +11,16 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "typecheck": "pnpm -r typecheck",
-    "lint": "biome check ."
+    "lint": "biome check .",
+    "docs:dev": "vitepress dev website",
+    "docs:build": "vitepress build website",
+    "docs:preview": "vitepress preview website"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.8.0",
     "@vitest/coverage-v8": "^1.6.1",
     "typescript": "^5.5.0",
+    "vitepress": "^1.6.4",
     "vitest": "^1.6.0"
   }
 }

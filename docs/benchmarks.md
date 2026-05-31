@@ -87,4 +87,4 @@ The current benchmarks use Node.js native `http`. The gap between Capix and Fast
 
 ## Optimization history
 
-See [benchmarks/README.md](../benchmarks/README.md) for the detailed optimization log (v1 → v4), including every micro-optimization applied and its measured impact.
+See [`benchmarks/README.md`](https://github.com/capix/capix/blob/main/benchmarks/README.md) for the detailed optimization log (v1 → v4), including every micro-optimization applied and its measured impact.

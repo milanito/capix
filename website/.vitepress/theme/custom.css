@@ -1,0 +1,24 @@
+:root {
+  --vp-c-brand-1:    #4f46e5;
+  --vp-c-brand-2:    #6366f1;
+  --vp-c-brand-3:    #818cf8;
+  --vp-c-brand-soft: rgba(79, 70, 229, 0.1);
+}
+
+.dark {
+  --vp-c-brand-1:    #818cf8;
+  --vp-c-brand-2:    #6366f1;
+  --vp-c-brand-3:    #4f46e5;
+  --vp-c-brand-soft: rgba(129, 140, 248, 0.1);
+}
+
+/* Slightly larger code text */
+.vp-doc code {
+  font-size: 0.92em;
+}
+
+/* Ensure TypeScript code blocks have adequate line height */
+.language-ts .line,
+.language-typescript .line {
+  min-height: 1.4em;
+}
