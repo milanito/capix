@@ -43,7 +43,7 @@ my-api/
 
 ## Code generation
 
-### `capix generate capability <group> <name>` (alias: `g capability`)
+### `capix generate capability [group] <name>` (alias: `g capability`)
 
 Generate a capability file.
 
@@ -125,14 +125,6 @@ Show full details for a single capability: input schema, output schema, intent, 
 
 ```bash
 capix show users.getUser
-```
-
-### `capix routes`
-
-Print the full HTTP route table.
-
-```bash
-capix routes
 ```
 
 ### `capix call <capability> [input]`

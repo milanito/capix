@@ -39,7 +39,7 @@ export default defineConfig({
         text: 'v0.1.0-alpha.1',
         items: [
           { text: 'Changelog', link: '/changelog' },
-          { text: 'npm',       link: 'https://www.npmjs.com/package/capix' },
+          { text: 'npm',       link: 'https://www.npmjs.com/package/@capixjs/core' },
         ],
       },
     ],
@@ -111,7 +111,7 @@ export default defineConfig({
     },
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/capix/capix' },
+      { icon: 'github', link: 'https://github.com/milanito/capix' },
     ],
 
     search: {
@@ -124,7 +124,7 @@ export default defineConfig({
     },
 
     editLink: {
-      pattern: 'https://github.com/capix/capix/edit/main/docs/:path',
+      pattern: 'https://github.com/milanito/capix/edit/master/docs/:path',
       text:    'Edit this page on GitHub',
     },
   },

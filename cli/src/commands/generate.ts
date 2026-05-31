@@ -4,6 +4,10 @@ import * as print from '../utils/print.js';
 import { writeFile, findProjectRoot } from '../utils/fs.js';
 import { renderCapabilityTs, renderGroupTs } from '../templates/generate.js';
 
+function toKebabCase(name: string): string {
+  return name.replace(/([A-Z])/g, '-$1').toLowerCase().replace(/^-/, '');
+}
+
 export function registerGenerate(program: Command): void {
   const gen = program
     .command('generate')
@@ -11,18 +15,35 @@ export function registerGenerate(program: Command): void {
     .description('generate capability or group scaffolding');
 
   gen
-    .command('capability <name>')
+    .command('capability <args...>')
     .alias('cap')
     .description('scaffold a new capability file')
     .option('--input', 'include a Zod input schema')
     .option('--dir <dir>', 'output directory (default: src/capabilities)')
-    .action((name: string, opts: { input?: boolean; dir?: string }) => {
+    .action((args: string[], opts: { input?: boolean; dir?: string }) => {
       const root = findProjectRoot() ?? process.cwd();
-      const outDir = opts.dir ?? path.join(root, 'src', 'capabilities');
-      const fileName = name.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+      const baseDir = opts.dir ?? path.join(root, 'src', 'capabilities');
+
+      // Support: generate capability getUser
+      //          generate capability users getUser       (group name)
+      //          generate capability users/variants list (slash-separated group)
+      let capabilityName: string;
+      let groupParts: string[];
+
+      if (args.length === 1) {
+        const parts = (args[0] ?? '').split('/').filter(Boolean);
+        capabilityName = parts[parts.length - 1] ?? args[0] ?? '';
+        groupParts = parts.slice(0, -1);
+      } else {
+        capabilityName = args[args.length - 1] ?? '';
+        groupParts = args.slice(0, -1).flatMap((a) => a.split('/').filter(Boolean));
+      }
+
+      const outDir = groupParts.length > 0 ? path.join(baseDir, ...groupParts) : baseDir;
+      const fileName = toKebabCase(capabilityName);
       const outPath = path.join(outDir, `${fileName}.ts`);
 
-      const content = renderCapabilityTs(name, opts.input ?? false);
+      const content = renderCapabilityTs(capabilityName, opts.input ?? false);
       writeFile(outPath, content);
 
       print.success(`Generated capability: ${path.relative(process.cwd(), outPath)}`);
@@ -35,7 +56,7 @@ export function registerGenerate(program: Command): void {
     .action((name: string, capabilities: string[], opts: { dir?: string }) => {
       const root = findProjectRoot() ?? process.cwd();
       const outDir = opts.dir ?? path.join(root, 'src', 'capabilities');
-      const fileName = name.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+      const fileName = toKebabCase(name);
       const outPath = path.join(outDir, `${fileName}.group.ts`);
 
       const content = renderGroupTs(name, capabilities);

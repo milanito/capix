@@ -56,8 +56,8 @@ my-api/
 ## Add a capability
 
 ```bash
-# Generate a capability file
-npx capix generate capability users getUser
+# Generate a capability file with an input schema
+npx capix generate capability users getUser --input
 
 # → src/capabilities/users/get-user.ts
 ```
@@ -66,15 +66,15 @@ The generated file:
 
 ```ts
 import { z } from 'zod';
-import { cap } from '../../capabilities.js';
+import { capability } from '@capixjs/core';
 
-export const getUser = cap(
-  z.object({ id: z.string() }),
-  async ({ id }, ctx) => {
-    return { id }; // implement your resolver here
-  },
-  'query',
-);
+const inputSchema = z.object({
+  id: z.string(),
+});
+
+export const getUser = capability(inputSchema, async ({ id }, _ctx) => {
+  return { id };
+});
 ```
 
 Register it in your capabilities index:

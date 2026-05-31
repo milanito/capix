@@ -13,8 +13,8 @@
     }
   },
   "files": [
-    "README.md",
     "dist",
+    "!dist/**/*.test.*",
     "LICENSE"
   ],
   "keywords": [

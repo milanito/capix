@@ -391,7 +391,6 @@ npm install -g @capixjs/cli
 | `capix new <name>` | Scaffold a new project |
 | `capix dev` | Start dev server with file watching |
 | `capix list` | List all registered capabilities |
-| `capix routes` | Show HTTP route table |
 | `capix docs` | Print capability docs as Markdown |
 | `capix generate capability <group> <name>` | Generate a capability file |
 | `capix client` | Generate a typed fetch client |

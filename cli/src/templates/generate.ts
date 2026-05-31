@@ -1,5 +1,6 @@
 function toCamelIdentifier(name: string): string {
-  // Split on any separator (/, ., -, _) and join as camelCase
+  // If already camelCase (no separators), return as-is
+  if (!/[/._-]/.test(name)) return name;
   const parts = name.split(/[/._-]+/).filter(Boolean);
   return parts
     .map((p, i) => (i === 0 ? p.toLowerCase() : p.charAt(0).toUpperCase() + p.slice(1).toLowerCase()))
@@ -12,9 +13,8 @@ export function renderCapabilityTs(name: string, withInput: boolean): string {
   if (!withInput) {
     return `import { capability } from '@capixjs/core';
 
-export const ${camel} = capability(() => {
-  // TODO: implement
-  return null;
+export const ${camel} = capability(async (_input, _ctx) => {
+  return {};
 });
 `;
   }
@@ -23,12 +23,11 @@ export const ${camel} = capability(() => {
 import { capability } from '@capixjs/core';
 
 const inputSchema = z.object({
-  // TODO: define input fields
+  id: z.string(),
 });
 
-export const ${camel} = capability(inputSchema, async (input) => {
-  // TODO: implement
-  return null;
+export const ${camel} = capability(inputSchema, async ({ id }, _ctx) => {
+  return { id };
 });
 `;
 }

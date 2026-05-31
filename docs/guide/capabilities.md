@@ -113,7 +113,7 @@ export const getProfile = authCap(
 ).guard(mustBeUser);
 ```
 
-The guard still runs at runtime. The factory only affects TypeScript types. Always pair `authCap` with `.guard(mustBeUser)`. See [TypeScript workarounds](../../docs/ts-workarounds.md) for the full explanation.
+The guard still runs at runtime. The factory only affects TypeScript types. Always pair `authCap` with `.guard(mustBeUser)`. See [TypeScript workarounds](../ts-workarounds) for the full explanation.
 
 ## Output schema
 
