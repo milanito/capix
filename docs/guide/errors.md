@@ -5,7 +5,7 @@ Capix errors are typed values, not thrown `Error` objects. They carry a status c
 ## Defining errors
 
 ```ts
-import { defineError } from 'capix';
+import { defineError } from '@capixjs/core';
 
 const errors = {
   NotFound:     defineError(404, 'Not found'),
@@ -65,7 +65,7 @@ The HTTP status code is set from `defineError`'s first argument.
 ## Built-in errors
 
 ```ts
-import { defaultErrors } from 'capix';
+import { defaultErrors } from '@capixjs/core';
 
 throw defaultErrors.BadRequest();           // 400
 throw defaultErrors.Unauthorized();         // 401
@@ -82,7 +82,7 @@ throw defaultErrors.Timeout({ capability: 'users.getUser', ms: 5000 }); // 504
 Use `isFrameworkError` to check errors in tests:
 
 ```ts
-import { isFrameworkError } from 'capix';
+import { isFrameworkError } from '@capixjs/core';
 
 test('returns 404 when user not found', async () => {
   try {
@@ -96,7 +96,7 @@ test('returns 404 when user not found', async () => {
 });
 ```
 
-Or with `capix-testing`:
+Or with `@capixjs/testing`:
 
 ```ts
 const response = await server.call({ capability: 'users.getUser', input: { id: '999' } });

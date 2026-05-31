@@ -10,7 +10,7 @@ export function renderCapabilityTs(name: string, withInput: boolean): string {
   const camel = toCamelIdentifier(name);
 
   if (!withInput) {
-    return `import { capability } from 'capix';
+    return `import { capability } from '@capixjs/core';
 
 export const ${camel} = capability(() => {
   // TODO: implement
@@ -20,7 +20,7 @@ export const ${camel} = capability(() => {
   }
 
   return `import { z } from 'zod';
-import { capability } from 'capix';
+import { capability } from '@capixjs/core';
 
 const inputSchema = z.object({
   // TODO: define input fields

@@ -5,8 +5,8 @@ Capix is a TypeScript-first server framework built around a single primitive: th
 Every handler is a typed unit with an input schema, output schema, guards, and enhancers — defined once, accessible everywhere.
 
 ```ts
-import { capability, createServer, defineContext } from 'capix';
-import { restTransport } from 'capix-transport-rest';
+import { capability, createServer, defineContext } from '@capixjs/core';
+import { restTransport } from '@capixjs/transport-rest';
 import { z } from 'zod';
 
 const buildContext = defineContext(async (req) => ({
@@ -136,10 +136,10 @@ createServer({ ..., plugins: [authPlugin] });
 ## Install
 
 ```bash
-npm install capix capix-transport-rest
+npm install @capixjs/core @capixjs/transport-rest
 
 # or scaffold a new project:
-npx capix-cli new my-app
+npx @capixjs/cli new my-app
 ```
 
 **Alpha status:** API is stable enough to build on; some edges are still rough.

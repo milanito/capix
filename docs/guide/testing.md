@@ -56,16 +56,16 @@ it('mustBeAdmin throws 403 for non-admin user', async () => {
 
 Guards are plain functions. Call them directly.
 
-## Integration testing with `capix-testing`
+## Integration testing with `@capixjs/testing`
 
-`capix-testing` runs the full execution engine — guards, validation, resolver, output schema — without an HTTP server:
+`@capixjs/testing` runs the full execution engine — guards, validation, resolver, output schema — without an HTTP server:
 
 ```bash
-npm install -D capix-testing
+npm install -D @capixjs/testing
 ```
 
 ```ts
-import { testServer } from 'capix-testing';
+import { testServer } from '@capixjs/testing';
 
 const server = testServer({
   context: buildContext,
@@ -105,10 +105,10 @@ it('returns 401 for unauthenticated requests', async () => {
 
 ## Mocking context
 
-`mockContext` from `capix-testing` creates a context object with defaults:
+`mockContext` from `@capixjs/testing` creates a context object with defaults:
 
 ```ts
-import { mockContext } from 'capix-testing';
+import { mockContext } from '@capixjs/testing';
 
 const ctx = mockContext({
   user: { id: '1', role: 'admin' },

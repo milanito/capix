@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import WebSocket from 'ws';
 import { z } from 'zod';
-import { capability, defineContext, createServer } from 'capix';
+import { capability, defineContext, createServer } from '@capixjs/core';
 import { wsTransport } from './transport.js';
 import { createEventBus } from './event-bus.js';
 

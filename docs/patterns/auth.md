@@ -19,8 +19,8 @@ One function that handles JWT verification and your custom context fields:
 
 ```ts
 // src/context.ts
-import { capability } from 'capix';
-import { jwtContextBuilder, createJWTHelpers } from 'capix-plugin-auth';
+import { capability } from '@capixjs/core';
+import { jwtContextBuilder, createJWTHelpers } from '@capixjs/plugin-auth';
 import { db } from './db.js';
 
 export type AppUser = { id: string; email: string; role: 'customer' | 'admin' };
@@ -63,7 +63,7 @@ export const login = cap(
 // src/capabilities/users/profile.ts
 import { z } from 'zod';
 import { authCap } from '../../context.js';
-import { mustBeAuthenticated } from 'capix-plugin-auth';
+import { mustBeAuthenticated } from '@capixjs/plugin-auth';
 
 export const getProfile = authCap(
   z.object({}),
@@ -80,8 +80,8 @@ For APIs that accept both user JWTs and machine-to-machine API keys:
 
 ```ts
 // src/context.ts
-import { defineContext, getHeader } from 'capix';
-import { createJWTHelpers } from 'capix-plugin-auth';
+import { defineContext, getHeader } from '@capixjs/core';
+import { createJWTHelpers } from '@capixjs/plugin-auth';
 import { db } from './db.js';
 
 export type AppUser = { id: string; email: string; role: 'customer' | 'admin' };
@@ -114,7 +114,7 @@ Both auth paths produce the same `user` shape — guards and resolvers are ident
 ## Pattern 3: Role-based guards
 
 ```ts
-import { defineGuard, defineError } from 'capix';
+import { defineGuard, defineError } from '@capixjs/core';
 
 const errors = {
   Unauthorized: defineError(401, 'Unauthorized'),

@@ -9,10 +9,10 @@ import {
   withCircuitBreaker,
   withTimeout,
   withMetrics,
-} from 'capix';
+} from '@capixjs/core';
 import { z } from 'zod';
-import { restTransport } from 'capix-transport-rest';
-import type { Server } from 'capix';
+import { restTransport } from '@capixjs/transport-rest';
+import type { Server } from '@capixjs/core';
 
 async function getFreePort(): Promise<number> {
   return new Promise((resolve, reject) => {

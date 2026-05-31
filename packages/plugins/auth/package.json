@@ -1,5 +1,5 @@
 {
-  "name": "capix-plugin-auth",
+  "name": "@capixjs/plugin-auth",
   "version": "0.1.0-alpha.1",
   "description": "JWT authentication plugin for Capix",
   "license": "MIT",
@@ -37,13 +37,13 @@
     "jsonwebtoken": "^9.0.0"
   },
   "peerDependencies": {
-    "capix": ">=0.1.0-0"
+    "@capixjs/core": ">=0.1.0-0"
   },
   "devDependencies": {
     "@types/jsonwebtoken": "^9.0.0",
     "@types/node": "^20.0.0",
-    "capix": "workspace:*",
     "typescript": "^5.5.0",
-    "vitest": "^1.6.1"
+    "vitest": "^1.6.1",
+    "@capixjs/core": "workspace:*"
   }
 }

@@ -1,5 +1,5 @@
 {
-  "name": "capix-plugin-helmet",
+  "name": "@capixjs/plugin-helmet",
   "version": "0.1.0-alpha.1",
   "description": "Security headers plugin for Capix",
   "license": "MIT",
@@ -33,11 +33,11 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "capix-transport-rest": ">=0.1.0-0"
+    "@capixjs/transport-rest": ">=0.1.0-0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "capix-transport-rest": "workspace:*",
-    "typescript": "^5.5.0"
+    "typescript": "^5.5.0",
+    "@capixjs/transport-rest": "workspace:*"
   }
 }

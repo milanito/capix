@@ -1,8 +1,8 @@
 import { Command } from 'commander';
 import * as print from '../utils/print.js';
 import { loadRegistry } from '../utils/loader.js';
-import { createExecutionEngine } from 'capix';
-import { defineContext } from 'capix';
+import { createExecutionEngine } from '@capixjs/core';
+import { defineContext } from '@capixjs/core';
 
 export function registerCall(program: Command): void {
   program

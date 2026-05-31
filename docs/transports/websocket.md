@@ -81,7 +81,7 @@ Use `createEventBus` to connect REST capabilities to WS clients:
 
 ```ts
 // src/events.ts
-import { createEventBus } from 'capix';
+import { createEventBus } from '@capixjs/core';
 
 export type AppEvents = {
   'order:paid':   { orderId: string; amount: number };
@@ -93,7 +93,7 @@ export const eventBus = createEventBus<AppEvents>();
 
 ```ts
 // src/server.ts
-import { wsTransport } from 'capix-transport-ws';
+import { wsTransport } from '@capixjs/transport-ws';
 import { eventBus } from './events.js';
 
 createServer({

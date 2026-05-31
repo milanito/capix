@@ -7,7 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { WebSocketServer } from 'ws';
 import type { WebSocket, RawData } from 'ws';
 import type { IncomingMessage } from 'node:http';
-import type { Transport, MountOptions, InvokeFn, GroupTree, TransportWithCapabilities } from 'capix';
+import type { Transport, MountOptions, InvokeFn, GroupTree, TransportWithCapabilities } from '@capixjs/core';
 import type { EventBus, EventMap } from './event-bus.js';
 
 export type WsTransportOptions = {

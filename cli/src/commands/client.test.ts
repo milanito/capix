@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
-import { capability, compileRegistry } from 'capix';
-import type { HttpOverride } from 'capix-transport-rest';
+import { capability, compileRegistry } from '@capixjs/core';
+import type { HttpOverride } from '@capixjs/transport-rest';
 import { generateClient } from './client.js';
 
 // ---------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { capability, defineError } from 'capix';
+import { capability, defineError } from '@capixjs/core';
 
 export const errors = {
   Unauthorized: defineError(401, 'Unauthorized'),

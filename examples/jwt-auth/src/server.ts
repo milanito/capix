@@ -1,5 +1,5 @@
-import { createServer, defineContext } from 'capix';
-import { restTransport } from 'capix-transport-rest';
+import { createServer, defineContext } from '@capixjs/core';
+import { restTransport } from '@capixjs/transport-rest';
 import jwt from 'jsonwebtoken';
 import { capabilities } from './capabilities.js';
 import type { Context, JwtPayload } from './capabilities.js';

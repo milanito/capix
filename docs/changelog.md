@@ -21,23 +21,23 @@ Initial public alpha.
 
 ### Transports
 
-- `capix-transport-rest` — Node.js `http` server with automatic URL inference from capability names, path parameter extraction, query string coercion, multipart/file upload, route overrides
-- `capix-transport-ws` — WebSocket server with request/response capability invocation and EventBus-powered server push
-- `capix-transport-graphql` — GraphQL schema auto-generated from Zod schemas, GraphiQL playground, `ZodDefault`/`ZodEffects` unwrapping
-- `capix-transport-queue` — background job worker via pluggable adapters (`MemoryQueueAdapter` included; BullMQ, SQS, etc. via custom adapters)
+- `@capixjs/transport-rest` — Node.js `http` server with automatic URL inference from capability names, path parameter extraction, query string coercion, multipart/file upload, route overrides
+- `@capixjs/transport-ws` — WebSocket server with request/response capability invocation and EventBus-powered server push
+- `@capixjs/transport-graphql` — GraphQL schema auto-generated from Zod schemas, GraphiQL playground, `ZodDefault`/`ZodEffects` unwrapping
+- `@capixjs/transport-queue` — background job worker via pluggable adapters (`MemoryQueueAdapter` included; BullMQ, SQS, etc. via custom adapters)
 
 ### Plugins
 
-- `capix-plugin-auth` — `jwtContextBuilder`, `createJWTHelpers`, `authPlugin`, `mustBeAuthenticated` guard, JWT cache
-- `capix-plugin-cors` — CORS headers for REST
-- `capix-plugin-helmet` — security headers for REST
-- `capix-plugin-logging` — structured request logging via pino
+- `@capixjs/plugin-auth` — `jwtContextBuilder`, `createJWTHelpers`, `authPlugin`, `mustBeAuthenticated` guard, JWT cache
+- `@capixjs/plugin-cors` — CORS headers for REST
+- `@capixjs/plugin-helmet` — security headers for REST
+- `@capixjs/plugin-logging` — structured request logging via pino
 
-### CLI (`capix-cli`)
+### CLI (`@capixjs/cli`)
 
 12 commands: `new`, `generate capability`, `generate group`, `dev`, `list`, `show`, `call`, `check`, `docs`, `client`, `diff`, `ai-context`
 
-### Testing (`capix-testing`)
+### Testing (`@capixjs/testing`)
 
 `mockContext`, `testServer` — run the full execution engine without an HTTP server
 

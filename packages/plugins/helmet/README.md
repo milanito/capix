@@ -1,19 +1,19 @@
-# capix-plugin-helmet
+# @capixjs/plugin-helmet
 
 Security headers plugin for Capix. Sets Content-Security-Policy, X-Frame-Options, and other protective headers on all responses.
 
 ## Install
 
 ```bash
-npm install capix-plugin-helmet
+npm install @capixjs/plugin-helmet
 ```
 
 ## Usage
 
 ```ts
-import { createServer } from 'capix';
-import { restTransport } from 'capix-transport-rest';
-import { helmetPlugin } from 'capix-plugin-helmet';
+import { createServer } from '@capixjs/core';
+import { restTransport } from '@capixjs/transport-rest';
+import { helmetPlugin } from '@capixjs/plugin-helmet';
 
 createServer({
   capabilities: { ... },

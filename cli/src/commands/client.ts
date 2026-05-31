@@ -2,9 +2,9 @@ import { Command } from 'commander';
 import * as path from 'node:path';
 import * as print from '../utils/print.js';
 import { loadRegistry } from '../utils/loader.js';
-import { generateRoutes } from 'capix-transport-rest';
-import type { RouteDefinition, HttpOverride } from 'capix-transport-rest';
-import type { AnyCapability, CapabilityRegistry } from 'capix';
+import { generateRoutes } from '@capixjs/transport-rest';
+import type { RouteDefinition, HttpOverride } from '@capixjs/transport-rest';
+import type { AnyCapability, CapabilityRegistry } from '@capixjs/core';
 
 function zodTypeToTs(def: unknown): string {
   const d = def as { _def?: { typeName?: string; innerType?: unknown; shape?: Record<string, unknown>; type?: unknown; options?: unknown[] } };

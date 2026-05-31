@@ -3,7 +3,7 @@
 Enhancers wrap the resolver to add cross-cutting behavior — caching, rate limiting, retries, circuit breaking, and observability. Apply them with `.enhance()`.
 
 ```ts
-import { withCache, withRateLimit, withTimeout } from 'capix';
+import { withCache, withRateLimit, withTimeout } from '@capixjs/core';
 
 const getUser = cap(schema, handler, 'query')
   .enhance(withCache(30))
@@ -91,7 +91,7 @@ const syncCatalog = cap(schema, handler)
 Enables `ctx.onRollback(fn)` inside the resolver. If the resolver throws, all registered rollback functions are called in reverse order.
 
 ```ts
-import { withRollback } from 'capix';
+import { withRollback } from '@capixjs/core';
 
 const checkout = authCap(z.object({}), async (_, ctx) => {
   const order = await ctx.db.orders.create({ userId: ctx.user.id });
@@ -115,7 +115,7 @@ See [patterns/multi-step.md](../patterns/multi-step.md) for the full pattern.
 Emits a histogram measurement and a success/error increment after each call.
 
 ```ts
-import { withMetrics, consoleMetricsCollector } from 'capix';
+import { withMetrics, consoleMetricsCollector } from '@capixjs/core';
 
 const getUser = cap(schema, handler)
   .enhance(withMetrics(consoleMetricsCollector));
@@ -124,7 +124,7 @@ const getUser = cap(schema, handler)
 Implement `MetricsCollector` to send metrics to DataDog, StatsD, Prometheus, or any backend:
 
 ```ts
-import type { MetricsCollector } from 'capix';
+import type { MetricsCollector } from '@capixjs/core';
 
 const statsdCollector: MetricsCollector = {
   increment(name, tags) { statsd.increment(name, tags); },
@@ -157,7 +157,7 @@ const buildContext = defineContext(async (req) => ({
 ## Writing custom enhancers
 
 ```ts
-import { defineEnhancer } from 'capix';
+import { defineEnhancer } from '@capixjs/core';
 
 const withRequestId = defineEnhancer((cap) => ({
   ...cap,

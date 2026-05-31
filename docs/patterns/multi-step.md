@@ -10,7 +10,7 @@ For operations that require multiple steps to succeed atomically — like checko
 
 ```ts
 import { z } from 'zod';
-import { withRollback } from 'capix';
+import { withRollback } from '@capixjs/core';
 import { authCap } from '../../capabilities.js';
 import { mustBeCustomer } from '../../guards.js';
 

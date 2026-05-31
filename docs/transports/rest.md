@@ -79,7 +79,7 @@ For `GET` requests, input comes from query string + path params. For `POST`/`PAT
 ## File uploads
 
 ```ts
-import type { UploadedFile } from 'capix-transport-rest';
+import type { UploadedFile } from '@capixjs/transport-rest';
 import { z } from 'zod';
 
 const uploadAvatar = cap(

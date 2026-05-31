@@ -5,7 +5,7 @@ The `capability()` function is the core primitive. This document covers every ov
 ## Basic usage
 
 ```ts
-import { capability } from 'capix';
+import { capability } from '@capixjs/core';
 import { z } from 'zod';
 
 // No schema — accepts any input, typed as unknown
@@ -66,7 +66,7 @@ const exportData = capability(schema, handler, 'query');
 
 ```ts
 // src/capabilities.ts
-import { capability } from 'capix';
+import { capability } from '@capixjs/core';
 import type { AppContext } from './context.js';
 
 export const cap = capability.withContext<AppContext>();
@@ -215,7 +215,7 @@ This makes it safe to share base capabilities across your codebase and apply dif
 For TypeScript utilities, `InferInput<Cap>`, `InferOutput<Cap>`, and `InferContext<Cap>` extract the capability's type parameters:
 
 ```ts
-import type { InferInput, InferOutput } from 'capix';
+import type { InferInput, InferOutput } from '@capixjs/core';
 
 type GetUserInput  = InferInput<typeof getUser>;   // { id: string }
 type GetUserOutput = InferOutput<typeof getUser>;  // User

@@ -3,8 +3,8 @@
  * No core dependency except types (CapabilityRegistry, AnyCapability).
  */
 
-import type { CapabilityRegistry, AnyCapability } from 'capix';
-import { inferIntent } from 'capix';
+import type { CapabilityRegistry, AnyCapability } from '@capixjs/core';
+import { inferIntent } from '@capixjs/core';
 
 export type RouteDefinition = {
   readonly method: string;

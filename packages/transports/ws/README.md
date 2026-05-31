@@ -1,18 +1,18 @@
-# capix-transport-ws
+# @capixjs/transport-ws
 
 WebSocket transport for Capix. Exposes your capabilities over a persistent WebSocket connection and delivers server-push events to subscribed clients.
 
 ## Install
 
 ```bash
-npm install capix capix-transport-ws
+npm install @capixjs/core @capixjs/transport-ws
 ```
 
 ## Usage
 
 ```ts
-import { createServer } from 'capix';
-import { wsTransport } from 'capix-transport-ws';
+import { createServer } from '@capixjs/core';
+import { wsTransport } from '@capixjs/transport-ws';
 
 createServer({
   context: buildContext,
@@ -64,7 +64,7 @@ The `id` field is optional but recommended — it is echoed back so clients can 
 
 ```ts
 // src/events.ts
-import { createEventBus } from 'capix-transport-ws';
+import { createEventBus } from '@capixjs/transport-ws';
 
 type AppEvents = {
   'order:paid':   { orderId: string; amount: number };
@@ -78,7 +78,7 @@ export const eventBus = createEventBus<AppEvents>();
 
 ```ts
 // src/server.ts
-import { wsTransport } from 'capix-transport-ws';
+import { wsTransport } from '@capixjs/transport-ws';
 import { eventBus } from './events.js';
 
 createServer({

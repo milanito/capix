@@ -10,7 +10,7 @@
 
 import * as http from 'node:http';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { Transport, MountOptions, InvokeFn, CapabilityResponse, GroupTree, TransportWithCapabilities } from 'capix';
+import type { Transport, MountOptions, InvokeFn, CapabilityResponse, GroupTree, TransportWithCapabilities } from '@capixjs/core';
 import { compileRouter, generateRoutes } from './router.js';
 import type { Router, HttpOverride } from './router.js';
 import { parseMultipart } from './multipart-parser.js';

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { capability } from 'capix';
+import { capability } from '@capixjs/core';
 
 type Product = {
   id: string;

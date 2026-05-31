@@ -8,9 +8,9 @@ Use the queue transport to run capabilities as background workers — no HTTP, n
 // src/server.ts — REST server + queue worker in one process (dev)
 // In production, run workers as separate processes
 
-import { createServer } from 'capix';
-import { restTransport } from 'capix-transport-rest';
-import { queueTransport, MemoryQueueAdapter, createQueueClient } from 'capix-transport-queue';
+import { createServer } from '@capixjs/core';
+import { restTransport } from '@capixjs/transport-rest';
+import { queueTransport, MemoryQueueAdapter, createQueueClient } from '@capixjs/transport-queue';
 import { buildContext } from './context.js';
 
 const adapter  = new MemoryQueueAdapter();
@@ -76,8 +76,8 @@ In production, run the worker separately from the API:
 
 ```ts
 // src/worker.ts — worker entry point
-import { createServer } from 'capix';
-import { queueTransport, BullMQAdapter } from 'capix-transport-queue';
+import { createServer } from '@capixjs/core';
+import { queueTransport, BullMQAdapter } from '@capixjs/transport-queue';
 import { buildContext } from './context.js';
 import { jobs } from './capabilities/jobs/index.js';
 
@@ -91,9 +91,9 @@ createServer({
 
 ```ts
 // src/server.ts — API entry point
-import { createServer } from 'capix';
-import { restTransport } from 'capix-transport-rest';
-import { BullMQAdapter, createQueueClient } from 'capix-transport-queue';
+import { createServer } from '@capixjs/core';
+import { restTransport } from '@capixjs/transport-rest';
+import { BullMQAdapter, createQueueClient } from '@capixjs/transport-queue';
 import { buildContext } from './context.js';
 import { capabilities } from './capabilities/index.js';
 

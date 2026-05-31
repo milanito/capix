@@ -2,9 +2,9 @@ import { Command } from 'commander';
 import * as print from '../utils/print.js';
 import { loadRegistry } from '../utils/loader.js';
 import { zodSchemaToString } from '../utils/zod-to-string.js';
-import { generateRoutes } from 'capix-transport-rest';
-import type { RouteDefinition } from 'capix-transport-rest';
-import type { AnyCapability } from 'capix';
+import { generateRoutes } from '@capixjs/transport-rest';
+import type { RouteDefinition } from '@capixjs/transport-rest';
+import type { AnyCapability } from '@capixjs/core';
 
 function capabilityToMarkdown(name: string, cap: AnyCapability, routes: RouteDefinition[]): string {
   const route = routes.find((r) => r.capability === name);

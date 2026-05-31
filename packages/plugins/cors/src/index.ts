@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { RestTransportOptions } from 'capix-transport-rest';
+import type { RestTransportOptions } from '@capixjs/transport-rest';
 
 export type CorsOptions = {
   /** Allowed origins. String for exact match, function for dynamic matching, '*' for any. */

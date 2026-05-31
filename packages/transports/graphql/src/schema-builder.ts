@@ -24,7 +24,7 @@ import {
   Kind,
 } from 'graphql';
 import type { GraphQLOutputType, GraphQLInputType, GraphQLFieldConfig } from 'graphql';
-import type { CapabilityRegistry, InvokeFn } from 'capix';
+import type { CapabilityRegistry, InvokeFn } from '@capixjs/core';
 
 export const JSONScalar = new GraphQLScalarType({
   name: 'JSON',

@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import * as print from '../utils/print.js';
 import { loadRegistry } from '../utils/loader.js';
-import { generateRoutes } from 'capix-transport-rest';
+import { generateRoutes } from '@capixjs/transport-rest';
 
 export function registerCheck(program: Command): void {
   program

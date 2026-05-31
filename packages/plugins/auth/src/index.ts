@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
-import { defineGuard, defaultErrors, defineContext } from 'capix';
-import type { BaseContext, RawRequest, ContextBuilder } from 'capix';
+import { defineGuard, defaultErrors, defineContext } from '@capixjs/core';
+import type { BaseContext, RawRequest, ContextBuilder } from '@capixjs/core';
 import { JWTCache } from './jwt-cache.js';
 import type { JWTCacheOptions } from './jwt-cache.js';
 
@@ -139,7 +139,7 @@ function extractBearerToken(headers: RawRequest['headers']): string | null {
  *
  * @example
  * // src/auth.ts
- * import { authPlugin } from 'capix-plugin-auth';
+ * import { authPlugin } from '@capixjs/plugin-auth';
  *
  * type AppUser = { id: string; email: string; role: string };
  *
@@ -223,7 +223,7 @@ export type JWTContextBuilderOptions<TUser, TExtra extends Record<string, unknow
  * without needing to wire up the plugin system separately.
  *
  * @example
- * import { jwtContextBuilder } from 'capix-plugin-auth';
+ * import { jwtContextBuilder } from '@capixjs/plugin-auth';
  *
  * export const buildContext = jwtContextBuilder<Customer, { db: DB; jobs: JobQueue }>({
  *   secret:          process.env.JWT_SECRET!,

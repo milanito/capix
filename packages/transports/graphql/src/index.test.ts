@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { z } from 'zod';
-import { capability, compileRegistry } from 'capix';
+import { capability, compileRegistry } from '@capixjs/core';
 import { graphql, GraphQLNonNull, GraphQLString, GraphQLFloat, GraphQLBoolean } from 'graphql';
 import { buildGraphQLSchema, JSONScalar } from './schema-builder.js';
-import type { CapabilityResponse, InvokeFn } from 'capix';
+import type { CapabilityResponse, InvokeFn } from '@capixjs/core';
 
 // ---------------------------------------------------------------------------
 // Helpers

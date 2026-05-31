@@ -1,19 +1,19 @@
-# capix-plugin-logging
+# @capixjs/plugin-logging
 
 Structured request logging plugin for Capix using [pino](https://github.com/pinojs/pino).
 
 ## Install
 
 ```bash
-npm install capix-plugin-logging
+npm install @capixjs/plugin-logging
 ```
 
 ## Usage
 
 ```ts
-import { createServer } from 'capix';
-import { restTransport } from 'capix-transport-rest';
-import { loggingPlugin } from 'capix-plugin-logging';
+import { createServer } from '@capixjs/core';
+import { restTransport } from '@capixjs/transport-rest';
+import { loggingPlugin } from '@capixjs/plugin-logging';
 
 createServer({
   capabilities: { ... },

@@ -1,18 +1,18 @@
-# capix-transport-graphql
+# @capixjs/transport-graphql
 
 GraphQL transport for [Capix](https://github.com/capix/capix). Serves a spec-compliant GraphQL endpoint and an optional GraphiQL playground from your Capix capability registry.
 
 ## Install
 
 ```bash
-npm install capix capix-transport-graphql zod
+npm install @capixjs/core @capixjs/transport-graphql zod
 ```
 
 ## Usage
 
 ```ts
-import { createServer } from 'capix';
-import { graphqlTransport } from 'capix-transport-graphql';
+import { createServer } from '@capixjs/core';
+import { graphqlTransport } from '@capixjs/transport-graphql';
 import { buildContext, capabilities } from './capabilities.js';
 
 createServer({
@@ -87,7 +87,7 @@ createServer({
 The GraphQL transport forwards `Authorization` and other request headers to `buildContext` unchanged. Use `getHeader(req, 'authorization')` inside your context builder to read them:
 
 ```ts
-import { defineContext, getHeader } from 'capix';
+import { defineContext, getHeader } from '@capixjs/core';
 
 const buildContext = defineContext(async (req) => ({
   requestId: crypto.randomUUID(),

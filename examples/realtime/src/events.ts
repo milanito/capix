@@ -1,4 +1,4 @@
-import { createEventBus } from 'capix-transport-ws';
+import { createEventBus } from '@capixjs/transport-ws';
 
 export type AppEvents = {
   'task:created': { id: string; title: string; status: string };

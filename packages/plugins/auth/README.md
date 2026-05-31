@@ -1,11 +1,11 @@
-# capix-plugin-auth
+# @capixjs/plugin-auth
 
 JWT authentication plugin for Capix. Reads the `Authorization: Bearer <token>` header, verifies the JWT, and provides typed `ctx.user` access in every capability.
 
 ## Install
 
 ```bash
-npm install capix-plugin-auth jsonwebtoken
+npm install @capixjs/plugin-auth jsonwebtoken
 ```
 
 ## Choosing your auth pattern
@@ -23,8 +23,8 @@ The simplest approach — one function that handles JWT verification AND your cu
 
 ```ts
 // src/context.ts
-import { defineContext, capability } from 'capix';
-import { jwtContextBuilder, createJWTHelpers } from 'capix-plugin-auth';
+import { defineContext, capability } from '@capixjs/core';
+import { jwtContextBuilder, createJWTHelpers } from '@capixjs/plugin-auth';
 import { db } from './db.js';
 import { jobs } from './jobs.js';
 
@@ -52,8 +52,8 @@ export const authCap = capability.withContext<AuthContext>();
 
 ```ts
 // src/server.ts
-import { createServer } from 'capix';
-import { restTransport } from 'capix-transport-rest';
+import { createServer } from '@capixjs/core';
+import { restTransport } from '@capixjs/transport-rest';
 import { buildContext } from './context.js';
 import { capabilities } from './capabilities/index.js';
 
@@ -68,7 +68,7 @@ createServer({
 // src/capabilities/profile.ts
 import { z } from 'zod';
 import { authCap } from '../context.js';
-import { mustBeAuthenticated } from 'capix-plugin-auth';
+import { mustBeAuthenticated } from '@capixjs/plugin-auth';
 
 export const getProfile = authCap(
   z.object({}),
@@ -99,7 +99,7 @@ Use when you want Capix to manage the JWT context extension via the plugin syste
 
 ```ts
 // src/auth.ts
-import { authPlugin } from 'capix-plugin-auth';
+import { authPlugin } from '@capixjs/plugin-auth';
 
 type AppUser = { id: string; email: string; role: string };
 
@@ -164,8 +164,8 @@ For APIs that accept both user sessions (JWT Bearer tokens) and machine-to-machi
 
 ```ts
 // src/context.ts
-import { defineContext } from 'capix';
-import { createJWTHelpers } from 'capix-plugin-auth';
+import { defineContext } from '@capixjs/core';
+import { createJWTHelpers } from '@capixjs/plugin-auth';
 import { db } from './db.js';
 
 export type AppUser = { id: string; email: string; role: 'customer' | 'admin' };

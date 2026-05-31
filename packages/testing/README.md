@@ -1,11 +1,11 @@
-# capix-testing
+# @capixjs/testing
 
 Test utilities for Capix applications. Provides `mockContext` for unit tests and `testServer` for integration tests — no mocking framework required.
 
 ## Install
 
 ```bash
-npm install --save-dev capix-testing
+npm install --save-dev @capixjs/testing
 ```
 
 ## mockContext
@@ -13,7 +13,7 @@ npm install --save-dev capix-testing
 Test capabilities in isolation without a running server:
 
 ```ts
-import { mockContext } from 'capix-testing';
+import { mockContext } from '@capixjs/testing';
 import { getUser } from '../src/capabilities.js';
 
 test('returns user by id', async () => {
@@ -35,7 +35,7 @@ test('guard rejects unauthenticated requests', async () => {
 Spin up a real HTTP server on a random port for integration tests:
 
 ```ts
-import { testServer } from 'capix-testing';
+import { testServer } from '@capixjs/testing';
 import { getUser, createUser } from '../src/capabilities.js';
 
 let server: Awaited<ReturnType<typeof testServer>>;
@@ -56,7 +56,7 @@ test('GET /users/:id', async () => {
 });
 ```
 
-`testServer` starts a `capix-transport-rest` server. `server.url` is the base URL (e.g., `http://127.0.0.1:54321`).
+`testServer` starts a `@capixjs/transport-rest` server. `server.url` is the base URL (e.g., `http://127.0.0.1:54321`).
 
 ## Options
 

@@ -1,19 +1,19 @@
-# capix-plugin-cors
+# @capixjs/plugin-cors
 
 CORS plugin for Capix. Adds Cross-Origin Resource Sharing headers to all responses when using the REST transport.
 
 ## Install
 
 ```bash
-npm install capix-plugin-cors
+npm install @capixjs/plugin-cors
 ```
 
 ## Usage
 
 ```ts
-import { createServer } from 'capix';
-import { restTransport } from 'capix-transport-rest';
-import { corsPlugin } from 'capix-plugin-cors';
+import { createServer } from '@capixjs/core';
+import { restTransport } from '@capixjs/transport-rest';
+import { corsPlugin } from '@capixjs/plugin-cors';
 
 createServer({
   capabilities: { ... },

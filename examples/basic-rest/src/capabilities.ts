@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { capability, defineError, defineGuard } from 'capix';
+import { capability, defineError, defineGuard } from '@capixjs/core';
 
 type User = { id: string; name: string; email: string; role: 'user' | 'admin' };
 

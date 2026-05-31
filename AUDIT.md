@@ -38,10 +38,10 @@ Audit performed 2026-05-30 covering test-suite health, TypeScript strictness, sc
 **Symptom:** Without `files`, npm publishes everything — including `src/`, `tsconfig.json`, test fixtures. Bloats install size and leaks source.
 **Fix:** Added `"files": ["dist", "README.md", "LICENSE"]`.
 
-### 6. `capix-plugin-logging` missing `test` script
+### 6. `@capixjs/plugin-logging` missing `test` script
 
 **File:** `packages/plugins/logging/package.json`
-**Symptom:** `pnpm test --filter capix-plugin-logging` exits with "Missing script: test". Would fail CI.
+**Symptom:** `pnpm test --filter @capixjs/plugin-logging` exits with "Missing script: test". Would fail CI.
 **Fix:** Added `"test": "vitest run --passWithNoTests"`.
 
 ---

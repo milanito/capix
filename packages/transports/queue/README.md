@@ -1,18 +1,18 @@
-# capix-transport-queue
+# @capixjs/transport-queue
 
 Queue transport for [Capix](https://github.com/capix/capix). Process background jobs by routing queue messages to capability resolvers — no HTTP, no WebSocket, just workers consuming from a queue adapter.
 
 ## Install
 
 ```bash
-npm install capix capix-transport-queue zod
+npm install @capixjs/core @capixjs/transport-queue zod
 ```
 
 ## Usage
 
 ```ts
-import { createServer } from 'capix';
-import { queueTransport, MemoryQueueAdapter, createQueueClient } from 'capix-transport-queue';
+import { createServer } from '@capixjs/core';
+import { queueTransport, MemoryQueueAdapter, createQueueClient } from '@capixjs/transport-queue';
 import { buildContext, capabilities } from './capabilities.js';
 
 const adapter  = new MemoryQueueAdapter();
@@ -37,7 +37,7 @@ await jobQueue.enqueue('jobs.processOrder', { orderId: '123' });
 In-process queue, suitable for development and testing. Jobs are not persisted — they are lost if the process restarts.
 
 ```ts
-import { MemoryQueueAdapter } from 'capix-transport-queue';
+import { MemoryQueueAdapter } from '@capixjs/transport-queue';
 const adapter = new MemoryQueueAdapter();
 ```
 
@@ -45,7 +45,7 @@ const adapter = new MemoryQueueAdapter();
 
 ```ts
 import { Queue, Worker } from 'bullmq';
-import type { QueueAdapter, QueueMessage } from 'capix-transport-queue';
+import type { QueueAdapter, QueueMessage } from '@capixjs/transport-queue';
 
 class BullMQAdapter implements QueueAdapter {
   private workers = new Map<string, Worker>();
@@ -79,7 +79,7 @@ class BullMQAdapter implements QueueAdapter {
 Implement the `QueueAdapter` interface to connect to SQS, Faktory, or any queue system:
 
 ```ts
-import type { QueueAdapter, QueueMessage } from 'capix-transport-queue';
+import type { QueueAdapter, QueueMessage } from '@capixjs/transport-queue';
 
 class BullMQAdapter implements QueueAdapter {
   async start(queue: string, handler: (msg: QueueMessage) => Promise<unknown>): Promise<void> {

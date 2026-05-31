@@ -3,11 +3,11 @@
 Complete reference for all exports in the `capix` package.
 
 For transport-specific APIs, see:
-- [capix-transport-rest](../../packages/transports/rest/README.md)
-- [capix-transport-ws](../../packages/transports/ws/README.md)
-- [capix-transport-graphql](../../packages/transports/graphql/README.md)
-- [capix-transport-queue](../../packages/transports/queue/README.md)
-- [capix-plugin-auth](../../packages/plugins/auth/README.md)
+- [@capixjs/transport-rest](../../packages/transports/rest/README.md)
+- [@capixjs/transport-ws](../../packages/transports/ws/README.md)
+- [@capixjs/transport-graphql](../../packages/transports/graphql/README.md)
+- [@capixjs/transport-queue](../../packages/transports/queue/README.md)
+- [@capixjs/plugin-auth](../../packages/plugins/auth/README.md)
 
 ---
 

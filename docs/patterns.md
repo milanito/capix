@@ -15,7 +15,7 @@ combine the **read-check-act** pattern with the `withRollback` enhancer:
 3. **Act** — register a `ctx.onRollback()` compensation at each step
 
 ```ts
-import { withRollback } from 'capix';
+import { withRollback } from '@capixjs/core';
 
 export const checkout = authCap(z.object({}), async (_, ctx) => {
   // 1. Read
@@ -92,7 +92,7 @@ input is not available. Use `.inputGuard()` for checks that depend on the
 resource being requested:
 
 ```ts
-import { defineInputGuard } from 'capix';
+import { defineInputGuard } from '@capixjs/core';
 
 const mustOwnOrder = defineInputGuard(
   async ({ id }: { id: string }, ctx: AuthContext) => {

@@ -5,7 +5,7 @@ From zero to a running API in 5 minutes.
 ## Scaffold a project
 
 ```bash
-npx capix-cli@alpha new my-api
+npx @capixjs/cli@alpha new my-api
 cd my-api
 pnpm install
 pnpm dev
@@ -97,7 +97,7 @@ Guards are preconditions — they run before the resolver and throw to reject th
 
 ```ts
 // src/context.ts
-import { defineGuard, defineError } from 'capix';
+import { defineGuard, defineError } from '@capixjs/core';
 
 const errors = {
   Unauthorized: defineError(401, 'Unauthorized'),

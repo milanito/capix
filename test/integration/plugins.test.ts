@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import * as net from 'node:net';
-import { capability, defineContext, createServer, defaultErrors } from 'capix';
-import { restTransport } from 'capix-transport-rest';
-import { cors } from 'capix-plugin-cors';
-import { helmet, mergeHooks } from 'capix-plugin-helmet';
-import { loggingEnhancer, createLogger } from 'capix-plugin-logging';
-import type { Server } from 'capix';
+import { capability, defineContext, createServer, defaultErrors } from '@capixjs/core';
+import { restTransport } from '@capixjs/transport-rest';
+import { cors } from '@capixjs/plugin-cors';
+import { helmet, mergeHooks } from '@capixjs/plugin-helmet';
+import { loggingEnhancer, createLogger } from '@capixjs/plugin-logging';
+import type { Server } from '@capixjs/core';
 
 async function getFreePort(): Promise<number> {
   return new Promise((resolve, reject) => {

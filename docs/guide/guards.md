@@ -5,7 +5,7 @@ Guards are preconditions that run before a capability's resolver. They receive t
 ## Defining guards
 
 ```ts
-import { defineGuard, defineError } from 'capix';
+import { defineGuard, defineError } from '@capixjs/core';
 
 const errors = {
   Unauthorized: defineError(401, 'Unauthorized'),
@@ -60,7 +60,7 @@ const mustBeEditorOrAdmin = defineGuard((ctx) => {
 `defineGuardFor<T>()` creates a guard that asserts the context is a specific subtype. Subsequent guards in the chain receive the narrowed type:
 
 ```ts
-import { defineGuardFor } from 'capix';
+import { defineGuardFor } from '@capixjs/core';
 
 type AppContext = { requestId: string; user: User | null; db: Database };
 type AuthContext = AppContext & { user: User };
@@ -82,7 +82,7 @@ This narrows the context **for subsequent guards only**. It does not narrow the 
 `defineInputGuard` creates guards that run after input validation, receiving `(input, ctx)`:
 
 ```ts
-import { defineInputGuard } from 'capix';
+import { defineInputGuard } from '@capixjs/core';
 
 const mustOwnResource = defineInputGuard((input: { id: string }, ctx) => {
   if (!ctx.user) throw errors.Unauthorized();

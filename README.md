@@ -4,8 +4,8 @@ A capability-based Node.js server framework. Replace routes and middleware with 
 
 ```ts
 import { z } from 'zod';
-import { capability, defineGuard, createServer } from 'capix';
-import { restTransport } from 'capix-transport-rest';
+import { capability, defineGuard, createServer } from '@capixjs/core';
+import { restTransport } from '@capixjs/transport-rest';
 
 const mustBeAdmin = defineGuard((ctx) => {
   if (!ctx.user?.admin) throw new Error('Forbidden');
@@ -39,21 +39,21 @@ No `req`/`res`. No `next()`. No middleware stack. The HTTP layer is an optional 
 
 | Package | Description |
 |---|---|
-| [`capix`](packages/core) | Core framework — `capability`, `createServer`, guards, enhancers, event bus |
-| [`capix-transport-rest`](packages/transports/rest) | HTTP/1.1 REST transport with automatic route inference |
-| [`capix-transport-ws`](packages/transports/ws) | WebSocket transport for real-time capabilities and server push |
-| [`capix-transport-graphql`](packages/transports/graphql) | GraphQL transport with auto-generated schema and GraphiQL playground |
-| [`capix-transport-queue`](packages/transports/queue) | Queue transport for background jobs via BullMQ, SQS, or any adapter |
-| [`capix-plugin-auth`](packages/plugins/auth) | JWT authentication — `jwtContextBuilder`, `createJWTHelpers`, `mustBeAuthenticated` |
-| [`capix-plugin-cors`](packages/plugins/cors) | CORS plugin |
-| [`capix-plugin-helmet`](packages/plugins/helmet) | Security headers plugin |
-| [`capix-plugin-logging`](packages/plugins/logging) | Structured request logging via pino |
-| [`capix-testing`](packages/testing) | Test utilities — `mockContext`, `testServer` |
+| [`@capixjs/core`](packages/core) | Core framework — `capability`, `createServer`, guards, enhancers, event bus |
+| [`@capixjs/transport-rest`](packages/transports/rest) | HTTP/1.1 REST transport with automatic route inference |
+| [`@capixjs/transport-ws`](packages/transports/ws) | WebSocket transport for real-time capabilities and server push |
+| [`@capixjs/transport-graphql`](packages/transports/graphql) | GraphQL transport with auto-generated schema and GraphiQL playground |
+| [`@capixjs/transport-queue`](packages/transports/queue) | Queue transport for background jobs via BullMQ, SQS, or any adapter |
+| [`@capixjs/plugin-auth`](packages/plugins/auth) | JWT authentication — `jwtContextBuilder`, `createJWTHelpers`, `mustBeAuthenticated` |
+| [`@capixjs/plugin-cors`](packages/plugins/cors) | CORS plugin |
+| [`@capixjs/plugin-helmet`](packages/plugins/helmet) | Security headers plugin |
+| [`@capixjs/plugin-logging`](packages/plugins/logging) | Structured request logging via pino |
+| [`@capixjs/testing`](packages/testing) | Test utilities — `mockContext`, `testServer` |
 
 ## Quick start
 
 ```bash
-npm install capix capix-transport-rest zod
+npm install @capixjs/core @capixjs/transport-rest zod
 ```
 
 ```ts
@@ -64,8 +64,8 @@ import {
   defineGuard,
   defineError,
   createServer,
-} from 'capix';
-import { restTransport } from 'capix-transport-rest';
+} from '@capixjs/core';
+import { restTransport } from '@capixjs/transport-rest';
 
 // --- Errors ---
 const Errors = {
@@ -115,7 +115,7 @@ Every real Capix app has app-specific context (database connection, current user
 
 ```ts
 // src/capabilities.ts — define once
-import { capability } from 'capix';
+import { capability } from '@capixjs/core';
 import type { AppContext } from './context.js';
 
 export const cap = capability.withContext<AppContext>();
@@ -207,7 +207,7 @@ const cap = capability(schema, handler)
 Enhancers wrap the resolver for cross-cutting concerns:
 
 ```ts
-import { withCache, withRateLimit, withCircuitBreaker, withTimeout, withMetrics } from 'capix';
+import { withCache, withRateLimit, withCircuitBreaker, withTimeout, withMetrics } from '@capixjs/core';
 
 const robustCap = capability(schema, handler)
   .enhance(withCache(30))              // cache for 30 seconds
@@ -246,7 +246,7 @@ restTransport({
 Group related capabilities and context extensions into reusable plugins:
 
 ```ts
-import { definePlugin } from 'capix';
+import { definePlugin } from '@capixjs/core';
 
 const authPlugin = definePlugin({
   capabilities: { users: { getUser, createUser } },
@@ -383,7 +383,7 @@ pnpm -r test  →  454 tests, 0 failures
 ## CLI
 
 ```bash
-npm install -g capix-cli
+npm install -g @capixjs/cli
 ```
 
 | Command | Description |
@@ -435,10 +435,10 @@ See [docs/cli.md](docs/cli.md) for all commands.
 
 ## Testing
 
-`capix-testing` provides helpers to test capabilities without a running server:
+`@capixjs/testing` provides helpers to test capabilities without a running server:
 
 ```ts
-import { mockContext, testServer } from 'capix-testing';
+import { mockContext, testServer } from '@capixjs/testing';
 
 // Unit test: invoke capability directly (no server needed)
 const ctx = mockContext({ user: { id: '1', admin: true } });

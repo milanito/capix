@@ -5,15 +5,15 @@ Core primitives for the Capix framework. Defines capabilities, context, guards, 
 ## Install
 
 ```bash
-npm install capix zod
+npm install @capixjs/core zod
 ```
 
 ## Quick example
 
 ```ts
 import { z } from 'zod';
-import { capability, defineContext, defineGuard, defineError, createServer } from 'capix';
-import { restTransport } from 'capix-transport-rest';
+import { capability, defineContext, defineGuard, defineError, createServer } from '@capixjs/core';
+import { restTransport } from '@capixjs/transport-rest';
 
 // 1. Define what your server knows about each request
 const buildContext = defineContext(async (req) => ({
@@ -87,7 +87,7 @@ Use `capability.withContext<TContext>()` to bind the factory to your application
 
 ```ts
 // src/capabilities.ts
-import { capability } from 'capix';
+import { capability } from '@capixjs/core';
 import type { AppContext } from './context.js';
 
 export const cap = capability.withContext<AppContext>();
@@ -126,7 +126,7 @@ export const updatePost = cap(z.object({ id: z.string(), title: z.string() }), a
 Guards run before the resolver and throw to reject the request:
 
 ```ts
-import { defineGuard, defineError } from 'capix';
+import { defineGuard, defineError } from '@capixjs/core';
 
 const Errors = { Forbidden: defineError(403, 'Forbidden') };
 
@@ -143,7 +143,7 @@ const adminCap = capability(schema, handler)
 **Input guards** run after input validation and receive both `(input, ctx)`:
 
 ```ts
-import { defineInputGuard } from 'capix';
+import { defineInputGuard } from '@capixjs/core';
 
 const mustOwnResource = defineInputGuard((input: { id: string }, ctx) => {
   if (input.id !== ctx.user?.id) throw Errors.Forbidden();
@@ -153,7 +153,7 @@ const mustOwnResource = defineInputGuard((input: { id: string }, ctx) => {
 ## Errors
 
 ```ts
-import { defineError, defaultErrors } from 'capix';
+import { defineError, defaultErrors } from '@capixjs/core';
 
 // Define application-specific errors
 const Errors = {
@@ -184,7 +184,7 @@ with the given HTTP status code.
 Enhancers wrap the resolver for cross-cutting concerns:
 
 ```ts
-import { withCache, withRateLimit, withCircuitBreaker, withTimeout, withRetry, withMetrics } from 'capix';
+import { withCache, withRateLimit, withCircuitBreaker, withTimeout, withRetry, withMetrics } from '@capixjs/core';
 
 const robustCap = capability(schema, handler)
   .enhance(withCache(30))
@@ -210,7 +210,7 @@ const robustCap = capability(schema, handler)
 Context is built once per request and passed to every guard and resolver:
 
 ```ts
-import { defineContext } from 'capix';
+import { defineContext } from '@capixjs/core';
 
 const buildContext = defineContext(async (req) => ({
   requestId: crypto.randomUUID(),
@@ -226,7 +226,7 @@ The `req` argument is `{ headers: Record<string, string | string[] | undefined> 
 Plugins encapsulate capabilities and context extensions:
 
 ```ts
-import { definePlugin } from 'capix';
+import { definePlugin } from '@capixjs/core';
 
 const tenantPlugin = definePlugin({
   capabilities: { users: { getUser, createUser } },
@@ -244,7 +244,7 @@ createServer({
 Typed pub/sub for broadcasting events from REST capabilities to WebSocket clients:
 
 ```ts
-import { createEventBus } from 'capix';
+import { createEventBus } from '@capixjs/core';
 
 type AppEvents = {
   'order:paid':   { orderId: string; amount: number };

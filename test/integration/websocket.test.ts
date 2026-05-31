@@ -8,9 +8,9 @@ import {
   defineGuard,
   defineError,
   createServer,
-} from 'capix';
-import { wsTransport } from 'capix-transport-ws';
-import type { Server } from 'capix';
+} from '@capixjs/core';
+import { wsTransport } from '@capixjs/transport-ws';
+import type { Server } from '@capixjs/core';
 
 async function getFreePort(): Promise<number> {
   return new Promise((resolve, reject) => {

@@ -13,9 +13,9 @@
  */
 import * as path from 'node:path';
 import * as fs from 'node:fs';
-import type { GroupTree } from 'capix';
-import { compileRegistry, isCapability } from 'capix';
-import type { CapabilityRegistry } from 'capix';
+import type { GroupTree } from '@capixjs/core';
+import { compileRegistry, isCapability } from '@capixjs/core';
+import type { CapabilityRegistry } from '@capixjs/core';
 import * as print from './print.js';
 
 // Register tsx so subsequent dynamic imports can resolve TypeScript source files.

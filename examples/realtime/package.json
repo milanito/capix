@@ -9,10 +9,10 @@
     "dev": "tsx watch src/server.ts"
   },
   "dependencies": {
-    "capix": "workspace:*",
-    "capix-transport-rest": "workspace:*",
-    "capix-transport-ws": "workspace:*",
-    "zod": "^3.23.0"
+    "zod": "^3.23.0",
+    "@capixjs/transport-rest": "workspace:*",
+    "@capixjs/transport-ws": "workspace:*",
+    "@capixjs/core": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

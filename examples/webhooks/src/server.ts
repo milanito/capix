@@ -8,8 +8,8 @@
  */
 import * as crypto from 'node:crypto';
 import * as http from 'node:http';
-import { createServer, defineContext } from 'capix';
-import { restTransport } from 'capix-transport-rest';
+import { createServer, defineContext } from '@capixjs/core';
+import { restTransport } from '@capixjs/transport-rest';
 import { capabilities } from './capabilities.js';
 
 const WEBHOOK_SECRET = process.env['WEBHOOK_SECRET'] ?? 'dev-webhook-secret';

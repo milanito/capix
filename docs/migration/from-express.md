@@ -167,7 +167,7 @@ app.post('/upload', upload.single('file'), async (req, res) => {
 });
 
 // Capix
-import type { UploadedFile } from 'capix-transport-rest';
+import type { UploadedFile } from '@capixjs/transport-rest';
 
 const uploadFile = capability(
   z.object({ file: z.custom<UploadedFile>() }),

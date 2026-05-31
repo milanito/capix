@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import * as net from 'node:net';
-import { capability, createServer, defineContext } from 'capix';
+import { capability, createServer, defineContext } from '@capixjs/core';
 import { z } from 'zod';
 import { restTransport } from './index.js';
-import type { Server } from 'capix';
+import type { Server } from '@capixjs/core';
 
 async function getFreePort(): Promise<number> {
   return new Promise((resolve, reject) => {

@@ -10,8 +10,8 @@ import {
   defineGuard,
   defineError,
   createServer,
-} from 'capix';
-import { restTransport } from 'capix-transport-rest';
+} from '@capixjs/core';
+import { restTransport } from '@capixjs/transport-rest';
 
 // ---------------------------------------------------------------------------
 // Domain types

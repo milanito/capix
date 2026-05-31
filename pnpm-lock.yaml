@@ -26,18 +26,18 @@ importers:
 
   benchmarks:
     dependencies:
+      '@capixjs/core':
+        specifier: workspace:*
+        version: link:../packages/core
+      '@capixjs/transport-rest':
+        specifier: workspace:*
+        version: link:../packages/transports/rest
       '@hono/node-server':
         specifier: ^1.0.0
         version: 1.19.14(hono@4.12.23)
       autocannon:
         specifier: ^7.0.0
         version: 7.15.0
-      capix:
-        specifier: workspace:*
-        version: link:../packages/core
-      capix-transport-rest:
-        specifier: workspace:*
-        version: link:../packages/transports/rest
       express:
         specifier: ^4.18.0
         version: 4.22.2
@@ -72,10 +72,10 @@ importers:
 
   cli:
     dependencies:
-      capix:
+      '@capixjs/core':
         specifier: workspace:*
         version: link:../packages/core
-      capix-transport-rest:
+      '@capixjs/transport-rest':
         specifier: workspace:*
         version: link:../packages/transports/rest
       commander:
@@ -103,10 +103,10 @@ importers:
 
   examples/basic-rest:
     dependencies:
-      capix:
+      '@capixjs/core':
         specifier: workspace:*
         version: link:../../packages/core
-      capix-transport-rest:
+      '@capixjs/transport-rest':
         specifier: workspace:*
         version: link:../../packages/transports/rest
       zod:
@@ -125,10 +125,10 @@ importers:
 
   examples/file-upload:
     dependencies:
-      capix:
+      '@capixjs/core':
         specifier: workspace:*
         version: link:../../packages/core
-      capix-transport-rest:
+      '@capixjs/transport-rest':
         specifier: workspace:*
         version: link:../../packages/transports/rest
       zod:
@@ -147,10 +147,10 @@ importers:
 
   examples/jwt-auth:
     dependencies:
-      capix:
+      '@capixjs/core':
         specifier: workspace:*
         version: link:../../packages/core
-      capix-transport-rest:
+      '@capixjs/transport-rest':
         specifier: workspace:*
         version: link:../../packages/transports/rest
       jsonwebtoken:
@@ -175,10 +175,10 @@ importers:
 
   examples/multi-tenant:
     dependencies:
-      capix:
+      '@capixjs/core':
         specifier: workspace:*
         version: link:../../packages/core
-      capix-transport-rest:
+      '@capixjs/transport-rest':
         specifier: workspace:*
         version: link:../../packages/transports/rest
       zod:
@@ -197,10 +197,10 @@ importers:
 
   examples/nested-routes:
     dependencies:
-      capix:
+      '@capixjs/core':
         specifier: workspace:*
         version: link:../../packages/core
-      capix-transport-rest:
+      '@capixjs/transport-rest':
         specifier: workspace:*
         version: link:../../packages/transports/rest
       zod:
@@ -219,10 +219,10 @@ importers:
 
   examples/pagination:
     dependencies:
-      capix:
+      '@capixjs/core':
         specifier: workspace:*
         version: link:../../packages/core
-      capix-transport-rest:
+      '@capixjs/transport-rest':
         specifier: workspace:*
         version: link:../../packages/transports/rest
       zod:
@@ -241,13 +241,13 @@ importers:
 
   examples/realtime:
     dependencies:
-      capix:
+      '@capixjs/core':
         specifier: workspace:*
         version: link:../../packages/core
-      capix-transport-rest:
+      '@capixjs/transport-rest':
         specifier: workspace:*
         version: link:../../packages/transports/rest
-      capix-transport-ws:
+      '@capixjs/transport-ws':
         specifier: workspace:*
         version: link:../../packages/transports/ws
       zod:
@@ -266,10 +266,10 @@ importers:
 
   examples/webhooks:
     dependencies:
-      capix:
+      '@capixjs/core':
         specifier: workspace:*
         version: link:../../packages/core
-      capix-transport-rest:
+      '@capixjs/transport-rest':
         specifier: workspace:*
         version: link:../../packages/transports/rest
       zod:
@@ -288,10 +288,10 @@ importers:
 
   examples/with-auth:
     dependencies:
-      capix:
+      '@capixjs/core':
         specifier: workspace:*
         version: link:../../packages/core
-      capix-transport-rest:
+      '@capixjs/transport-rest':
         specifier: workspace:*
         version: link:../../packages/transports/rest
       zod:
@@ -310,10 +310,10 @@ importers:
 
   examples/with-graphql:
     dependencies:
-      capix:
+      '@capixjs/core':
         specifier: workspace:*
         version: link:../../packages/core
-      capix-transport-graphql:
+      '@capixjs/transport-graphql':
         specifier: workspace:*
         version: link:../../packages/transports/graphql
       zod:
@@ -352,15 +352,15 @@ importers:
         specifier: ^9.0.0
         version: 9.0.3
     devDependencies:
+      '@capixjs/core':
+        specifier: workspace:*
+        version: link:../../core
       '@types/jsonwebtoken':
         specifier: ^9.0.0
         version: 9.0.10
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.41
-      capix:
-        specifier: workspace:*
-        version: link:../../core
       typescript:
         specifier: ^5.5.0
         version: 5.9.3
@@ -370,24 +370,24 @@ importers:
 
   packages/plugins/cors:
     devDependencies:
+      '@capixjs/transport-rest':
+        specifier: workspace:*
+        version: link:../../transports/rest
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.41
-      capix-transport-rest:
-        specifier: workspace:*
-        version: link:../../transports/rest
       typescript:
         specifier: ^5.5.0
         version: 5.9.3
 
   packages/plugins/helmet:
     devDependencies:
+      '@capixjs/transport-rest':
+        specifier: workspace:*
+        version: link:../../transports/rest
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.41
-      capix-transport-rest:
-        specifier: workspace:*
-        version: link:../../transports/rest
       typescript:
         specifier: ^5.5.0
         version: 5.9.3
@@ -398,12 +398,12 @@ importers:
         specifier: ^9.0.0
         version: 9.14.0
     devDependencies:
+      '@capixjs/core':
+        specifier: workspace:*
+        version: link:../../core
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.41
-      capix:
-        specifier: workspace:*
-        version: link:../../core
       typescript:
         specifier: ^5.5.0
         version: 5.9.3
@@ -414,12 +414,12 @@ importers:
         specifier: ^3.23.0
         version: 3.25.76
     devDependencies:
+      '@capixjs/core':
+        specifier: workspace:*
+        version: link:../core
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.41
-      capix:
-        specifier: workspace:*
-        version: link:../core
       typescript:
         specifier: ^5.5.0
         version: 5.9.3
@@ -436,12 +436,12 @@ importers:
         specifier: ^1.22.0
         version: 1.22.4(graphql@16.14.0)
     devDependencies:
+      '@capixjs/core':
+        specifier: workspace:*
+        version: link:../../core
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.41
-      capix:
-        specifier: workspace:*
-        version: link:../../core
       typescript:
         specifier: ^5.5.0
         version: 5.9.3
@@ -454,15 +454,15 @@ importers:
 
   packages/transports/queue:
     devDependencies:
+      '@capixjs/core':
+        specifier: workspace:*
+        version: link:../../core
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.41
       bullmq:
         specifier: ^5.0.0
         version: 5.77.6
-      capix:
-        specifier: workspace:*
-        version: link:../../core
       ioredis:
         specifier: ^5.0.0
         version: 5.11.0
@@ -491,6 +491,9 @@ importers:
         specifier: ^3.25.2
         version: 3.25.2(zod@3.25.76)
     devDependencies:
+      '@capixjs/core':
+        specifier: workspace:*
+        version: link:../../core
       '@types/busboy':
         specifier: ^1.5.0
         version: 1.5.4
@@ -500,9 +503,6 @@ importers:
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.41
-      capix:
-        specifier: workspace:*
-        version: link:../../core
       form-data:
         specifier: ^4.0.5
         version: 4.0.5
@@ -519,15 +519,15 @@ importers:
         specifier: ^8.0.0
         version: 8.21.0
     devDependencies:
+      '@capixjs/core':
+        specifier: workspace:*
+        version: link:../../core
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.41
       '@types/ws':
         specifier: ^8.0.0
         version: 8.18.1
-      capix:
-        specifier: workspace:*
-        version: link:../../core
       typescript:
         specifier: ^5.5.0
         version: 5.9.3
@@ -540,22 +540,22 @@ importers:
 
   test/integration:
     dependencies:
-      capix:
+      '@capixjs/core':
         specifier: workspace:*
         version: link:../../packages/core
-      capix-plugin-cors:
+      '@capixjs/plugin-cors':
         specifier: workspace:*
         version: link:../../packages/plugins/cors
-      capix-plugin-helmet:
+      '@capixjs/plugin-helmet':
         specifier: workspace:*
         version: link:../../packages/plugins/helmet
-      capix-plugin-logging:
+      '@capixjs/plugin-logging':
         specifier: workspace:*
         version: link:../../packages/plugins/logging
-      capix-transport-rest:
+      '@capixjs/transport-rest':
         specifier: workspace:*
         version: link:../../packages/transports/rest
-      capix-transport-ws:
+      '@capixjs/transport-ws':
         specifier: workspace:*
         version: link:../../packages/transports/ws
       zod:

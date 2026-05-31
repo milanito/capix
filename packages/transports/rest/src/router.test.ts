@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { z } from 'zod';
-import { capability, compileRegistry } from 'capix';
+import { capability, compileRegistry } from '@capixjs/core';
 import { compileRouter, generateRoutes } from './router.js';
 import type { RouteDefinition } from './router.js';
 

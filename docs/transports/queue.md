@@ -14,8 +14,8 @@ See the [package README](../../packages/transports/queue/README.md) for the full
 ## Setup
 
 ```ts
-import { createServer } from 'capix';
-import { queueTransport, MemoryQueueAdapter, createQueueClient } from 'capix-transport-queue';
+import { createServer } from '@capixjs/core';
+import { queueTransport, MemoryQueueAdapter, createQueueClient } from '@capixjs/transport-queue';
 
 const adapter  = new MemoryQueueAdapter();
 const jobQueue = createQueueClient(adapter, 'jobs');

@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import * as net from 'node:net';
-import { capability, createServer, defineContext, defineGuard, defineError } from 'capix';
-import { restTransport, uploadedFile } from 'capix-transport-rest';
-import type { UploadedFile } from 'capix-transport-rest';
+import { capability, createServer, defineContext, defineGuard, defineError } from '@capixjs/core';
+import { restTransport, uploadedFile } from '@capixjs/transport-rest';
+import type { UploadedFile } from '@capixjs/transport-rest';
 import { z } from 'zod';
-import type { Server } from 'capix';
+import type { Server } from '@capixjs/core';
 
 async function getFreePort(): Promise<number> {
   return new Promise((resolve, reject) => {

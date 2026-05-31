@@ -1,18 +1,18 @@
-# capix-transport-rest
+# @capixjs/transport-rest
 
 HTTP/1.1 REST transport for Capix. Mounts your capabilities as REST endpoints with automatic route inference.
 
 ## Install
 
 ```bash
-npm install capix capix-transport-rest zod
+npm install @capixjs/core @capixjs/transport-rest zod
 ```
 
 ## Usage
 
 ```ts
-import { createServer } from 'capix';
-import { restTransport } from 'capix-transport-rest';
+import { createServer } from '@capixjs/core';
+import { restTransport } from '@capixjs/transport-rest';
 
 createServer({
   capabilities: {
@@ -116,7 +116,7 @@ restTransport({
 Use `UploadedFile` from the transport for typed file handling:
 
 ```ts
-import type { UploadedFile } from 'capix-transport-rest';
+import type { UploadedFile } from '@capixjs/transport-rest';
 import { z } from 'zod';
 
 const uploadAvatar = capability(

@@ -1,5 +1,5 @@
 import type { ServerResponse } from 'node:http';
-import type { RestTransportOptions } from 'capix-transport-rest';
+import type { RestTransportOptions } from '@capixjs/transport-rest';
 
 export type HelmetOptions = {
   /** Content-Security-Policy value (false to disable) */

@@ -5,7 +5,7 @@ Context is built once per request and passed to every guard and resolver for tha
 ## Defining context
 
 ```ts
-import { defineContext, getHeader } from 'capix';
+import { defineContext, getHeader } from '@capixjs/core';
 
 const buildContext = defineContext(async (req) => ({
   requestId: crypto.randomUUID(),
@@ -30,7 +30,7 @@ Use `getHeader(req, name)` for type-safe access — it returns `string | undefin
 Once you have a context type, create typed capability factories:
 
 ```ts
-import { capability } from 'capix';
+import { capability } from '@capixjs/core';
 
 export type AppContext = Awaited<ReturnType<typeof buildContext>>;
 
@@ -71,7 +71,7 @@ const buildContext = defineContext(async (req) => {
 Plugins can extend the context. The extended context is merged into every request's context:
 
 ```ts
-import { definePlugin } from 'capix';
+import { definePlugin } from '@capixjs/core';
 
 const metricsPlugin = definePlugin({
   context: (base) => ({

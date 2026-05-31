@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { capability, defineContext, createServer, defineError } from 'capix';
+import { capability, defineContext, createServer, defineError } from '@capixjs/core';
 import { z } from 'zod';
 import { queueTransport, createQueueClient, MemoryQueueAdapter } from './index.js';
 import type { QueueMessage } from './index.js';

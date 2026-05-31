@@ -13,9 +13,9 @@
  */
 
 import { z } from 'zod';
-import { capability, defineContext, defineError, createServer } from 'capix';
-import { restTransport } from 'capix-transport-rest';
-import { wsTransport } from 'capix-transport-ws';
+import { capability, defineContext, defineError, createServer } from '@capixjs/core';
+import { restTransport } from '@capixjs/transport-rest';
+import { wsTransport } from '@capixjs/transport-ws';
 import { eventBus } from './events.js';
 
 // ---------------------------------------------------------------------------

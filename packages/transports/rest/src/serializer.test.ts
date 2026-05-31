@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
-import { compileRegistry, capability } from 'capix';
+import { compileRegistry, capability } from '@capixjs/core';
 import { buildSerializers, defaultSerializer } from './serializer.js';
 
 describe('defaultSerializer', () => {

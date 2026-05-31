@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { capability, defineError, defineGuard } from 'capix';
-import { uploadedFile } from 'capix-transport-rest';
+import { capability, defineError, defineGuard } from '@capixjs/core';
+import { uploadedFile } from '@capixjs/transport-rest';
 
 export const errors = {
   Unauthorized: defineError(401, 'Unauthorized'),

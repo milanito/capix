@@ -4,7 +4,7 @@
  */
 
 import { z } from 'zod';
-import { capability, compileRegistry, createExecutionEngine } from 'capix';
+import { capability, compileRegistry, createExecutionEngine } from '@capixjs/core';
 import type {
   AnyCapability,
   BaseContext,
@@ -12,7 +12,7 @@ import type {
   ContextBuilder,
   InvokeFn,
   GroupTree,
-} from 'capix';
+} from '@capixjs/core';
 
 /** Creates a mock context with sensible defaults merged with any overrides. */
 export function mockContext<TContext extends BaseContext = BaseContext>(

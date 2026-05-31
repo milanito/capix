@@ -1,5 +1,5 @@
 {
-  "name": "capix-plugin-logging",
+  "name": "@capixjs/plugin-logging",
   "version": "0.1.0-alpha.1",
   "description": "Structured request logging plugin for Capix using pino",
   "license": "MIT",
@@ -36,11 +36,11 @@
     "pino": "^9.0.0"
   },
   "peerDependencies": {
-    "capix": ">=0.1.0-0"
+    "@capixjs/core": ">=0.1.0-0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "capix": "workspace:*",
-    "typescript": "^5.5.0"
+    "typescript": "^5.5.0",
+    "@capixjs/core": "workspace:*"
   }
 }

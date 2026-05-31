@@ -5,15 +5,15 @@ export type NewProjectOptions = {
 
 export function renderPackageJson(opts: NewProjectOptions): string {
   const deps: Record<string, string> = {
-    capix: '^0.1.0',
+    '@capixjs/core': '^0.1.0',
     zod: '^3.23.0',
   };
 
   if (opts.transport === 'rest' || opts.transport === 'both') {
-    deps['capix-transport-rest'] = '^0.1.0';
+    deps['@capixjs/transport-rest'] = '^0.1.0';
   }
   if (opts.transport === 'ws' || opts.transport === 'both') {
-    deps['capix-transport-ws'] = '^0.1.0';
+    deps['@capixjs/transport-ws'] = '^0.1.0';
   }
 
   return JSON.stringify(
@@ -67,7 +67,7 @@ export function renderTsConfig(): string {
 
 export function renderCapabilitiesTs(): string {
   return `import { z } from 'zod';
-import { capability, defineContext, defineError } from 'capix';
+import { capability, defineContext, defineError } from '@capixjs/core';
 
 // ---------------------------------------------------------------------------
 // Context
@@ -132,17 +132,17 @@ export const capabilities = {
 
 export function renderServerTs(opts: NewProjectOptions): string {
   const imports: string[] = [
-    `import { createServer } from 'capix';`,
+    `import { createServer } from '@capixjs/core';`,
     `import { buildContext, capabilities } from './capabilities.js';`,
   ];
   const transports: string[] = [];
 
   if (opts.transport === 'rest' || opts.transport === 'both') {
-    imports.push(`import { restTransport } from 'capix-transport-rest';`);
+    imports.push(`import { restTransport } from '@capixjs/transport-rest';`);
     transports.push(`restTransport({ port: 3000 })`);
   }
   if (opts.transport === 'ws' || opts.transport === 'both') {
-    imports.push(`import { wsTransport } from 'capix-transport-ws';`);
+    imports.push(`import { wsTransport } from '@capixjs/transport-ws';`);
     transports.push(`wsTransport({ port: 3001 })`);
   }
 
@@ -217,7 +217,7 @@ export const ping = cap(async (_input, _ctx) => ({ ok: true }), 'query');
 Guards narrow the context type and run before the resolver:
 
 \`\`\`ts
-import { defineGuard, defaultErrors } from 'capix';
+import { defineGuard, defaultErrors } from '@capixjs/core';
 
 export const mustBeAuthenticated = defineGuard(
   (ctx: AppContext): asserts ctx is AuthContext => {
@@ -250,10 +250,10 @@ transport packages — NOT in capability definitions:
 
 | Import from | What |
 |---|---|
-| \`capix\` | \`capability\`, \`defineGuard\`, \`defineContext\`, \`defineError\`, \`defineEnhancer\`, \`withRollback\` |
-| \`capix-transport-rest\` | \`restTransport\`, \`HttpOverride\` |
-| \`capix-transport-ws\` | \`wsTransport\` |
-| \`capix-transport-graphql\` | \`graphqlTransport\` |
+| \`@capixjs/core\` | \`capability\`, \`defineGuard\`, \`defineContext\`, \`defineError\`, \`defineEnhancer\`, \`withRollback\` |
+| \`@capixjs/transport-rest\` | \`restTransport\`, \`HttpOverride\` |
+| \`@capixjs/transport-ws\` | \`wsTransport\` |
+| \`@capixjs/transport-graphql\` | \`graphqlTransport\` |
 
 Never import transport packages inside capability files.
 
@@ -300,7 +300,7 @@ Framework errors: \`defaultErrors.Unauthorized()\`, \`defaultErrors.Forbidden()\
 ## Enhancers
 
 \`\`\`ts
-import { withRateLimit, withCache } from 'capix';
+import { withRateLimit, withCache } from '@capixjs/core';
 
 export const getItem = cap(schema, resolver).enhance(withRateLimit({ limit: 100, windowMs: 60_000 }));
 \`\`\`

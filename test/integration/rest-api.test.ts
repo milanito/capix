@@ -7,9 +7,9 @@ import {
   defineGuard,
   defineError,
   createServer,
-} from 'capix';
-import { restTransport } from 'capix-transport-rest';
-import type { Server } from 'capix';
+} from '@capixjs/core';
+import { restTransport } from '@capixjs/transport-rest';
+import type { Server } from '@capixjs/core';
 
 // ---------------------------------------------------------------------------
 // Helpers

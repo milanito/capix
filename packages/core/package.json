@@ -1,5 +1,5 @@
 {
-  "name": "capix",
+  "name": "@capixjs/core",
   "version": "0.1.0-alpha.1",
   "description": "Capability-based Node.js server framework — core",
   "license": "MIT",

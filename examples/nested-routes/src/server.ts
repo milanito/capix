@@ -19,8 +19,8 @@
  */
 
 import { z } from 'zod';
-import { capability, defineContext, defineError, defineGuard, createServer } from 'capix';
-import { restTransport } from 'capix-transport-rest';
+import { capability, defineContext, defineError, defineGuard, createServer } from '@capixjs/core';
+import { restTransport } from '@capixjs/transport-rest';
 
 // ---------------------------------------------------------------------------
 // Domain types

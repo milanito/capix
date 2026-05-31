@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { jwtContextBuilder, createJWTHelpers } from './index.js';
-import type { RawRequest } from 'capix';
+import type { RawRequest } from '@capixjs/core';
 
 function mockRequest(headers: Record<string, string> = {}): RawRequest {
   return {

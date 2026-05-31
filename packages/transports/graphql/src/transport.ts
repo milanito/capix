@@ -8,7 +8,7 @@
 import * as http from 'node:http';
 import { createHandler } from 'graphql-http/lib/use/node';
 import { buildGraphQLSchema } from './schema-builder.js';
-import type { Transport, MountOptions, InvokeFn, GroupTree, TransportWithCapabilities } from 'capix';
+import type { Transport, MountOptions, InvokeFn, GroupTree, TransportWithCapabilities } from '@capixjs/core';
 
 export type GraphQLTransportOptions = {
   readonly port: number;

@@ -8,7 +8,7 @@
 
 import fastJsonStringify from 'fast-json-stringify';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import type { CapabilityRegistry } from 'capix';
+import type { CapabilityRegistry } from '@capixjs/core';
 
 /** Pre-compiled response serializer: data → '{"data":<json>}' */
 export type ResponseSerializer = (data: unknown) => string;

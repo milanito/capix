@@ -1,13 +1,13 @@
 # CLI
 
-`capix-cli` provides scaffolding, code generation, introspection, and development tools.
+`@capixjs/cli` provides scaffolding, code generation, introspection, and development tools.
 
 ## Install
 
 ```bash
-npm install -g capix-cli
+npm install -g @capixjs/cli
 # or use without installing:
-npx capix-cli@alpha <command>
+npx @capixjs/cli@alpha <command>
 ```
 
 ## Scaffolding

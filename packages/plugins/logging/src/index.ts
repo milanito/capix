@@ -1,6 +1,6 @@
 import pino from 'pino';
-import { defineEnhancer, isFrameworkError } from 'capix';
-import type { Enhancer, AnyCapability } from 'capix';
+import { defineEnhancer, isFrameworkError } from '@capixjs/core';
+import type { Enhancer, AnyCapability } from '@capixjs/core';
 
 export type LoggingOptions = {
   /** Pino logger instance. If not provided, one is created with the given level. */

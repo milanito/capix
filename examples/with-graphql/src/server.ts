@@ -11,9 +11,9 @@
  */
 
 import { z } from 'zod';
-import { capability, defineContext, defineGuard, defineError, createServer, getHeader } from 'capix';
-import type { BaseContext } from 'capix';
-import { graphqlTransport } from 'capix-transport-graphql';
+import { capability, defineContext, defineGuard, defineError, createServer, getHeader } from '@capixjs/core';
+import type { BaseContext } from '@capixjs/core';
+import { graphqlTransport } from '@capixjs/transport-graphql';
 
 // ---------------------------------------------------------------------------
 // Domain

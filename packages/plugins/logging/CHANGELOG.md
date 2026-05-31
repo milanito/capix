@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to `capix-plugin-logging` are documented here.
+All notable changes to `@capixjs/plugin-logging` are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Versioning: [Semantic Versioning](https://semver.org/).
 

@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import * as print from '../utils/print.js';
 import { loadRegistry } from '../utils/loader.js';
-import type { CapabilityRegistry } from 'capix';
+import type { CapabilityRegistry } from '@capixjs/core';
 
 type CapSnap = { intent: string; guards: number; hasInput: boolean; hasOutput: boolean };
 

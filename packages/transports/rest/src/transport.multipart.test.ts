@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import * as net from 'node:net';
 import FormData from 'form-data';
-import { createServer, capability, defineContext } from 'capix';
+import { createServer, capability, defineContext } from '@capixjs/core';
 import { z } from 'zod';
 import { restTransport, uploadedFile } from './index.js';
-import type { Server } from 'capix';
+import type { Server } from '@capixjs/core';
 import type { UploadedFile } from './multipart.js';
 
 async function getFreePort(): Promise<number> {

@@ -23,7 +23,7 @@ Use `capability.withContext<AuthContext>()` to create a factory pre-typed with t
 
 ```ts
 // src/capabilities.ts
-import { capability } from 'capix';
+import { capability } from '@capixjs/core';
 import type { AppContext } from './context.js';
 
 export type AppUser = { id: string; email: string; role: string };

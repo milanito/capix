@@ -1,4 +1,4 @@
-import type { Transport, MountOptions, InvokeFn, GroupTree, TransportWithCapabilities } from 'capix';
+import type { Transport, MountOptions, InvokeFn, GroupTree, TransportWithCapabilities } from '@capixjs/core';
 import type { QueueAdapter, QueueMessage }                                               from './types.js';
 import { randomUUID }                                                                    from 'node:crypto';
 

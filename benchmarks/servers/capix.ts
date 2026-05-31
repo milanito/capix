@@ -8,8 +8,8 @@
  */
 
 import { z } from 'zod';
-import { capability, defineContext, defineError, createServer } from 'capix';
-import { restTransport } from 'capix-transport-rest';
+import { capability, defineContext, defineError, createServer } from '@capixjs/core';
+import { restTransport } from '@capixjs/transport-rest';
 
 const SECRET = 'benchmark-secret';
 const Errors = { Unauthorized: defineError(401, 'Unauthorized') };

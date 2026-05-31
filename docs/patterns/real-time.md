@@ -6,7 +6,7 @@ Capix's WebSocket transport is request/response. For server-push (broadcasting m
 
 ```ts
 // src/events.ts — define the event map and create the bus
-import { createEventBus } from 'capix';
+import { createEventBus } from '@capixjs/core';
 
 export type AppEvents = {
   'task:created':  { id: string; title: string; assigneeId: string };
@@ -20,9 +20,9 @@ export const eventBus = createEventBus<AppEvents>();
 
 ```ts
 // src/server.ts — wire eventBus into wsTransport
-import { createServer } from 'capix';
-import { restTransport } from 'capix-transport-rest';
-import { wsTransport } from 'capix-transport-ws';
+import { createServer } from '@capixjs/core';
+import { restTransport } from '@capixjs/transport-rest';
+import { wsTransport } from '@capixjs/transport-ws';
 import { eventBus } from './events.js';
 
 createServer({
@@ -79,7 +79,7 @@ Subscribe with a filter to only receive events matching a predicate — useful w
 
 ```ts
 // Server-side: define a filterable event subscription
-import { type SubscribeOptions } from 'capix';
+import { type SubscribeOptions } from '@capixjs/core';
 
 const unsub = eventBus.subscribe('task:updated', handler, {
   filter: (data) => data.id === 'specific-task-id',

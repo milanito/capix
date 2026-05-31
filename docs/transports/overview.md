@@ -6,18 +6,18 @@ A transport connects an incoming communication channel to the Capix execution en
 
 | Transport | Package | Protocol |
 |---|---|---|
-| REST | `capix-transport-rest` | HTTP/1.1 |
-| WebSocket | `capix-transport-ws` | WebSocket |
-| GraphQL | `capix-transport-graphql` | HTTP/1.1 (GraphQL over HTTP) |
-| Queue | `capix-transport-queue` | Custom (adapter-based) |
+| REST | `@capixjs/transport-rest` | HTTP/1.1 |
+| WebSocket | `@capixjs/transport-ws` | WebSocket |
+| GraphQL | `@capixjs/transport-graphql` | HTTP/1.1 (GraphQL over HTTP) |
+| Queue | `@capixjs/transport-queue` | Custom (adapter-based) |
 
 ## Multiple transports
 
 ```ts
-import { createServer } from 'capix';
-import { restTransport } from 'capix-transport-rest';
-import { wsTransport } from 'capix-transport-ws';
-import { graphqlTransport } from 'capix-transport-graphql';
+import { createServer } from '@capixjs/core';
+import { restTransport } from '@capixjs/transport-rest';
+import { wsTransport } from '@capixjs/transport-ws';
+import { graphqlTransport } from '@capixjs/transport-graphql';
 
 createServer({
   context:      buildContext,
@@ -74,7 +74,7 @@ Every transport goes through the same execution engine. Guards always run. Input
 A transport is an object with a `mount(invoke, options)` method:
 
 ```ts
-import type { Transport, InvokeFn, MountOptions } from 'capix';
+import type { Transport, InvokeFn, MountOptions } from '@capixjs/core';
 
 const myTransport: Transport = {
   async mount(invoke: InvokeFn, options: MountOptions) {
@@ -98,7 +98,7 @@ const myTransport: Transport = {
 For per-transport capabilities, implement `TransportWithCapabilities`:
 
 ```ts
-import type { TransportWithCapabilities, GroupTree } from 'capix';
+import type { TransportWithCapabilities, GroupTree } from '@capixjs/core';
 
 function myTransport(options: { capabilities?: GroupTree }): TransportWithCapabilities {
   return {

@@ -2,9 +2,9 @@ import { Command } from 'commander';
 import * as path from 'node:path';
 import * as print from '../utils/print.js';
 import { loadRegistry } from '../utils/loader.js';
-import { generateRoutes } from 'capix-transport-rest';
-import type { RouteDefinition } from 'capix-transport-rest';
-import type { CapabilityRegistry } from 'capix';
+import { generateRoutes } from '@capixjs/transport-rest';
+import type { RouteDefinition } from '@capixjs/transport-rest';
+import type { CapabilityRegistry } from '@capixjs/core';
 
 function schemaToObject(schema: unknown): Record<string, string> | null {
   if (!schema) return null;

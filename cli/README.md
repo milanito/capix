@@ -1,11 +1,11 @@
-# capix-cli
+# @capixjs/cli
 
 CLI tools for the Capix framework. Scaffold projects, inspect capabilities, generate docs, and call capabilities directly from the terminal.
 
 ## Install
 
 ```bash
-npm install -g capix-cli
+npm install -g @capixjs/cli
 # or use without installing:
 npx capix <command>
 ```

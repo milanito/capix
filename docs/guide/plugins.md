@@ -5,7 +5,7 @@ Plugins bundle capabilities and context extensions into a reusable, composable u
 ## Defining a plugin
 
 ```ts
-import { definePlugin } from 'capix';
+import { definePlugin } from '@capixjs/core';
 
 const auditPlugin = definePlugin({
   // Add capabilities to the server registry
@@ -25,11 +25,11 @@ Both `capabilities` and `context` are optional. A plugin that only adds capabili
 ## Using plugins
 
 ```ts
-import { createServer } from 'capix';
-import { restTransport } from 'capix-transport-rest';
-import { corsPlugin } from 'capix-plugin-cors';
-import { helmetPlugin } from 'capix-plugin-helmet';
-import { loggingPlugin } from 'capix-plugin-logging';
+import { createServer } from '@capixjs/core';
+import { restTransport } from '@capixjs/transport-rest';
+import { corsPlugin } from '@capixjs/plugin-cors';
+import { helmetPlugin } from '@capixjs/plugin-helmet';
+import { loggingPlugin } from '@capixjs/plugin-logging';
 
 createServer({
   context:      buildContext,
@@ -67,7 +67,7 @@ Plugins are plain TypeScript objects. To package one for npm:
 
 ```ts
 // my-plugin/src/index.ts
-import { definePlugin } from 'capix';
+import { definePlugin } from '@capixjs/core';
 
 export function myPlugin(options: MyPluginOptions) {
   return definePlugin({
