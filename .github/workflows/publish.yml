@@ -27,10 +27,17 @@ jobs:
         run: |
           CURRENT=$(node -p "require('./packages/core/package.json').version")
           echo "version=$CURRENT" >> $GITHUB_OUTPUT
-          git diff HEAD~1 HEAD -- packages/core/package.json \
-            | grep '"version"' | grep '^+' | grep -v '^+++' \
-            && echo "changed=true"  >> $GITHUB_OUTPUT \
-            || echo "changed=false" >> $GITHUB_OUTPUT
+
+          # Check if this version already exists on npm
+          PUBLISHED=$(npm view @capixjs/core@$CURRENT version 2>/dev/null || echo "not-found")
+
+          if [ "$PUBLISHED" = "$CURRENT" ]; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "Version $CURRENT is already published on npm — skipping"
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "Version $CURRENT not found on npm — will publish"
+          fi
 
   audit:
     name: Pre-publish audit
