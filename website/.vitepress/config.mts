@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitepress';
 
 export default defineConfig({
+  base:      process.env['VITEPRESS_BASE'] ?? '/',
   srcDir:    '../docs',
   outDir:    '../dist/website',
   cacheDir:  '../.vitepress-cache',
@@ -17,7 +18,7 @@ export default defineConfig({
   lang:        'en-US',
 
   head: [
-    ['link', { rel: 'icon', href: '/favicon.svg', type: 'image/svg+xml' }],
+    ['link', { rel: 'icon', href: `${process.env['VITEPRESS_BASE'] ?? '/'}favicon.svg`, type: 'image/svg+xml' }],
     ['meta', { name: 'theme-color', content: '#4f46e5' }],
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:title', content: 'Capix' }],
