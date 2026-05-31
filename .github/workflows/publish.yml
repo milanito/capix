@@ -1,0 +1,142 @@
+name: Publish
+
+on:
+  push:
+    branches: [master]
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  check-version:
+    name: Check if version changed
+    runs-on: ubuntu-latest
+    outputs:
+      should-publish: ${{ steps.check.outputs.changed }}
+      version:        ${{ steps.check.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check version change
+        id: check
+        run: |
+          CURRENT=$(node -p "require('./packages/core/package.json').version")
+          echo "version=$CURRENT" >> $GITHUB_OUTPUT
+          git diff HEAD~1 HEAD -- packages/core/package.json \
+            | grep '"version"' | grep '^+' | grep -v '^+++' \
+            && echo "changed=true"  >> $GITHUB_OUTPUT \
+            || echo "changed=false" >> $GITHUB_OUTPUT
+
+  audit:
+    name: Pre-publish audit
+    needs: check-version
+    if: needs.check-version.outputs.should-publish == 'true'
+    uses: ./.github/workflows/audit.yml
+
+  publish:
+    name: Publish packages
+    needs: [check-version, audit]
+    if: needs.check-version.outputs.should-publish == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all packages
+        run: pnpm build
+
+      - name: Determine npm tag
+        id: tag
+        run: |
+          VERSION="${{ needs.check-version.outputs.version }}"
+          if   [[ "$VERSION" == *"alpha"* ]]; then echo "tag=alpha"  >> $GITHUB_OUTPUT
+          elif [[ "$VERSION" == *"beta"*  ]]; then echo "tag=beta"   >> $GITHUB_OUTPUT
+          elif [[ "$VERSION" == *"rc"*    ]]; then echo "tag=next"   >> $GITHUB_OUTPUT
+          else                                     echo "tag=latest" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Publish packages in dependency order
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          echo "Publishing with tag: $TAG"
+
+          publish_pkg() {
+            local pkg=$1
+            echo "Publishing $pkg..."
+            cd "$pkg"
+            npm publish --tag "$TAG" --access public
+            cd "$GITHUB_WORKSPACE"
+          }
+
+          publish_pkg packages/core
+          publish_pkg packages/transports/rest
+          publish_pkg packages/transports/ws
+          publish_pkg packages/transports/graphql
+          publish_pkg packages/transports/queue
+          publish_pkg packages/testing
+          publish_pkg packages/plugins/cors
+          publish_pkg packages/plugins/helmet
+          publish_pkg packages/plugins/logging
+          publish_pkg packages/plugins/auth
+          publish_pkg cli
+
+      - name: Verify published packages work
+        run: |
+          mkdir /tmp/npm-verify && cd /tmp/npm-verify
+          echo '{"name":"verify","version":"1.0.0","type":"module"}' > package.json
+          pnpm add @capixjs/core@${{ steps.tag.outputs.tag }} \
+                   @capixjs/transport-rest@${{ steps.tag.outputs.tag }}
+
+          node --input-type=module << 'EOF'
+          import { capability, defineContext, createServer } from '@capixjs/core';
+          import { restTransport } from '@capixjs/transport-rest';
+          const server = createServer({
+            context:      defineContext(async () => ({ requestId: 'test' })),
+            capabilities: { test: { hello: capability(() => ({ ok: true }), 'query') } },
+            transports:   [restTransport({ port: 4321 })],
+          });
+          server.start().then(async () => {
+            const res  = await fetch('http://localhost:4321/test/hello');
+            const body = await res.json();
+            console.log(body?.data?.ok === true
+              ? '✓ Published packages work'
+              : '✗ FAIL: ' + JSON.stringify(body));
+            await server.stop();
+          });
+          EOF
+
+      - name: Create GitHub Release
+        if: steps.tag.outputs.tag == 'latest'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = '${{ needs.check-version.outputs.version }}';
+            await github.rest.repos.createRelease({
+              owner:      context.repo.owner,
+              repo:       context.repo.repo,
+              tag_name:   `v${version}`,
+              name:       `v${version}`,
+              body:       `See [CHANGELOG](https://github.com/${context.repo.owner}/${context.repo.repo}/blob/master/docs/changelog.md).`,
+              draft:      false,
+              prerelease: false,
+            });

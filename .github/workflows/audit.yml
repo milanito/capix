@@ -1,0 +1,210 @@
+name: Pre-publish audit
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  audit:
+    name: Full pre-publish audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # ─── Build ────────────────────────────────────────────────────────────
+
+      - name: Build all packages
+        run: pnpm build
+
+      # ─── Tests ────────────────────────────────────────────────────────────
+
+      - name: Run test suite
+        run: pnpm test
+
+      # ─── TypeScript ───────────────────────────────────────────────────────
+
+      - name: TypeScript check (all packages)
+        run: pnpm -r exec tsc --noEmit
+
+      # ─── Package integrity ────────────────────────────────────────────────
+
+      - name: Verify all packages are scoped @capixjs/*
+        run: |
+          FAILED=0
+          for pkg in packages/core packages/transports/rest packages/transports/ws \
+                     packages/transports/graphql packages/transports/queue \
+                     packages/testing packages/plugins/cors packages/plugins/helmet \
+                     packages/plugins/logging packages/plugins/auth cli; do
+            name=$(node -p "require('./$pkg/package.json').name")
+            if [[ "$name" != @capixjs/* ]]; then
+              echo "✗ $pkg: '$name' is not scoped @capixjs/*"
+              FAILED=1
+            else
+              echo "✓ $name"
+            fi
+          done
+          exit $FAILED
+
+      - name: Verify all packages have consistent versions
+        run: |
+          EXPECTED=$(node -p "require('./packages/core/package.json').version")
+          FAILED=0
+          for pkg in packages/transports/rest packages/transports/ws \
+                     packages/transports/graphql packages/transports/queue \
+                     packages/testing packages/plugins/cors packages/plugins/helmet \
+                     packages/plugins/logging packages/plugins/auth cli; do
+            ver=$(node -p "require('./$pkg/package.json').version")
+            if [[ "$ver" != "$EXPECTED" ]]; then
+              echo "✗ $(basename $pkg): $ver != $EXPECTED"
+              FAILED=1
+            else
+              echo "✓ $(basename $pkg)@$ver"
+            fi
+          done
+          exit $FAILED
+
+      - name: Verify peerDependencies include prereleases
+        run: |
+          FAILED=0
+          # Packages that peer on @capixjs/core
+          for pkg in packages/transports/rest packages/transports/ws \
+                     packages/transports/graphql packages/transports/queue \
+                     packages/testing packages/plugins/logging packages/plugins/auth; do
+            peer=$(node -p "require('./$pkg/package.json').peerDependencies?.['@capixjs/core'] || ''")
+            if [[ "$peer" != *"-0"* ]]; then
+              echo "✗ $(basename $pkg): @capixjs/core peerDep '$peer' must use >=x.x.x-0 range"
+              FAILED=1
+            else
+              echo "✓ $(basename $pkg): @capixjs/core $peer"
+            fi
+          done
+          # Packages that peer on @capixjs/transport-rest
+          for pkg in packages/plugins/cors packages/plugins/helmet; do
+            peer=$(node -p "require('./$pkg/package.json').peerDependencies?.['@capixjs/transport-rest'] || ''")
+            if [[ "$peer" != *"-0"* ]]; then
+              echo "✗ $(basename $pkg): @capixjs/transport-rest peerDep '$peer' must use >=x.x.x-0 range"
+              FAILED=1
+            else
+              echo "✓ $(basename $pkg): @capixjs/transport-rest $peer"
+            fi
+          done
+          exit $FAILED
+
+      - name: Verify all packages have LICENSE and README
+        run: |
+          FAILED=0
+          for pkg in packages/core packages/transports/rest packages/transports/ws \
+                     packages/transports/graphql packages/transports/queue \
+                     packages/testing packages/plugins/cors packages/plugins/helmet \
+                     packages/plugins/logging packages/plugins/auth cli; do
+            [ -f "$pkg/LICENSE" ]   || { echo "✗ $pkg: missing LICENSE";   FAILED=1; }
+            [ -f "$pkg/README.md" ] || { echo "✗ $pkg: missing README.md"; FAILED=1; }
+          done
+          [ $FAILED -eq 0 ] && echo "✓ All packages have LICENSE and README"
+          exit $FAILED
+
+      - name: Dry-run pack all packages
+        run: |
+          FAILED=0
+          for pkg in packages/core packages/transports/rest packages/transports/ws \
+                     packages/transports/graphql packages/transports/queue \
+                     packages/testing packages/plugins/cors packages/plugins/helmet \
+                     packages/plugins/logging packages/plugins/auth cli; do
+            cd "$pkg"
+            OUTPUT=$(npm pack --dry-run 2>&1)
+            echo "$OUTPUT" | grep -q "dist/" || { echo "✗ $pkg: dist/ not in pack"; FAILED=1; }
+            echo "$OUTPUT" | grep -q " src/" && { echo "✗ $pkg: src/ included in pack"; FAILED=1; } || true
+            echo "$OUTPUT" | grep -qE "\.(test|spec)\.(ts|js)" && { echo "✗ $pkg: test files in pack"; FAILED=1; } || true
+            [ $FAILED -eq 0 ] && echo "✓ $(node -p "require('./package.json').name") pack clean"
+            cd "$GITHUB_WORKSPACE"
+          done
+          exit $FAILED
+
+      # ─── Documentation accuracy ───────────────────────────────────────────
+
+      - name: No unscoped capix imports in docs
+        run: |
+          FOUND=$(grep -rE "from 'capix'|from \"capix\"|add capix[^j]|install capix[^j]" \
+            --include="*.md" docs/ 2>/dev/null || true)
+          if [ -n "$FOUND" ]; then
+            echo "✗ Unscoped capix references in docs:"; echo "$FOUND"; exit 1
+          fi
+          echo "✓ All docs use @capixjs/* scoped imports"
+
+      - name: No wrong GitHub repo links in docs
+        run: |
+          FOUND=$(grep -r "github.com/capix/capix" --include="*.md" docs/ 2>/dev/null || true)
+          if [ -n "$FOUND" ]; then
+            echo "✗ Wrong GitHub repo links:"; echo "$FOUND"; exit 1
+          fi
+          echo "✓ No wrong GitHub repo links"
+
+      - name: No unscoped npm package links in docs
+        run: |
+          FOUND=$(grep -rE "npmjs.com/package/capix[^j]" --include="*.md" docs/ 2>/dev/null || true)
+          if [ -n "$FOUND" ]; then
+            echo "✗ Unscoped npm links:"; echo "$FOUND"; exit 1
+          fi
+          echo "✓ No unscoped npm links"
+
+      # ─── Scaffold smoke test ──────────────────────────────────────────────
+
+      - name: Scaffold smoke test
+        run: |
+          node cli/dist/index.js new smoke-test --rest -y
+          cd smoke-test
+
+          node -e "
+            const fs  = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            pkg.dependencies = {
+              '@capixjs/core':           'file:$GITHUB_WORKSPACE/packages/core',
+              '@capixjs/transport-rest': 'file:$GITHUB_WORKSPACE/packages/transports/rest',
+              'zod': '^3.23.0',
+            };
+            pkg.devDependencies = {
+              'typescript': '^5.4.0',
+              'tsx': '^4.0.0',
+              '@types/node': '^20.0.0',
+            };
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+          "
+
+          npm install
+
+          if grep -E '"capix[^j]' package.json; then
+            echo "✗ Scaffold generated unscoped package references"; exit 1
+          fi
+
+          npx tsc --noEmit
+          echo "✓ Scaffold compiles cleanly"
+
+          npx tsx src/server.ts &
+          SERVER_PID=$!
+          sleep 2
+
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/system/ping)
+          kill $SERVER_PID 2>/dev/null || true
+
+          if [ "$STATUS" = "200" ]; then
+            echo "✓ Scaffold server responds"
+          else
+            echo "✗ Server returned HTTP $STATUS (expected 200)"; exit 1
+          fi
