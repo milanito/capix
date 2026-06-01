@@ -1,6 +1,6 @@
 {
   "name": "@capixjs/transport-queue",
-  "version": "0.1.0-alpha.4",
+  "version": "0.1.0-alpha.5",
   "description": "Message queue transport for Capix (BullMQ + in-memory)",
   "license": "MIT",
   "type": "module",
