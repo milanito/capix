@@ -91,7 +91,7 @@ jobs:
             local pkg=$1
             echo "Publishing $pkg..."
             cd "$pkg"
-            npm publish --tag "$TAG" --access public
+            pnpm publish --tag "$TAG" --access public --no-git-checks
             cd "$GITHUB_WORKSPACE"
           }
 
