@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.1.0-alpha.5 — 2026-06-01
+
+### Added
+- `ROADMAP.md` — documents pre-1.0 gaps and post-1.0 plans
+- `CONTRIBUTING.md` — contributing guidelines for bug reports and local setup
+- Scaffold now generates `.cursor/rules` with idiomatic Capix patterns for
+  AI-assisted development
+
+### Changed
+- Scaffold `capabilities.ts` now defines `AppUser`, `AuthContext`, and
+  `authCap` out of the box — the two-factory guard pattern is visible from
+  the start instead of requiring discovery through a confusing TypeScript error
+
+### Removed
+- README no longer promises a uWebSockets.js transport — moved to `ROADMAP.md`
+  under "After 1.0"
+
+---
+
 ## 0.1.0-alpha.4 — 2026-06-01
 
 ### Fixed
