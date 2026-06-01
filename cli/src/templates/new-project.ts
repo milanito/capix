@@ -32,6 +32,9 @@ export function renderPackageJson(opts: NewProjectOptions): string {
         tsx: '^4.0.0',
         typescript: '^5.5.0',
       },
+      pnpm: {
+        onlyBuiltDependencies: ['esbuild'],
+      },
     },
     null,
     2,

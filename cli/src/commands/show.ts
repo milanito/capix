@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import * as print from '../utils/print.js';
 import { loadRegistry } from '../utils/loader.js';
+import { zodSchemaToString } from '../utils/zod-to-string.js';
 
 export function registerShow(program: Command): void {
   program
@@ -31,14 +32,14 @@ export function registerShow(program: Command): void {
       if (cap.inputSchema) {
         print.blank();
         print.bold('Input schema:');
-        const shape = (cap.inputSchema as { shape?: Record<string, unknown> }).shape;
+        const schema = cap.inputSchema as { _def?: { typeName?: string; shape?: () => Record<string, unknown> } };
+        const shape = schema._def?.typeName === 'ZodObject' ? schema._def.shape?.() : undefined;
         if (shape) {
           for (const [field, def] of Object.entries(shape)) {
-            const zodType = (def as { _def?: { typeName?: string } })._def?.typeName ?? 'unknown';
-            print.item(`  ${field}`, zodType);
+            print.item(`  ${field}`, zodSchemaToString(def));
           }
         } else {
-          print.item('  (schema present but shape not inspectable)');
+          print.item('  (inline)', zodSchemaToString(cap.inputSchema));
         }
       } else {
         print.item('input', 'none');
