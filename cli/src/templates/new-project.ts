@@ -78,13 +78,18 @@ import { capability, defineContext, defineError } from '@capixjs/core';
 
 export type AppContext = {
   readonly requestId: string;
+  readonly user: AppUser | null;
   // Add your app-specific fields here:
-  // user: AppUser | null;
   // db: Database;
 };
 
+// Narrowed context for authenticated capabilities — user is guaranteed non-null.
+export type AppUser = { id: string; email: string };
+export type AuthContext = AppContext & { user: AppUser };
+
 export const buildContext = defineContext(async (_req): Promise<AppContext> => ({
   requestId: crypto.randomUUID(),
+  user: null,
 }));
 
 // ---------------------------------------------------------------------------
@@ -96,17 +101,16 @@ const errors = {
 };
 
 // ---------------------------------------------------------------------------
-// Scoped capability factory
+// Scoped capability factories
 //
-// Import \`cap\` in every capability file instead of using \`capability\` directly.
-// This pre-binds AppContext so \`ctx\` is correctly typed in every resolver.
-//
-// For capabilities that require authentication, create a second factory:
-//   type AuthContext = AppContext & { user: NonNullable<AppContext['user']> };
-//   export const authCap = capability.withContext<AuthContext>();
+// Use \`cap\` for public capabilities.
+// Use \`authCap\` for capabilities that require authentication — pair with
+// .guard(mustBeAuthenticated) so the narrowed \`ctx.user\` type is non-null.
+// See: https://milanito.github.io/capix/guide/guards
 // ---------------------------------------------------------------------------
 
-export const cap = capability.withContext<AppContext>();
+export const cap     = capability.withContext<AppContext>();
+export const authCap = capability.withContext<AuthContext>();
 
 // ---------------------------------------------------------------------------
 // Example capabilities — replace with your own
@@ -167,6 +171,13 @@ dist/
 *.tsbuildinfo
 .DS_Store
 .env
+`;
+}
+
+export function renderNpmrc(): string {
+  return `# Allow installing packages published within the last 24 hours.
+# pnpm 9 blocks these by default — this opts out of that policy.
+minimum-release-age=0
 `;
 }
 

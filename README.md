@@ -372,8 +372,6 @@ Capix's REST transport trails Fastify by ~3% in a hello-world microbenchmark and
 | Hono | 23,970 | 21,365 |
 | Express | 16,632 | 16,239 |
 
-> A uWS-based transport is planned — uWebSockets.js typically delivers 2–3× higher throughput than Node.js native `http`. See [docs/benchmarks.md](docs/benchmarks.md) for details.
-
 ## 454 tests passing
 
 ```

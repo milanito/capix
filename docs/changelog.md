@@ -1,5 +1,37 @@
 # Changelog
 
+## 0.1.0-alpha.4 — 2026-06-01
+
+### Fixed
+- `capix show` was displaying `ZodString` instead of `string` for field
+  types — now uses the same schema prettifier as `capix docs`
+- Scaffold template now includes `pnpm.onlyBuiltDependencies` to prevent
+  esbuild postinstall errors under pnpm 9
+- Scaffold template now generates `.npmrc` with `minimum-release-age=0`
+  to prevent pnpm 9 blocking installs within 24 hours of a new release
+- Scaffold template now shows the `authCap` two-factory pattern so
+  developers see the correct guard narrowing approach from the start
+
+---
+
+## 0.1.0-alpha.3 — 2026-06-01
+
+### Fixed
+- Scaffold template generated `"@capixjs/core": "^0.1.0"` which excluded
+  prerelease versions — changed to `"@capixjs/core": "alpha"` (dist-tag)
+  so installs always resolve correctly during the alpha period
+
+---
+
+## 0.1.0-alpha.2 — 2026-06-01
+
+### Fixed
+- Publishing CI was leaving `workspace:*` protocol in published packages
+  instead of substituting real version numbers — fixed by switching from
+  `npm publish` to `pnpm publish --no-git-checks`
+
+---
+
 ## 0.1.0-alpha.1 — 2026-05-30
 
 Initial public alpha.
