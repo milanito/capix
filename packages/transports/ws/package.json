@@ -1,6 +1,6 @@
 {
   "name": "@capixjs/transport-ws",
-  "version": "0.1.0-alpha.3",
+  "version": "0.1.0-alpha.4",
   "description": "Capix WebSocket transport",
   "license": "MIT",
   "type": "module",
