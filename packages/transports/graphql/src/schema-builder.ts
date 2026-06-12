@@ -21,6 +21,7 @@ import {
   GraphQLNonNull,
   GraphQLScalarType,
   GraphQLEnumType,
+  GraphQLError,
   Kind,
 } from 'graphql';
 import type { GraphQLOutputType, GraphQLInputType, GraphQLFieldConfig } from 'graphql';
@@ -207,8 +208,17 @@ export function buildGraphQLSchema(registry: CapabilityRegistry, invoke: InvokeF
           signal,
         });
         if (!response.ok) {
-          const { error, message } = response.error;
-          throw new Error(`${error}: ${message}`);
+          // Preserve the typed FrameworkError shape in GraphQL extensions so
+          // clients can branch on `extensions.code` / `extensions.status`
+          // instead of parsing the message string.
+          const { status, error, message, meta } = response.error;
+          throw new GraphQLError(message, {
+            extensions: {
+              code: error,
+              status,
+              ...(meta !== undefined ? { meta } : {}),
+            },
+          });
         }
         return response.data;
       },

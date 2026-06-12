@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.0-alpha.10 — 2026-06-12
+
+### Fixed
+- **GraphQL transport: typed errors are no longer flattened into message
+  strings.** Capability errors used to surface as `Error('NotFound: Item not
+  found')`, losing the status code and meta. Errors are now thrown as
+  `GraphQLError` with `extensions: { code, status, meta }` so clients can
+  branch on `extensions.code` instead of parsing messages. The error message
+  is now the human-readable message alone (no `Code:` prefix)
+
+---
+
 ## 0.1.0-alpha.9 — 2026-06-12
 
 ### Fixed

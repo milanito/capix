@@ -137,7 +137,53 @@ describe('buildGraphQLSchema — invoke integration', () => {
     const result = await graphql({ schema, source: '{ items_getItem(id: "99") }' });
 
     expect(result.errors).toBeDefined();
-    expect(result.errors![0]!.message).toContain('NotFound');
+    expect(result.errors![0]!.message).toBe('Item not found');
+  });
+
+  it('exposes code, status, and meta in error extensions', async () => {
+    const invoke = makeInvoke({
+      ok: false,
+      error: {
+        status: 429,
+        error: 'TooManyRequests',
+        message: 'Too many requests',
+        meta: { retryAfter: 12, limit: 100 },
+      },
+    });
+    const schema = makeSchema({
+      items: {
+        getItem: capability(z.object({ id: z.string() }), async (i) => i, 'query'),
+      },
+    }, invoke);
+
+    const result = await graphql({ schema, source: '{ items_getItem(id: "99") }' });
+
+    expect(result.errors).toBeDefined();
+    const err = result.errors![0]!;
+    expect(err.message).toBe('Too many requests');
+    expect(err.extensions).toMatchObject({
+      code: 'TooManyRequests',
+      status: 429,
+      meta: { retryAfter: 12, limit: 100 },
+    });
+  });
+
+  it('omits meta from extensions when the error has none', async () => {
+    const invoke = makeInvoke({
+      ok: false,
+      error: { status: 403, error: 'Forbidden', message: 'Forbidden' },
+    });
+    const schema = makeSchema({
+      items: {
+        getItem: capability(z.object({ id: z.string() }), async (i) => i, 'query'),
+      },
+    }, invoke);
+
+    const result = await graphql({ schema, source: '{ items_getItem(id: "1") }' });
+
+    const err = result.errors![0]!;
+    expect(err.extensions).toMatchObject({ code: 'Forbidden', status: 403 });
+    expect(err.extensions).not.toHaveProperty('meta');
   });
 
   it('dot-path name maps to underscore field name', async () => {
