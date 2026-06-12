@@ -319,7 +319,13 @@ export function restTransport(options: RestTransportOptions): TransportWithCapab
         if (v !== undefined) headers[k] = Array.isArray(v) ? v.join(', ') : v;
       }
 
-      const signal = _noTimeoutSignal ?? AbortSignal.timeout(requestTimeout as number);
+      // Manual controller + timer instead of AbortSignal.timeout: the timer is
+      // cleared as soon as the invocation settles. AbortSignal.timeout would keep
+      // its timer (and the race's abort-listener closure) alive for the full
+      // timeout window after every completed request — at high RPS that retains
+      // hundreds of thousands of dead closures at steady state.
+      const controller = requestTimeout === false ? null : new AbortController();
+      const signal = controller?.signal ?? _noTimeoutSignal!;
 
       const invocation = invokeFn!({
         capability: match.capability,
@@ -329,19 +335,28 @@ export function restTransport(options: RestTransportOptions): TransportWithCapab
         ...(rawBodyForContext !== undefined ? { rawBody: rawBodyForContext } : {}),
       });
 
-      // Race invocation against the abort signal so hung capabilities don't hold resources.
-      // When timeout: false the signal never fires, so we await directly.
-      const response: CapabilityResponse = requestTimeout === false
-        ? await invocation
-        : await Promise.race([
-            invocation,
-            new Promise<CapabilityResponse>((resolve) => {
-              signal.addEventListener('abort', () => resolve({
-                ok: false,
-                error: { status: 504, error: 'GatewayTimeout', message: 'Request timed out' },
-              }), { once: true });
-            }),
-          ]);
+      // Race invocation against the timeout so hung capabilities don't hold the
+      // connection. When timeout: false there is no timer, so we await directly.
+      let response: CapabilityResponse;
+      if (controller === null) {
+        response = await invocation;
+      } else {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const timeoutPromise = new Promise<CapabilityResponse>((resolve) => {
+          timer = setTimeout(() => {
+            controller.abort();
+            resolve({
+              ok: false,
+              error: { status: 504, error: 'GatewayTimeout', message: 'Request timed out' },
+            });
+          }, requestTimeout as number);
+        });
+        try {
+          response = await Promise.race([invocation, timeoutPromise]);
+        } finally {
+          clearTimeout(timer);
+        }
+      }
 
       if (response.ok) {
         if (response.data === null || response.data === undefined) {

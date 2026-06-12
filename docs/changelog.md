@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.1.0-alpha.7 — 2026-06-12
+
+### Fixed
+- **REST transport: per-request timeout no longer retains memory after the
+  response.** Every completed request used to leave its `AbortSignal.timeout`
+  timer and an abort-listener closure alive for the full timeout window
+  (default 30s) — at high request rates that meant hundreds of thousands of
+  dead closures held at steady state. The timer is now cleared the moment the
+  invocation settles. Behavior is unchanged: hung capabilities still get a
+  `504` and the request signal still aborts at the deadline
+
+---
+
 ## 0.1.0-alpha.6 — 2026-06-12
 
 ### Fixed

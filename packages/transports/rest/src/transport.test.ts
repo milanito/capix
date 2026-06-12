@@ -313,6 +313,54 @@ describe('request timeout', () => {
     expect(res.status).toBe(200);
     await srv.stop();
   });
+
+  it('timeout timer is cancelled once the request completes', async () => {
+    // Regression: AbortSignal.timeout kept its timer + abort listener alive for
+    // the full window after every completed request. The signal must NOT fire
+    // after the response is sent — the timer is cleared on settle.
+    const p = await getFreePort();
+    let captured: AbortSignal | undefined;
+    const srv = createServer({
+      context: defineContext(async (req) => {
+        captured = req.signal;
+        return { requestId: crypto.randomUUID() };
+      }),
+      capabilities: { status: { getStatus } },
+      transports: [restTransport({ port: p, timeout: 100 })],
+    });
+    await srv.start();
+    const res = await fetch(`http://localhost:${p}/status`);
+    expect(res.status).toBe(200);
+    // Wait past the 100ms timeout window — a leaked timer would abort the signal
+    await new Promise((r) => setTimeout(r, 250));
+    expect(captured).toBeDefined();
+    expect(captured!.aborted).toBe(false);
+    await srv.stop();
+  });
+
+  it('hung capability aborts the request signal at timeout', async () => {
+    const p = await getFreePort();
+    let captured: AbortSignal | undefined;
+    const hang = capability(async () => {
+      await new Promise((r) => setTimeout(r, 400));
+      return { ok: true };
+    });
+    const srv = createServer({
+      context: defineContext(async (req) => {
+        captured = req.signal;
+        return { requestId: crypto.randomUUID() };
+      }),
+      capabilities: { hang: { list: hang } },
+      transports: [restTransport({ port: p, timeout: 80 })],
+    });
+    await srv.start();
+    const res = await fetch(`http://localhost:${p}/hang`, {
+      signal: AbortSignal.timeout(2_000),
+    });
+    expect(res.status).toBe(504);
+    expect(captured!.aborted).toBe(true);
+    await srv.stop();
+  });
 });
 
 describe('hostile request input', () => {
