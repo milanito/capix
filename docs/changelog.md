@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.1.0-alpha.12 — 2026-06-12
+
+### Changed
+- **REST transport: query/multipart coercion is now schema-aware.** Previously
+  every query-string and multipart value was blindly coerced — `?name=123`
+  became the number `123` and failed `z.string()` validation, and
+  `?code=01234` was silently corrupted to `1234`. Values are now coerced to
+  number/boolean only when the capability's Zod input schema types that field
+  as number/boolean (through `optional`/`default`/`nullable`/refinement
+  wrappers); everything else stays a raw string. Capabilities without an
+  object schema (`z.record`, schemaless) receive raw strings
+- **REST transport: path params are now coerced too.** `GET /things/42` with
+  `z.object({ id: z.number() })` now validates (path params were never
+  coerced before, so numeric ids always failed)
+- JSON body values are never coerced — JSON expresses numbers and booleans
+  itself, so a string where a number belongs remains a type error
+
+---
+
 ## 0.1.0-alpha.11 — 2026-06-12
 
 ### Fixed

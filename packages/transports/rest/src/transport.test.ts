@@ -48,6 +48,19 @@ const searchEchoes = capability(z.record(z.unknown()), (input) => ({ echoed: inp
 // createEcho → mutation (create*) → POST /echoes
 const createEcho = capability(z.record(z.unknown()), (input) => ({ echoed: input }));
 
+// findPeople → query collection → GET /people (schema-aware coercion fixture)
+const findPeople = capability(
+  z.object({
+    name: z.string(),
+    age: z.number().optional(),
+    active: z.boolean().default(false),
+  }),
+  (input) => input,
+);
+
+// getThing → query with numeric id → GET /things/:id (path param coercion fixture)
+const getThing = capability(z.object({ id: z.number() }), ({ id }) => ({ id, idType: typeof id }));
+
 let server: Server;
 let port: number;
 
@@ -62,6 +75,8 @@ beforeAll(async () => {
       records: { createRecord },
       metrics: { getMetrics },
       echoes: { searchEchoes, createEcho },
+      people: { findPeople },
+      things: { getThing },
     },
     transports: [
       restTransport({
@@ -397,7 +412,8 @@ describe('hostile request input', () => {
     const res = await fetch(`http://localhost:${port}/echoes?__proto__=evil&a=1`);
     expect(res.status).toBe(200);
     const json = await res.json() as { data: { echoed: Record<string, unknown> } };
-    expect(json.data.echoed).toEqual({ a: 1 });
+    // z.record has no field types to coerce toward — values stay raw strings
+    expect(json.data.echoed).toEqual({ a: '1' });
   });
 
   it('__proto__ JSON body keys are not merged into input', async () => {
@@ -423,5 +439,54 @@ describe('hostile request input', () => {
       const json = await res.json() as { message: string };
       expect(json.message).toContain('JSON body must be an object');
     }
+  });
+});
+
+describe('schema-aware coercion', () => {
+  it('numeric-looking strings stay strings when the schema says string', async () => {
+    const res = await fetch(`http://localhost:${port}/people?name=123`);
+    expect(res.status).toBe(200);
+    const json = await res.json() as { data: { name: unknown } };
+    expect(json.data.name).toBe('123');
+  });
+
+  it('leading-zero strings are not corrupted', async () => {
+    const res = await fetch(`http://localhost:${port}/people?name=01234`);
+    expect(res.status).toBe(200);
+    const json = await res.json() as { data: { name: unknown } };
+    expect(json.data.name).toBe('01234');
+  });
+
+  it('number and boolean fields are coerced per schema', async () => {
+    const res = await fetch(`http://localhost:${port}/people?name=ada&age=36&active=true`);
+    expect(res.status).toBe(200);
+    const json = await res.json() as { data: { name: string; age: number; active: boolean } };
+    expect(json.data).toEqual({ name: 'ada', age: 36, active: true });
+  });
+
+  it('path params are coerced when the schema wants a number', async () => {
+    const res = await fetch(`http://localhost:${port}/things/42`);
+    expect(res.status).toBe(200);
+    const json = await res.json() as { data: { id: number; idType: string } };
+    expect(json.data.id).toBe(42);
+    expect(json.data.idType).toBe('number');
+  });
+
+  it('non-numeric text for a number field fails validation on the raw value', async () => {
+    const res = await fetch(`http://localhost:${port}/things/not-a-number`);
+    expect(res.status).toBe(400);
+    const json = await res.json() as { error: string };
+    expect(json.error).toBe('BadRequest');
+  });
+
+  it('JSON body values are never coerced', async () => {
+    // updateItem expects { id: string, name: string }; numbers in the JSON body
+    // must NOT be massaged into strings or vice versa — JSON types are authoritative
+    const res = await fetch(`http://localhost:${port}/items/xyz`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 42 }),
+    });
+    expect(res.status).toBe(400);
   });
 });

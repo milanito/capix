@@ -76,6 +76,19 @@ All three sources (`projectId` from path, `status` and `page` from query string)
 
 For `GET` requests, input comes from query string + path params. For `POST`/`PATCH`/`PUT`, input comes from body + path params. Body must be `application/json` or `multipart/form-data`.
 
+## Type coercion
+
+Query strings, path params, and multipart text fields always arrive as strings. The transport coerces them based on the capability's input schema, derived once at startup:
+
+- A field typed `z.number()` receives `42` for `?count=42` (also through `.optional()`, `.default()`, `.nullable()`, and refinements)
+- A field typed `z.boolean()` receives `true`/`false` for the literal strings `true`/`false`
+- Everything else stays a raw string — `?name=123` arrives as the **string** `"123"` for a `z.string()` field, and `?code=01234` keeps its leading zero
+- Values that don't parse cleanly (e.g. `?count=abc`) are left as-is so the validation error reports the original input
+
+JSON bodies are never coerced: JSON expresses numbers and booleans itself, so a string where a number belongs is a genuine type error.
+
+Capabilities without an object schema (`z.record`, no schema) receive raw strings. `z.coerce.*` in your schema continues to work and is the right tool for anything beyond plain numbers and booleans.
+
 ## File uploads
 
 ```ts

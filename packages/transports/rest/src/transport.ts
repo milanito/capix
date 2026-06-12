@@ -17,6 +17,8 @@ import { parseMultipart } from './multipart-parser.js';
 import type { MultipartOptions } from './multipart.js';
 import { buildSerializers, defaultSerializer } from './serializer.js';
 import type { ResponseSerializer } from './serializer.js';
+import { buildCoercionMaps, coerceFields, coerceValue } from './coercion.js';
+import type { CoercionMaps, CoercionKind } from './coercion.js';
 
 const DEFAULT_MAX_BODY_SIZE = 1024 * 1024; // 1MB
 const EMPTY_INPUT: Record<string, unknown> = {};
@@ -73,6 +75,7 @@ export function restTransport(options: RestTransportOptions): TransportWithCapab
   let router: Router | null = null;
   let invokeFn: InvokeFn | null = null;
   let serializers: Map<string, ResponseSerializer> | null = null;
+  let coercers: CoercionMaps | null = null;
 
   const corsOriginOpt = options.cors?.origin ?? '*';
   const maxBodySize = options.maxBodySize ?? DEFAULT_MAX_BODY_SIZE;
@@ -135,13 +138,6 @@ export function restTransport(options: RestTransportOptions): TransportWithCapab
     });
   }
 
-  function coerceQueryValue(val: string): unknown {
-    if (val === 'true') return true;
-    if (val === 'false') return false;
-    if (val !== '' && !isNaN(Number(val))) return Number(val);
-    return val;
-  }
-
   // Malformed percent-encoding falls back to the raw text (WHATWG URLSearchParams
   // behavior) instead of throwing out of the synchronous request path.
   function safeDecode(s: string): string {
@@ -153,6 +149,8 @@ export function restTransport(options: RestTransportOptions): TransportWithCapab
     }
   }
 
+  // Values stay raw strings here; schema-aware coercion is applied afterwards
+  // using the matched capability's coercion map (see coercion.ts).
   function parseQueryString(url: string): Record<string, unknown> | null {
     const idx = url.indexOf('?');
     if (idx === -1) return null;
@@ -163,8 +161,7 @@ export function restTransport(options: RestTransportOptions): TransportWithCapab
       if (eqIdx === -1) continue;
       const key = safeDecode(part.slice(0, eqIdx));
       if (key === '__proto__') continue; // never allow prototype-setting keys into input
-      const val = safeDecode(part.slice(eqIdx + 1));
-      result[key] = coerceQueryValue(val);
+      result[key] = safeDecode(part.slice(eqIdx + 1));
     }
     return result;
   }
@@ -236,7 +233,11 @@ export function restTransport(options: RestTransportOptions): TransportWithCapab
       return;
     }
 
+    // Schema-derived coercion targets for this capability (null → leave strings raw)
+    const fieldKinds = coercers?.get(match.capability) ?? null;
+
     const queryParams = parseQueryString(url);
+    if (queryParams !== null && fieldKinds !== null) coerceFields(queryParams, fieldKinds);
     const pathParams = match.params;
     const noBody = method === 'GET' || method === 'HEAD' || method === 'DELETE';
 
@@ -267,7 +268,9 @@ export function restTransport(options: RestTransportOptions): TransportWithCapab
             try {
               const parsed = await parseMultipart(req.headers, rawBody, multipartOpts);
               for (const [k, v] of Object.entries(parsed.fields)) {
-                if (k !== '__proto__') bodyParams[k] = coerceQueryValue(v);
+                if (k === '__proto__') continue;
+                const kind: CoercionKind | undefined = fieldKinds?.get(k);
+                bodyParams[k] = kind !== undefined ? coerceValue(v, kind) : v;
               }
               for (const [k, f] of Object.entries(parsed.files)) {
                 if (k !== '__proto__') bodyParams[k] = f;
@@ -308,8 +311,15 @@ export function restTransport(options: RestTransportOptions): TransportWithCapab
         if (queryParams !== null) Object.assign(input, queryParams);
         // JSON.parse can produce an own '__proto__' data property — Object.assign
         // would turn that into a prototype write on input. assignSafe skips it.
+        // JSON body values are deliberately NOT coerced: JSON expresses numbers
+        // and booleans itself, so a string where a number belongs is a real error.
         assignSafe(input, bodyParams);
-        if (pathParams !== null) Object.assign(input, pathParams);
+        if (pathParams !== null) {
+          for (const k of Object.keys(pathParams)) {
+            const kind: CoercionKind | undefined = fieldKinds?.get(k);
+            input[k] = kind !== undefined ? coerceValue(pathParams[k]!, kind) : pathParams[k];
+          }
+        }
       }
 
       // Build flat headers map using for..in (avoids Object.entries array allocation).
@@ -400,6 +410,7 @@ export function restTransport(options: RestTransportOptions): TransportWithCapab
       const routes = generateRoutes(mountOptions.registry, routeOpts);
       router = compileRouter(routes);
       serializers = buildSerializers(mountOptions.registry);
+      coercers = buildCoercionMaps(mountOptions.registry);
 
       console.log('\nCapix REST transport starting...');
       for (const route of routes) {
