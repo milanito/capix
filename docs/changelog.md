@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.0-alpha.9 — 2026-06-12
+
+### Fixed
+- **Queue transport: BullMQ adapter no longer opens a Redis connection per
+  job.** `enqueue` used to create a new `Queue` and close it for every single
+  message. Queue instances are now cached per queue name and reused for the
+  adapter's lifetime; `stop()` closes them. Concurrent first enqueues share a
+  single instance
+
+---
+
 ## 0.1.0-alpha.8 — 2026-06-12
 
 ### Fixed

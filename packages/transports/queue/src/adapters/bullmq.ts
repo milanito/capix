@@ -18,9 +18,19 @@ export type BullMQAdapterOptions = {
   removeOnFail?: number;
 };
 
+type QueueLike = {
+  add(name: string, data: unknown, opts: { jobId: string }): Promise<unknown>;
+  close(): Promise<void>;
+};
+
 export class BullMQAdapter implements QueueAdapter {
   private options: BullMQAdapterOptions;
   private workers = new Map<string, { close(): Promise<void> }>();
+  // One Queue (and Redis connection) per queue name, reused across enqueues.
+  // Creating and closing a Queue per enqueue opens a new Redis connection per
+  // job — connection churn that collapses enqueue throughput under load.
+  // Stored as promises so concurrent first enqueues share one instance.
+  private queues = new Map<string, Promise<QueueLike>>();
 
   constructor(options: BullMQAdapterOptions) {
     this.options = options;
@@ -53,11 +63,21 @@ export class BullMQAdapter implements QueueAdapter {
     console.log(`[capix] Queue transport processing: ${queueName}`);
   }
 
+  private getQueue(queueName: string): Promise<QueueLike> {
+    let queue = this.queues.get(queueName);
+    if (queue === undefined) {
+      queue = loadBullMQ().then(
+        ({ Queue }) =>
+          new Queue(queueName, { connection: this.options.connection }) as unknown as QueueLike,
+      );
+      this.queues.set(queueName, queue);
+    }
+    return queue;
+  }
+
   async enqueue(queueName: string, msg: QueueMessage): Promise<void> {
-    const { Queue } = await loadBullMQ();
-    const queue = new Queue(queueName, { connection: this.options.connection });
+    const queue = await this.getQueue(queueName);
     await queue.add(msg.capability, msg, { jobId: msg.id });
-    await queue.close();
   }
 
   async stop(): Promise<void> {
@@ -65,5 +85,10 @@ export class BullMQAdapter implements QueueAdapter {
       await worker.close();
     }
     this.workers.clear();
+    for (const queuePromise of this.queues.values()) {
+      const queue = await queuePromise.catch(() => null);
+      if (queue !== null) await queue.close();
+    }
+    this.queues.clear();
   }
 }

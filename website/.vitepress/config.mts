@@ -36,7 +36,7 @@ export default defineConfig({
       { text: 'Patterns',    link: '/patterns/auth' },
       { text: 'Benchmarks',  link: '/benchmarks' },
       {
-        text: 'v0.1.0-alpha.8',
+        text: 'v0.1.0-alpha.9',
         items: [
           { text: 'Changelog', link: '/changelog' },
           { text: 'npm',       link: 'https://www.npmjs.com/package/@capixjs/core' },
