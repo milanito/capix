@@ -204,3 +204,30 @@ describe('createEventBus', () => {
     expect(h).toHaveBeenCalledWith({ id: '2', status: 'done' });
   });
 });
+
+describe('subscriber isolation', () => {
+  it('a throwing subscriber does not block delivery to other subscribers', () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const bus = createEventBus<TestEvents>();
+    const healthy = vi.fn();
+    bus.subscribe('c1', 'task:updated', () => { throw new Error('subscriber boom'); });
+    bus.subscribe('c2', 'task:updated', healthy);
+
+    expect(() => bus.publish('task:updated', { id: '1', status: 'done' })).not.toThrow();
+    expect(healthy).toHaveBeenCalledOnce();
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('task:updated'), expect.any(Error));
+    errSpy.mockRestore();
+  });
+
+  it('a throwing filter does not propagate to the publisher', () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const bus = createEventBus<TestEvents>();
+    const after = vi.fn();
+    bus.subscribe('c1', 'task:updated', vi.fn(), { filter: () => { throw new Error('filter boom'); } });
+    bus.subscribe('c2', 'task:updated', after);
+
+    expect(() => bus.publish('task:updated', { id: '1', status: 'done' })).not.toThrow();
+    expect(after).toHaveBeenCalledOnce();
+    errSpy.mockRestore();
+  });
+});

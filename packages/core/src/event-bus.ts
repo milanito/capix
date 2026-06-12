@@ -95,8 +95,16 @@ export function createEventBus<TEvents extends EventMap>(): EventBus<TEvents> {
       const eventListeners = listeners.get(event);
       if (!eventListeners) return;
       for (const sub of eventListeners.values()) {
-        if (!sub.filter || sub.filter(data)) {
-          sub.handler(data);
+        // Isolate subscribers: a throwing handler (or filter) must not abort
+        // delivery to the remaining subscribers, and must never propagate into
+        // the publisher — a resolver that emits after a successful mutation
+        // would otherwise turn into a 500 after the write already committed.
+        try {
+          if (!sub.filter || sub.filter(data)) {
+            sub.handler(data);
+          }
+        } catch (err) {
+          console.error(`[capix] Event subscriber for '${event}' threw:`, err);
         }
       }
     },

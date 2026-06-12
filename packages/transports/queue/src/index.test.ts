@@ -377,3 +377,58 @@ describe('queue + REST same capability', () => {
     await server.stop();
   });
 });
+
+describe('MemoryQueueAdapter result/error hooks', () => {
+  it('onResult receives ok results', async () => {
+    const onResult = vi.fn();
+    const adapter = new MemoryQueueAdapter({ onResult });
+    await adapter.start('jobs', async () => ({ ok: true, data: { done: true } }));
+    await adapter.enqueue('jobs', { id: '1', capability: 'jobs.run', input: {}, headers: {} });
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    expect(onResult).toHaveBeenCalledOnce();
+    expect(onResult).toHaveBeenCalledWith(
+      expect.objectContaining({ id: '1' }),
+      { ok: true, data: { done: true } },
+    );
+  });
+
+  it('onResult receives ok:false results — failed jobs are observable', async () => {
+    const onResult = vi.fn();
+    const adapter = new MemoryQueueAdapter({ onResult });
+    const failure = {
+      ok: false as const,
+      error: { status: 400, error: 'BadRequest', message: 'Input validation failed' },
+    };
+    await adapter.start('jobs', async () => failure);
+    await adapter.enqueue('jobs', { id: '2', capability: 'jobs.run', input: {}, headers: {} });
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    expect(onResult).toHaveBeenCalledWith(expect.objectContaining({ id: '2' }), failure);
+  });
+
+  it('onError receives handler throws', async () => {
+    const onError = vi.fn();
+    const adapter = new MemoryQueueAdapter({ onError });
+    await adapter.start('jobs', async () => { throw new Error('handler boom'); });
+    await adapter.enqueue('jobs', { id: '3', capability: 'jobs.run', input: {}, headers: {} });
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    expect(onError).toHaveBeenCalledWith(expect.objectContaining({ id: '3' }), expect.any(Error));
+  });
+
+  it('handler throws are logged by default instead of silently dropped', async () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const adapter = new MemoryQueueAdapter();
+    await adapter.start('jobs', async () => { throw new Error('silent no more'); });
+    await adapter.enqueue('jobs', { id: '4', capability: 'jobs.run', input: {}, headers: {} });
+    await new Promise((r) => setImmediate(r));
+    await new Promise((r) => setImmediate(r));
+
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('jobs.run'), expect.any(Error));
+    errSpy.mockRestore();
+  });
+});

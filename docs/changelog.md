@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.1.0-alpha.11 — 2026-06-12
+
+### Fixed
+- **Event bus: a throwing subscriber no longer breaks the publisher.** A sync
+  throw in one subscriber (or its filter) used to propagate into the resolver
+  that called `publish()` — turning a successful mutation into a 500 after the
+  write committed — and skipped delivery to the remaining subscribers.
+  Subscriber errors are now caught, logged, and isolated
+- **Queue transport: in-memory adapter no longer drops failures silently.**
+  Handler throws are now logged by default
+
+### Added
+- `MemoryQueueAdapter` now accepts `{ onResult, onError }` hooks. `onResult`
+  fires for every processed message — including `ok: false` results
+  (validation failures, guard rejections, resolver errors), which were
+  previously invisible. `MemoryQueueAdapterOptions` is exported
+
+---
+
 ## 0.1.0-alpha.10 — 2026-06-12
 
 ### Fixed
