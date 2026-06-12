@@ -142,6 +142,17 @@ export function restTransport(options: RestTransportOptions): TransportWithCapab
     return val;
   }
 
+  // Malformed percent-encoding falls back to the raw text (WHATWG URLSearchParams
+  // behavior) instead of throwing out of the synchronous request path.
+  function safeDecode(s: string): string {
+    if (!s.includes('%')) return s;
+    try {
+      return decodeURIComponent(s);
+    } catch {
+      return s;
+    }
+  }
+
   function parseQueryString(url: string): Record<string, unknown> | null {
     const idx = url.indexOf('?');
     if (idx === -1) return null;
@@ -150,11 +161,20 @@ export function restTransport(options: RestTransportOptions): TransportWithCapab
     for (const part of qs.split('&')) {
       const eqIdx = part.indexOf('=');
       if (eqIdx === -1) continue;
-      const key = decodeURIComponent(part.slice(0, eqIdx));
-      const val = decodeURIComponent(part.slice(eqIdx + 1));
+      const key = safeDecode(part.slice(0, eqIdx));
+      if (key === '__proto__') continue; // never allow prototype-setting keys into input
+      const val = safeDecode(part.slice(eqIdx + 1));
       result[key] = coerceQueryValue(val);
     }
     return result;
+  }
+
+  /** Object.assign with [[Set]]-semantics '__proto__' assignment excluded. */
+  function assignSafe(target: Record<string, unknown>, source: Record<string, unknown>): void {
+    for (const key of Object.keys(source)) {
+      if (key === '__proto__') continue;
+      target[key] = source[key];
+    }
   }
 
   function sendJson(res: ServerResponse, status: number, body: unknown): void {
@@ -163,7 +183,20 @@ export function restTransport(options: RestTransportOptions): TransportWithCapab
     res.end(json);
   }
 
+  // Defense in depth: a synchronous throw in the request path would otherwise
+  // escape node:http as an uncaughtException and kill the process.
   function handler(req: IncomingMessage, res: ServerResponse): void {
+    try {
+      handleRequest(req, res);
+    } catch (err) {
+      console.error('[capix:rest] Unhandled synchronous error in handler:', err);
+      if (!res.headersSent) {
+        sendJson(res, 500, { error: 'Internal', message: 'Internal server error' });
+      }
+    }
+  }
+
+  function handleRequest(req: IncomingMessage, res: ServerResponse): void {
     // Fast path: pre-built static headers avoid per-request setHeader calls.
     // Dynamic origin functions still use setCorsHeaders.
     if (hasDynamicOrigin) setCorsHeaders(req, res);
@@ -192,7 +225,9 @@ export function restTransport(options: RestTransportOptions): TransportWithCapab
     const match = router.match(method, url);
 
     if (!match.found) {
-      if (match.allowedMethods !== undefined) {
+      if (match.malformed === true) {
+        sendJson(res, 400, { error: 'BadRequest', message: 'Malformed URL encoding' });
+      } else if (match.allowedMethods !== undefined) {
         res.setHeader('Allow', match.allowedMethods.join(', '));
         sendJson(res, 405, { error: 'MethodNotAllowed', message: 'Method not allowed' });
       } else {
@@ -231,8 +266,12 @@ export function restTransport(options: RestTransportOptions): TransportWithCapab
               typeof options.multipart === 'object' ? options.multipart : {};
             try {
               const parsed = await parseMultipart(req.headers, rawBody, multipartOpts);
-              for (const [k, v] of Object.entries(parsed.fields)) bodyParams[k] = coerceQueryValue(v);
-              for (const [k, f] of Object.entries(parsed.files)) bodyParams[k] = f;
+              for (const [k, v] of Object.entries(parsed.fields)) {
+                if (k !== '__proto__') bodyParams[k] = coerceQueryValue(v);
+              }
+              for (const [k, f] of Object.entries(parsed.files)) {
+                if (k !== '__proto__') bodyParams[k] = f;
+              }
             } catch (err) {
               const status = (err as { status?: number }).status ?? 400;
               const message = err instanceof Error ? err.message : 'Failed to parse multipart body';
@@ -240,12 +279,20 @@ export function restTransport(options: RestTransportOptions): TransportWithCapab
               return;
             }
           } else if (contentType.includes('application/json')) {
+            let parsed: unknown;
             try {
-              bodyParams = JSON.parse(rawBody.toString('utf8')) as Record<string, unknown>;
+              parsed = JSON.parse(rawBody.toString('utf8'));
             } catch {
               sendJson(res, 400, { error: 'BadRequest', message: 'Invalid JSON body' });
               return;
             }
+            // Arrays and primitives cannot merge into the input object — reject
+            // instead of producing index-keyed garbage ({ '0': ..., '1': ... }).
+            if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+              sendJson(res, 400, { error: 'BadRequest', message: 'JSON body must be an object' });
+              return;
+            }
+            bodyParams = parsed as Record<string, unknown>;
           }
         }
       }
@@ -259,7 +306,9 @@ export function restTransport(options: RestTransportOptions): TransportWithCapab
       } else {
         input = {};
         if (queryParams !== null) Object.assign(input, queryParams);
-        Object.assign(input, bodyParams);
+        // JSON.parse can produce an own '__proto__' data property — Object.assign
+        // would turn that into a prototype write on input. assignSafe skips it.
+        assignSafe(input, bodyParams);
         if (pathParams !== null) Object.assign(input, pathParams);
       }
 

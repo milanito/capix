@@ -42,6 +42,12 @@ const getMetrics = capability(
   (input) => input,
 );
 
+// searchEchoes → query (search*) → GET /echoes; record schema passes arbitrary keys through
+const searchEchoes = capability(z.record(z.unknown()), (input) => ({ echoed: input }));
+
+// createEcho → mutation (create*) → POST /echoes
+const createEcho = capability(z.record(z.unknown()), (input) => ({ echoed: input }));
+
 let server: Server;
 let port: number;
 
@@ -55,6 +61,7 @@ beforeAll(async () => {
       items: { getItem, deleteItem, updateItem },
       records: { createRecord },
       metrics: { getMetrics },
+      echoes: { searchEchoes, createEcho },
     },
     transports: [
       restTransport({
@@ -305,5 +312,68 @@ describe('request timeout', () => {
     const res = await fetch(`http://localhost:${p}/status`);
     expect(res.status).toBe(200);
     await srv.stop();
+  });
+});
+
+describe('hostile request input', () => {
+  it('malformed percent-encoding in a path param → 400, server stays up', async () => {
+    const res = await fetch(`http://localhost:${port}/items/%zz`);
+    expect(res.status).toBe(400);
+    const json = await res.json() as { error: string; message: string };
+    expect(json.error).toBe('BadRequest');
+    expect(json.message).toContain('Malformed URL encoding');
+
+    // The process must survive — subsequent requests are served normally
+    const after = await fetch(`http://localhost:${port}/status`);
+    expect(after.status).toBe(200);
+  });
+
+  it('malformed percent-encoding in the query string falls back to raw text', async () => {
+    const res = await fetch(`http://localhost:${port}/echoes?x=%zz`);
+    expect(res.status).toBe(200);
+    const json = await res.json() as { data: { echoed: Record<string, unknown> } };
+    expect(json.data.echoed['x']).toBe('%zz');
+  });
+
+  it('never crashes on a batch of hostile URLs', async () => {
+    const hostile = ['/items/%', '/items/%2', '/items/%C0%AF', '/items/%E0%A4%A', `/items/${'%'.repeat(64)}`, '/echoes?%zz=%zz&a=1'];
+    for (const path of hostile) {
+      const res = await fetch(`http://localhost:${port}${path}`);
+      expect(res.status).toBeLessThan(500);
+    }
+    const after = await fetch(`http://localhost:${port}/status`);
+    expect(after.status).toBe(200);
+  });
+
+  it('__proto__ query keys are dropped from input', async () => {
+    const res = await fetch(`http://localhost:${port}/echoes?__proto__=evil&a=1`);
+    expect(res.status).toBe(200);
+    const json = await res.json() as { data: { echoed: Record<string, unknown> } };
+    expect(json.data.echoed).toEqual({ a: 1 });
+  });
+
+  it('__proto__ JSON body keys are not merged into input', async () => {
+    const res = await fetch(`http://localhost:${port}/echoes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{"__proto__": {"polluted": true}, "name": "x"}',
+    });
+    expect(res.status).toBe(200);
+    const json = await res.json() as { data: { echoed: Record<string, unknown> } };
+    expect(json.data.echoed).toEqual({ name: 'x' });
+    expect(({} as Record<string, unknown>)['polluted']).toBeUndefined();
+  });
+
+  it('non-object JSON body → 400', async () => {
+    for (const body of ['[1,2,3]', '"hello"', '42', 'null']) {
+      const res = await fetch(`http://localhost:${port}/echoes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+      });
+      expect(res.status).toBe(400);
+      const json = await res.json() as { message: string };
+      expect(json.message).toContain('JSON body must be an object');
+    }
   });
 });

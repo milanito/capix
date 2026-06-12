@@ -314,3 +314,42 @@ describe('generateRoutes', () => {
     expect(r).toContainEqual({ method: 'DELETE', path: '/:id/like-post', capability: 'unlikePost' });
   });
 });
+
+describe('malformed percent-encoding', () => {
+  it('returns found: false with malformed flag instead of throwing', () => {
+    const router = routes({ method: 'GET', path: '/users/:id', capability: 'users.get' });
+    expect(() => router.match('GET', '/users/%zz')).not.toThrow();
+    expect(router.match('GET', '/users/%zz')).toMatchObject({ found: false, malformed: true });
+  });
+
+  it('propagates malformed flag from deeper segments', () => {
+    const router = routes({ method: 'GET', path: '/orgs/:orgId/users/:userId', capability: 'orgs.users.get' });
+    expect(router.match('GET', '/orgs/ok/users/%E0%A4%A')).toMatchObject({ found: false, malformed: true });
+  });
+
+  it('valid percent-encoding still decodes', () => {
+    const router = routes({ method: 'GET', path: '/users/:id', capability: 'users.get' });
+    expect(router.match('GET', '/users/a%2Fb')).toMatchObject({ found: true, params: { id: 'a/b' } });
+  });
+
+  it('never throws on hostile paths', () => {
+    const router = routes(
+      { method: 'GET', path: '/users/:id', capability: 'users.get' },
+      { method: 'GET', path: '/a/:x/b/:y', capability: 'ab' },
+    );
+    const hostile = [
+      '/users/%',
+      '/users/%2',
+      '/users/%%%%',
+      '/users/%C0%AF',          // overlong UTF-8
+      '/users/%E0%A4%A',        // truncated multi-byte
+      '/a/%zz/b/ok',
+      '/a/ok/b/%fz',
+      '/users/' + '%'.repeat(512),
+      '/users/%zz?x=%zz',
+    ];
+    for (const p of hostile) {
+      expect(() => router.match('GET', p)).not.toThrow();
+    }
+  });
+});

@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.1.0-alpha.6 — 2026-06-12
+
+### Fixed
+- **REST transport: malformed percent-encoding crashed the process.** A request
+  like `GET /users/%zz` threw an uncaught `URIError` from the synchronous
+  request path and killed the server. Undecodable path params now return
+  `400 Bad Request`; undecodable query-string text falls back to its raw form
+  (WHATWG `URLSearchParams` behavior)
+- REST transport: synchronous errors in the request handler are now caught and
+  answered with `500` instead of escaping as an `uncaughtException`
+
+### Security
+- REST transport: `__proto__` keys are stripped from query strings, JSON bodies,
+  and multipart fields before merging into capability input
+- REST transport: JSON bodies that are not objects (arrays, primitives) are
+  rejected with `400` instead of being merged as index-keyed garbage
+
+---
+
 ## 0.1.0-alpha.5 — 2026-06-01
 
 ### Added

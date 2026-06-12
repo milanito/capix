@@ -14,7 +14,7 @@ export type RouteDefinition = {
 
 export type RouterMatch =
   | { readonly found: true; readonly capability: string; readonly params: Record<string, string> | null }
-  | { readonly found: false; readonly allowedMethods?: string[] };
+  | { readonly found: false; readonly allowedMethods?: string[]; readonly malformed?: boolean };
 
 export type Router = {
   match(method: string, path: string): RouterMatch;
@@ -52,6 +52,20 @@ type RadixNode = {
 
 function newNode(): RadixNode {
   return { handlers: new Map(), staticChildren: new Map() };
+}
+
+/**
+ * decodeURIComponent that returns null instead of throwing on malformed
+ * percent-encoding ('%zz', truncated '%E0%A4', overlong sequences).
+ * A throwing decode here would escape the transport's synchronous request
+ * path and crash the process.
+ */
+function safeDecode(s: string): string | null {
+  try {
+    return decodeURIComponent(s);
+  } catch {
+    return null;
+  }
 }
 
 /** Splits a URL path into segments in a single pass (no intermediate array from filter). */
@@ -133,14 +147,18 @@ function matchRoute(
   if (staticChild !== undefined) {
     const result = matchRoute(staticChild, method, segments, index + 1, params);
     if (result.found) return result;
-    // If static matched path but not method, return that result
-    if (!result.found && result.allowedMethods !== undefined) return result;
+    // If static matched path but not method (or a deeper segment was undecodable), return that result
+    if (!result.found && (result.allowedMethods !== undefined || result.malformed === true)) return result;
   }
 
   // Param match — look up the param name for the current method
   if (root.paramChild !== undefined) {
     // Conditional decode: skip when there are no percent-encoded chars
-    const decoded = seg.includes('%') ? decodeURIComponent(seg) : seg;
+    const decoded = seg.includes('%') ? safeDecode(seg) : seg;
+    if (decoded === null) {
+      // Undecodable segment can never bind to a param — the URL itself is invalid.
+      return { found: false, malformed: true };
+    }
     const paramName =
       root.paramChild.methodNames.get(method) ??
       root.paramChild.methodNames.values().next().value ??
