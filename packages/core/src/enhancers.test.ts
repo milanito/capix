@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { z } from 'zod';
 import { capability } from './capability.js';
 import type { AnyCapability } from './capability.js';
 import { defineError, isFrameworkError } from './errors.js';
@@ -84,6 +85,57 @@ describe('withCache', () => {
     await cap.resolve(undefined, ctx);
     vi.advanceTimersByTime(1500);
     await cap.resolve(undefined, ctx);
+    expect(resolver).toHaveBeenCalledTimes(2);
+  });
+
+  it('evicts least-recently-used entries beyond maxSize', async () => {
+    const resolver = vi.fn((input: { k: string }) => `v:${input.k}`);
+    const cap = capability(z.object({ k: z.string() }), resolver).enhance(
+      withCache(60, { maxSize: 2 }),
+    );
+    await cap.resolve({ k: 'a' }, ctx); // miss → cached
+    await cap.resolve({ k: 'b' }, ctx); // miss → cached
+    await cap.resolve({ k: 'a' }, ctx); // hit — refreshes 'a' recency
+    expect(resolver).toHaveBeenCalledTimes(2);
+
+    await cap.resolve({ k: 'c' }, ctx); // miss → evicts LRU 'b'
+    expect(resolver).toHaveBeenCalledTimes(3);
+
+    await cap.resolve({ k: 'a' }, ctx); // still cached
+    expect(resolver).toHaveBeenCalledTimes(3);
+
+    await cap.resolve({ k: 'b' }, ctx); // was evicted → miss
+    expect(resolver).toHaveBeenCalledTimes(4);
+  });
+
+  it('store stays bounded under many distinct inputs', async () => {
+    const resolver = vi.fn((input: { k: string }) => input.k);
+    const cap = capability(z.object({ k: z.string() }), resolver).enhance(
+      withCache(60, { maxSize: 10 }),
+    );
+    for (let i = 0; i < 1_000; i++) {
+      await cap.resolve({ k: `key-${i}` }, ctx);
+    }
+    // Only the last 10 keys can be cached; the 10 most recent are hits
+    resolver.mockClear();
+    for (let i = 990; i < 1_000; i++) {
+      await cap.resolve({ k: `key-${i}` }, ctx);
+    }
+    expect(resolver).not.toHaveBeenCalled();
+  });
+
+  it('keyFn includes context in the cache key', async () => {
+    type UserCtx = { requestId: string; userId: string };
+    const resolver = vi.fn((_input: unknown, c: UserCtx) => `data-for-${c.userId}`);
+    const cap = capability(resolver).enhance(
+      withCache(60, { keyFn: (_input, c) => (c as UserCtx).userId }),
+    );
+    const alice = { requestId: 'r1', userId: 'alice' };
+    const bob = { requestId: 'r2', userId: 'bob' };
+
+    expect(await cap.resolve(undefined, alice)).toBe('data-for-alice');
+    expect(await cap.resolve(undefined, bob)).toBe('data-for-bob'); // not alice's cache
+    expect(await cap.resolve(undefined, alice)).toBe('data-for-alice'); // cached
     expect(resolver).toHaveBeenCalledTimes(2);
   });
 });
@@ -222,7 +274,38 @@ describe('withRateLimit', () => {
     expect(isFrameworkError(err)).toBe(true);
     expect((err as { status: number }).status).toBe(429);
   });
+
+  it('evicts tracked keys beyond maxKeys so memory stays bounded', async () => {
+    const cap = capability(z.object({ k: z.string() }), () => 'ok').enhance(
+      withRateLimit({
+        limit: 1,
+        windowMs: 60_000,
+        maxKeys: 5,
+        keyFn: (input) => (input as { k: string }).k,
+      }),
+    );
+    await cap.resolve({ k: 'first' }, ctx);
+    // limit 1 → same key is rejected while its state is tracked
+    const blocked = await tryResolveWith(cap, { k: 'first' });
+    expect(isFrameworkError(blocked)).toBe(true);
+    expect((blocked as { status: number }).status).toBe(429);
+
+    // Flood with unique keys to push 'first' past the maxKeys hard cap
+    for (let i = 0; i < 20; i++) {
+      await cap.resolve({ k: `flood-${i}` }, ctx);
+    }
+    // 'first' was evicted — its rate-limit state reset, so it is allowed again
+    await expect(cap.resolve({ k: 'first' }, ctx)).resolves.toBe('ok');
+  });
 });
+
+async function tryResolveWith(cap: AnyCapability, input: unknown, c: unknown = ctx): Promise<unknown> {
+  try {
+    return await cap.resolve(input, c as never);
+  } catch (err) {
+    return err;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // withMetrics

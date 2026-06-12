@@ -5,7 +5,7 @@
 
 import type { ZodSchema, ZodTypeAny } from 'zod';
 import type { BaseContext } from './context.js';
-import { runGuards, runInputGuards } from './guards.js';
+import { runInputGuards } from './guards.js';
 import type { AnyGuard, AnyInputGuard, Guard, InputGuard, NarrowContext } from './guards.js';
 
 const CAPABILITY_BRAND = Symbol.for('capix.Capability');

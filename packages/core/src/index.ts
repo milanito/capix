@@ -44,6 +44,7 @@ export {
   consoleMetricsCollector,
 } from './enhancers.js';
 export type {
+  CacheOptions,
   RateLimitOptions,
   MetricsCollector,
   CircuitBreakerOptions,

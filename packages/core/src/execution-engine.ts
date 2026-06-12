@@ -5,8 +5,8 @@
 
 import type { CapabilityRegistry } from './capability.js';
 import type { BaseContext, ContextBuilder, RawRequest } from './context.js';
-import { runGuards, runInputGuards } from './guards.js';
-import { isFrameworkError, defaultErrors } from './errors.js';
+import { runInputGuards } from './guards.js';
+import { isFrameworkError } from './errors.js';
 
 export type CapabilityRequest = {
   readonly capability: string;

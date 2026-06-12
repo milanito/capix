@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.1.0-alpha.8 — 2026-06-12
+
+### Fixed
+- **`withCache` no longer grows without bound.** The cache is now a true LRU
+  with a `maxSize` cap (default 1,000 entries); expired entries are removed on
+  access instead of occupying capacity forever
+- **`withRateLimit` no longer leaks tracked keys.** With a per-user or per-IP
+  `keyFn`, every key ever seen stayed in memory permanently. Stale keys are
+  now swept and a `maxKeys` hard cap (default 10,000) bounds the store
+
+### Added
+- `withCache(ttl, { keyFn })` — derive the cache key from input *and* context.
+  The default key ignores context, which serves one user's cached response to
+  every other user when the output depends on `ctx`. Use `keyFn` for any
+  context-dependent capability
+- `withCache(ttl, { maxSize })` and `withRateLimit({ maxKeys })` options
+- `CacheOptions` exported from `@capixjs/core`
+
+---
+
 ## 0.1.0-alpha.7 — 2026-06-12
 
 ### Fixed

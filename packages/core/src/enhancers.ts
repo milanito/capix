@@ -32,19 +32,52 @@ export const withLogging = defineEnhancer((cap) => ({
   },
 })) as Enhancer;
 
-/** In-memory cache. Key = capabilityName:JSON(input). TTL in seconds. */
-export function withCache(ttlSeconds: number): Enhancer {
+export type CacheOptions = {
+  /**
+   * Maximum number of cached entries. Least-recently-used entries are evicted
+   * when the limit is reached. Default: 1_000.
+   */
+  readonly maxSize?: number;
+  /**
+   * Derives the cache key from input and context. Defaults to JSON(input).
+   *
+   * WARNING: The default key ignores the context. If the capability's output
+   * depends on ctx (e.g. the current user), the default key serves one
+   * caller's cached response to every other caller. Always provide a keyFn
+   * for context-dependent outputs:
+   *
+   * @example Per-user cache key
+   * withCache(30, { keyFn: (input, ctx) => `${(ctx as AppContext).user?.id}:${JSON.stringify(input)}` })
+   */
+  readonly keyFn?: (input: unknown, ctx: unknown) => string;
+};
+
+/** In-memory LRU cache. Key = capabilityName:keyFn(input, ctx). TTL in seconds. */
+export function withCache(ttlSeconds: number, options: CacheOptions = {}): Enhancer {
+  const maxSize = options.maxSize ?? 1_000;
+  const keyFn = options.keyFn;
   const store = new Map<string, { value: unknown; expiresAt: number }>();
 
   return defineEnhancer((cap) => ({
     ...cap,
     resolve: async (input: unknown, ctx: unknown) => {
-      const key = `${cap.name}:${JSON.stringify(input)}`;
+      const key = `${cap.name}:${keyFn ? keyFn(input, ctx) : JSON.stringify(input)}`;
       const cached = store.get(key);
-      if (cached !== undefined && cached.expiresAt > Date.now()) {
-        return cached.value;
+      if (cached !== undefined) {
+        if (cached.expiresAt > Date.now()) {
+          // Refresh recency for LRU ordering
+          store.delete(key);
+          store.set(key, cached);
+          return cached.value;
+        }
+        store.delete(key); // expired — don't let dead entries occupy capacity
       }
       const result = await (cap as AnyCapability)._resolverOnly(input, ctx);
+      if (store.size >= maxSize) {
+        // Evict least-recently-used (first key in Map insertion order)
+        const oldest = store.keys().next().value;
+        if (oldest !== undefined) store.delete(oldest);
+      }
       store.set(key, { value: result, expiresAt: Date.now() + ttlSeconds * 1000 });
       return result;
     },
@@ -118,12 +151,37 @@ export type RateLimitOptions = {
    * withRateLimit({ limit: 10, windowMs: 60_000, keyFn: (_input, ctx) => (ctx as AppContext).ip ?? 'unknown' })
    */
   readonly keyFn?: (input: unknown, ctx: unknown) => string;
+  /**
+   * Maximum number of distinct keys tracked. Default: 10_000.
+   *
+   * When exceeded, keys with no activity in the current window are swept;
+   * if every key is still active, the oldest-tracked keys are evicted (their
+   * rate-limit state resets). This bounds memory when keyFn has unbounded
+   * cardinality (per-user, per-IP).
+   */
+  readonly maxKeys?: number;
 };
 
 /** Sliding-window in-memory rate limiter. Throws 429 when limit exceeded. */
 export function withRateLimit(options: RateLimitOptions): Enhancer {
   const { limit, windowMs, keyFn } = options;
+  const maxKeys = options.maxKeys ?? 10_000;
   const store = new Map<string, number[]>();
+
+  function evictStale(now: number): void {
+    const cutoff = now - windowMs;
+    for (const [k, ts] of store) {
+      const last = ts[ts.length - 1];
+      if (last === undefined || last <= cutoff) store.delete(k);
+    }
+    // Every key still active — hard-cap by evicting oldest-tracked keys
+    if (store.size > maxKeys) {
+      for (const k of store.keys()) {
+        store.delete(k);
+        if (store.size <= maxKeys) break;
+      }
+    }
+  }
 
   return defineEnhancer((cap) => ({
     ...cap,
@@ -131,6 +189,8 @@ export function withRateLimit(options: RateLimitOptions): Enhancer {
       const key = keyFn ? keyFn(input, ctx) : cap.name;
       const now = Date.now();
       const windowStart = now - windowMs;
+
+      if (store.size > maxKeys) evictStale(now);
 
       let timestamps = store.get(key) ?? [];
       timestamps = timestamps.filter((t) => t > windowStart);
