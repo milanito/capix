@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.1.0-alpha.15 — 2026-07-02
+
+### Added
+- **New package: `@capixjs/transport-mcp`.** Exposes every capability as a
+  Model Context Protocol tool so AI clients (Claude Code, editors, agents)
+  can call your server directly. Dot-path names become tool names
+  (`users.getUser` → `users_getUser`), Zod input schemas become tool
+  `inputSchema`, object output schemas become `outputSchema` +
+  `structuredContent`, and intent maps to tool annotations (`query` →
+  `readOnlyHint`, `delete` → `destructiveHint`, matching REST route
+  inference). Guards, validation, and typed errors run through the same
+  execution engine as every other transport. Two modes: stdio (local MCP
+  clients spawn the process) and stateless Streamable HTTP (`port` option,
+  request headers reach the context builder for auth guards)
+- **New CLI command: `capix mcp`.** Serves your capabilities file as an MCP
+  stdio server (`claude mcp add my-api -- npx capix mcp`), or over
+  Streamable HTTP with `--port`
+
+---
+
 ## 0.1.0-alpha.14 — 2026-07-02
 
 ### Breaking

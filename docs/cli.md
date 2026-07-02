@@ -181,6 +181,27 @@ Options:
 
 The spec is also available programmatically via `generateOpenAPI(registry, options)` from `@capixjs/transport-rest` — useful for serving it from an endpoint or feeding Swagger UI.
 
+### `capix mcp`
+
+Serve your capabilities as MCP (Model Context Protocol) tools. Defaults to stdio — the mode MCP clients like Claude Code spawn directly:
+
+```bash
+capix mcp                              # stdio server
+capix mcp --port 4000                  # Streamable HTTP on :4000/mcp
+claude mcp add my-api -- npx capix mcp --config src/capabilities.ts
+```
+
+Options:
+
+| Flag | Description |
+|---|---|
+| `--config <path>` | Path to capabilities file |
+| `--port <port>` | Serve Streamable HTTP instead of stdio |
+| `--name <name>` | MCP server name (default `capix`) |
+| `--api-version <version>` | MCP server version string (default `0.1.0`) |
+
+The command runs with a stub context (like `capix call`), so capabilities behind auth guards will reject. Apps that need real context should mount `mcpTransport` from [`@capixjs/transport-mcp`](transports/mcp.md) in their own server.
+
 ---
 
 ## Comparison

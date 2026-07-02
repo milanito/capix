@@ -10,6 +10,7 @@ import { registerCheck } from './commands/check.js';
 import { registerDocs } from './commands/docs.js';
 import { registerClient } from './commands/client.js';
 import { registerOpenapi } from './commands/openapi.js';
+import { registerMcp } from './commands/mcp.js';
 import { registerDiff } from './commands/diff.js';
 import { registerAiContext } from './commands/ai-context.js';
 
@@ -30,6 +31,7 @@ registerCheck(program);
 registerDocs(program);
 registerClient(program);
 registerOpenapi(program);
+registerMcp(program);
 registerDiff(program);
 registerAiContext(program);
 

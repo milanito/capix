@@ -36,7 +36,7 @@ export default defineConfig({
       { text: 'Patterns',    link: '/patterns/auth' },
       { text: 'Benchmarks',  link: '/benchmarks' },
       {
-        text: 'v0.1.0-alpha.14',
+        text: 'v0.1.0-alpha.15',
         items: [
           { text: 'Changelog', link: '/changelog' },
           { text: 'npm',       link: 'https://www.npmjs.com/package/@capixjs/core' },
@@ -76,6 +76,7 @@ export default defineConfig({
             { text: 'WebSocket',  link: '/transports/websocket' },
             { text: 'GraphQL',    link: '/transports/graphql' },
             { text: 'Queue',      link: '/transports/queue' },
+            { text: 'MCP',        link: '/transports/mcp' },
           ],
         },
       ],

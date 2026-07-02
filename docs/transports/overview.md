@@ -10,6 +10,7 @@ A transport connects an incoming communication channel to the Capix execution en
 | WebSocket | `@capixjs/transport-ws` | WebSocket |
 | GraphQL | `@capixjs/transport-graphql` | HTTP/1.1 (GraphQL over HTTP) |
 | Queue | `@capixjs/transport-queue` | Custom (adapter-based) |
+| MCP | `@capixjs/transport-mcp` | Model Context Protocol (stdio / Streamable HTTP) |
 
 ## Multiple transports
 

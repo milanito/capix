@@ -100,6 +100,7 @@ jobs:
           publish_pkg packages/transports/ws
           publish_pkg packages/transports/graphql
           publish_pkg packages/transports/queue
+          publish_pkg packages/transports/mcp
           publish_pkg packages/testing
           publish_pkg packages/plugins/cors
           publish_pkg packages/plugins/helmet
@@ -118,6 +119,7 @@ jobs:
           VERSION="${{ needs.check-version.outputs.version }}"
           for pkg in @capixjs/core @capixjs/transport-rest @capixjs/transport-ws \
                      @capixjs/transport-graphql @capixjs/transport-queue \
+                     @capixjs/transport-mcp \
                      @capixjs/testing @capixjs/plugin-cors @capixjs/plugin-helmet \
                      @capixjs/plugin-logging @capixjs/plugin-auth @capixjs/cli; do
             npm dist-tag add "$pkg@$VERSION" latest

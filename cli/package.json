@@ -1,6 +1,6 @@
 {
   "name": "@capixjs/cli",
-  "version": "0.1.0-alpha.14",
+  "version": "0.1.0-alpha.15",
   "description": "CLI for the Capix framework",
   "type": "module",
   "bin": {
@@ -30,7 +30,8 @@
     "tsx": "^4.0.0",
     "zod": "^4.0.0",
     "@capixjs/core": "workspace:*",
-    "@capixjs/transport-rest": "workspace:*"
+    "@capixjs/transport-rest": "workspace:*",
+    "@capixjs/transport-mcp": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

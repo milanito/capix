@@ -44,6 +44,7 @@ No `req`/`res`. No `next()`. No middleware stack. The HTTP layer is an optional 
 | [`@capixjs/transport-ws`](packages/transports/ws) | WebSocket transport for real-time capabilities and server push |
 | [`@capixjs/transport-graphql`](packages/transports/graphql) | GraphQL transport with auto-generated schema and GraphiQL playground |
 | [`@capixjs/transport-queue`](packages/transports/queue) | Queue transport for background jobs via BullMQ, SQS, or any adapter |
+| [`@capixjs/transport-mcp`](packages/transports/mcp) | MCP transport — expose capabilities as Model Context Protocol tools |
 | [`@capixjs/plugin-auth`](packages/plugins/auth) | JWT authentication — `jwtContextBuilder`, `createJWTHelpers`, `mustBeAuthenticated` |
 | [`@capixjs/plugin-cors`](packages/plugins/cors) | CORS plugin |
 | [`@capixjs/plugin-helmet`](packages/plugins/helmet) | Security headers plugin |
@@ -372,10 +373,10 @@ Capix's REST transport trails Fastify by ~3% in a hello-world microbenchmark and
 | Hono | 23,970 | 21,365 |
 | Express | 16,632 | 16,239 |
 
-## 511 tests passing
+## 524 tests passing
 
 ```
-pnpm -r test  →  511 tests, 0 failures
+pnpm -r test  →  524 tests, 0 failures
 ```
 
 ## CLI
@@ -393,6 +394,7 @@ npm install -g @capixjs/cli
 | `capix generate capability <group> <name>` | Generate a capability file |
 | `capix client` | Generate a typed fetch client |
 | `capix openapi` | Generate an OpenAPI 3.1 spec |
+| `capix mcp` | Serve capabilities as MCP tools (stdio or HTTP) |
 
 See [docs/cli.md](docs/cli.md) for all commands.
 

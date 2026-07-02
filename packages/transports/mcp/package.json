@@ -1,7 +1,7 @@
 {
-  "name": "@capixjs/plugin-cors",
+  "name": "@capixjs/transport-mcp",
   "version": "0.1.0-alpha.15",
-  "description": "CORS plugin for Capix",
+  "description": "Capix MCP transport — expose capabilities as Model Context Protocol tools",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
@@ -14,14 +14,14 @@
   },
   "files": [
     "dist",
+    "!dist/**/*.test.*",
     "LICENSE"
   ],
   "keywords": [
     "capix",
-    "cors",
-    "plugin",
-    "http",
-    "security",
+    "mcp",
+    "model-context-protocol",
+    "transport",
     "typescript"
   ],
   "engines": {
@@ -29,14 +29,20 @@
   },
   "scripts": {
     "build": "tsc",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "zod": "^4.0.0"
+  },
   "peerDependencies": {
-    "@capixjs/transport-rest": ">=0.1.0-0"
+    "@capixjs/core": ">=0.1.0-0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
     "typescript": "^5.5.0",
-    "@capixjs/transport-rest": "workspace:*"
+    "vitest": "^1.6.0",
+    "@capixjs/core": "workspace:*"
   }
 }

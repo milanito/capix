@@ -1,6 +1,6 @@
 {
   "name": "@capixjs/plugin-logging",
-  "version": "0.1.0-alpha.14",
+  "version": "0.1.0-alpha.15",
   "description": "Structured request logging plugin for Capix using pino",
   "license": "MIT",
   "type": "module",
