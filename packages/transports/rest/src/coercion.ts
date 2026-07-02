@@ -20,38 +20,39 @@ export type CoercionKind = 'number' | 'boolean';
 /** field name → coercion target, per capability dot-path. */
 export type CoercionMaps = Map<string, Map<string, CoercionKind>>;
 
+/** Zod 4 internal def — schema._zod.def (see zod's library-authors guide). */
 type ZodDefLike = {
-  typeName?: string;
+  type?: string;
   innerType?: unknown;
-  schema?: unknown;
-  type?: unknown;
+  in?: unknown;
   options?: unknown[];
-  shape?: (() => Record<string, unknown>) | Record<string, unknown>;
+  shape?: Record<string, unknown>;
 };
 
 function defOf(schema: unknown): ZodDefLike | null {
   if (typeof schema !== 'object' || schema === null) return null;
-  const def = (schema as { _def?: ZodDefLike })._def;
+  const def = (schema as { _zod?: { def?: ZodDefLike } })._zod?.def;
   return typeof def === 'object' && def !== null ? def : null;
 }
 
 /** Wrapper types whose inner schema determines the coercion target. */
 const WRAPPERS = new Set([
-  'ZodOptional',
-  'ZodNullable',
-  'ZodDefault',
-  'ZodCatch',
-  'ZodBranded',
-  'ZodReadonly',
-  'ZodEffects', // z.coerce.* in some Zod versions, .transform(), .refine()
+  'optional',
+  'nullable',
+  'default',
+  'prefault',
+  'catch',
+  'readonly',
+  'nonoptional',
+  'pipe', // .transform() — the input side is what the client sends
 ]);
 
-/** Unwraps optional/nullable/default/effects layers to the underlying def. */
+/** Unwraps optional/nullable/default/pipe layers to the underlying def. */
 function unwrap(schema: unknown): ZodDefLike | null {
   let def = defOf(schema);
   let depth = 0;
-  while (def !== null && def.typeName !== undefined && WRAPPERS.has(def.typeName) && depth < 16) {
-    def = defOf(def.innerType ?? def.schema ?? def.type);
+  while (def !== null && def.type !== undefined && WRAPPERS.has(def.type) && depth < 16) {
+    def = defOf(def.innerType ?? def.in);
     depth++;
   }
   return def;
@@ -60,20 +61,20 @@ function unwrap(schema: unknown): ZodDefLike | null {
 function kindOf(fieldSchema: unknown): CoercionKind | null {
   const def = unwrap(fieldSchema);
   if (def === null) return null;
-  switch (def.typeName) {
-    case 'ZodNumber':
+  switch (def.type) {
+    case 'number':
       return 'number';
-    case 'ZodBoolean':
+    case 'boolean':
       return 'boolean';
-    case 'ZodUnion': {
+    case 'union': {
       // Coerce only when every meaningful branch agrees on one primitive kind
       // (e.g. z.union([z.number(), z.null()])). A string branch means the raw
       // string is already acceptable — leave it alone.
       const kinds = new Set<CoercionKind | null>();
       for (const option of def.options ?? []) {
         const inner = unwrap(option);
-        if (inner?.typeName === 'ZodNull' || inner?.typeName === 'ZodUndefined') continue;
-        kinds.add(inner?.typeName === 'ZodNumber' ? 'number' : inner?.typeName === 'ZodBoolean' ? 'boolean' : null);
+        if (inner?.type === 'null' || inner?.type === 'undefined') continue;
+        kinds.add(inner?.type === 'number' ? 'number' : inner?.type === 'boolean' ? 'boolean' : null);
       }
       if (kinds.size === 1) {
         const only = kinds.values().next().value;
@@ -97,9 +98,9 @@ export function buildCoercionMaps(registry: CapabilityRegistry): CoercionMaps {
   for (const [dotPath, cap] of registry) {
     if (cap.inputSchema === null) continue;
     const def = unwrap(cap.inputSchema);
-    if (def?.typeName !== 'ZodObject') continue;
+    if (def?.type !== 'object') continue;
 
-    const shape = typeof def.shape === 'function' ? def.shape() : (def.shape ?? {});
+    const shape = def.shape ?? {};
     const fields = new Map<string, CoercionKind>();
     for (const [key, fieldSchema] of Object.entries(shape)) {
       const kind = kindOf(fieldSchema);

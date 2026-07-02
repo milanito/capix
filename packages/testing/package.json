@@ -1,6 +1,6 @@
 {
   "name": "@capixjs/testing",
-  "version": "0.1.0-alpha.13",
+  "version": "0.1.0-alpha.14",
   "description": "Capix testing utilities",
   "license": "MIT",
   "type": "module",
@@ -33,7 +33,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "zod": "^3.23.0"
+    "zod": "^4.0.0"
   },
   "peerDependencies": {
     "@capixjs/core": ">=0.1.0-0"

@@ -3,7 +3,7 @@
  * Depends on: errors.ts, context.ts, guards.ts, zod
  */
 
-import type { ZodSchema, ZodTypeAny } from 'zod';
+import type { ZodType, output as ZodOutput } from 'zod';
 import type { BaseContext } from './context.js';
 import { runInputGuards } from './guards.js';
 import type { AnyGuard, AnyInputGuard, Guard, InputGuard, NarrowContext } from './guards.js';
@@ -76,8 +76,8 @@ export type Capability<
   readonly _input: TInput;
   readonly _output: TOutput;
   readonly _context: TContext;
-  readonly inputSchema: ZodTypeAny | null;
-  readonly outputSchema: ZodTypeAny | null;
+  readonly inputSchema: ZodType | null;
+  readonly outputSchema: ZodType | null;
   readonly guards: ReadonlyArray<AnyGuard>;
   readonly inputGuards: ReadonlyArray<AnyInputGuard>;
   readonly intent: Intent;
@@ -144,7 +144,7 @@ export type Capability<
 
   enhance(e: Enhancer): Capability<TInput, TOutput, TContext>;
 
-  output<O>(schema: ZodSchema<O>): Capability<TInput, O, TContext>;
+  output<O>(schema: ZodType<O>): Capability<TInput, O, TContext>;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -161,8 +161,8 @@ type CapabilityBase = {
   _input: unknown;
   _output: unknown;
   _context: unknown;
-  inputSchema: ZodTypeAny | null;
-  outputSchema: ZodTypeAny | null;
+  inputSchema: ZodType | null;
+  outputSchema: ZodType | null;
   guards: ReadonlyArray<AnyGuard>;
   inputGuards: ReadonlyArray<AnyInputGuard>;
   intent: Intent;
@@ -260,7 +260,7 @@ function makeCapability<TInput, TOutput, TContext extends BaseContext>(
       configurable: false,
     },
     output: {
-      value<O>(schema: ZodSchema<O>): Capability<TInput, O, TContext> {
+      value<O>(schema: ZodType<O>): Capability<TInput, O, TContext> {
         return makeCapability<TInput, O, TContext>({
           ...base,
           outputSchema: schema,
@@ -322,29 +322,29 @@ export function capability<TOutput, TContext extends BaseContext = BaseContext>(
 
 /** With typed input schema. */
 export function capability<
-  TSchema extends ZodTypeAny,
+  TSchema extends ZodType,
   TOutput,
   TContext extends BaseContext = BaseContext,
 >(
   schema: TSchema,
-  resolver: Resolver<TSchema['_output'], TOutput, TContext>,
-): Capability<TSchema['_output'], TOutput, TContext>;
+  resolver: Resolver<ZodOutput<TSchema>, TOutput, TContext>,
+): Capability<ZodOutput<TSchema>, TOutput, TContext>;
 
 /** With typed input schema and explicit intent. */
 export function capability<
-  TSchema extends ZodTypeAny,
+  TSchema extends ZodType,
   TOutput,
   TContext extends BaseContext = BaseContext,
 >(
   schema: TSchema,
-  resolver: Resolver<TSchema['_output'], TOutput, TContext>,
+  resolver: Resolver<ZodOutput<TSchema>, TOutput, TContext>,
   intent: Intent,
-): Capability<TSchema['_output'], TOutput, TContext>;
+): Capability<ZodOutput<TSchema>, TOutput, TContext>;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function capability(...args: any[]): AnyCapability {
   const [first, second, thirdArg] = args as [
-    ZodTypeAny | ((...a: unknown[]) => unknown),
+    ZodType | ((...a: unknown[]) => unknown),
     ((...a: unknown[]) => unknown) | Intent | undefined,
     Intent | undefined,
   ];
@@ -352,7 +352,7 @@ export function capability(...args: any[]): AnyCapability {
   const isZodSchema =
     first !== null &&
     typeof first === 'object' &&
-    '_def' in (first as object);
+    ('_zod' in (first as object) || '_def' in (first as object));
 
   if (!isZodSchema) {
     // No-schema overloads: capability(resolver) | capability(resolver, intent)
@@ -385,7 +385,7 @@ export function capability(...args: any[]): AnyCapability {
     _input: undefined,
     _output: undefined,
     _context: undefined,
-    inputSchema: first as ZodTypeAny,
+    inputSchema: first as ZodType,
     outputSchema: null,
     guards: [],
     inputGuards: [],
@@ -518,15 +518,15 @@ export type ScopedCapabilityFactory<TContext extends BaseContext> = {
     resolver: (input: undefined, ctx: TContext) => TOutput | Promise<TOutput>,
     intent: Intent,
   ): Capability<undefined, TOutput, TContext>;
-  <TSchema extends ZodTypeAny, TOutput>(
+  <TSchema extends ZodType, TOutput>(
     schema: TSchema,
-    resolver: Resolver<TSchema['_output'], TOutput, TContext>,
-  ): Capability<TSchema['_output'], TOutput, TContext>;
-  <TSchema extends ZodTypeAny, TOutput>(
+    resolver: Resolver<ZodOutput<TSchema>, TOutput, TContext>,
+  ): Capability<ZodOutput<TSchema>, TOutput, TContext>;
+  <TSchema extends ZodType, TOutput>(
     schema: TSchema,
-    resolver: Resolver<TSchema['_output'], TOutput, TContext>,
+    resolver: Resolver<ZodOutput<TSchema>, TOutput, TContext>,
     intent: Intent,
-  ): Capability<TSchema['_output'], TOutput, TContext>;
+  ): Capability<ZodOutput<TSchema>, TOutput, TContext>;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-namespace

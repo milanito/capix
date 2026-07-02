@@ -107,7 +107,7 @@ describe('generateOpenAPI — routes and parameters', () => {
   });
 
   it('uses a non-object input schema as the whole request body', () => {
-    const createBlob = capability(z.record(z.unknown()), (i) => i);
+    const createBlob = capability(z.record(z.string(), z.unknown()), (i) => i);
     const doc = spec({ blobs: { createBlob } });
     const schema = doc.paths['/blobs']!['post']!.requestBody!.content['application/json']!.schema;
     expect(schema['type']).toBe('object');

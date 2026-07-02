@@ -7,7 +7,7 @@
  */
 
 import fastJsonStringify from 'fast-json-stringify';
-import { zodToJsonSchema } from 'zod-to-json-schema';
+import { z } from 'zod';
 import type { CapabilityRegistry } from '@capixjs/core';
 
 /** Pre-compiled response serializer: data → '{"data":<json>}' */
@@ -20,7 +20,7 @@ export { DEFAULT as defaultSerializer };
 /**
  * Builds per-capability serializers from compiled output schemas.
  * Falls back to JSON.stringify for capabilities without an outputSchema or
- * if zod-to-json-schema cannot convert the schema.
+ * if the schema cannot be converted to JSON Schema (e.g. contains z.date()).
  */
 export function buildSerializers(registry: CapabilityRegistry): Map<string, ResponseSerializer> {
   const map = new Map<string, ResponseSerializer>();
@@ -29,9 +29,10 @@ export function buildSerializers(registry: CapabilityRegistry): Map<string, Resp
     if (cap.outputSchema === null) continue;
 
     try {
-      const jsonSchema = zodToJsonSchema(cap.outputSchema, {
-        target: 'jsonSchema7',
-        $refStrategy: 'none',
+      const jsonSchema = z.toJSONSchema(cap.outputSchema as z.ZodType, {
+        target: 'draft-7',
+        io: 'output',
+        reused: 'inline',
       });
       // Remove the $schema meta field — fjs doesn't need it
       if (typeof jsonSchema === 'object' && jsonSchema !== null) {

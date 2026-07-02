@@ -51,8 +51,8 @@ importers:
         specifier: ^9.0.0
         version: 9.0.3
       zod:
-        specifier: ^3.23.0
-        version: 3.25.76
+        specifier: ^4.0.0
+        version: 4.4.3
     devDependencies:
       '@types/express':
         specifier: ^4.17.0
@@ -88,8 +88,8 @@ importers:
         specifier: ^4.0.0
         version: 4.22.3
       zod:
-        specifier: ^3.23.0
-        version: 3.25.76
+        specifier: ^4.0.0
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -110,8 +110,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/transports/rest
       zod:
-        specifier: ^3.23.0
-        version: 3.25.76
+        specifier: ^4.0.0
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -132,8 +132,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/transports/rest
       zod:
-        specifier: ^3.23.0
-        version: 3.25.76
+        specifier: ^4.0.0
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -157,8 +157,8 @@ importers:
         specifier: ^9.0.0
         version: 9.0.3
       zod:
-        specifier: ^3.23.0
-        version: 3.25.76
+        specifier: ^4.0.0
+        version: 4.4.3
     devDependencies:
       '@types/jsonwebtoken':
         specifier: ^9.0.0
@@ -182,8 +182,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/transports/rest
       zod:
-        specifier: ^3.23.0
-        version: 3.25.76
+        specifier: ^4.0.0
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -204,8 +204,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/transports/rest
       zod:
-        specifier: ^3.23.0
-        version: 3.25.76
+        specifier: ^4.0.0
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -226,8 +226,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/transports/rest
       zod:
-        specifier: ^3.23.0
-        version: 3.25.76
+        specifier: ^4.0.0
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -251,8 +251,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/transports/ws
       zod:
-        specifier: ^3.23.0
-        version: 3.25.76
+        specifier: ^4.0.0
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -273,8 +273,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/transports/rest
       zod:
-        specifier: ^3.23.0
-        version: 3.25.76
+        specifier: ^4.0.0
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -295,8 +295,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/transports/rest
       zod:
-        specifier: ^3.23.0
-        version: 3.25.76
+        specifier: ^4.0.0
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -317,8 +317,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/transports/graphql
       zod:
-        specifier: ^3.23.0
-        version: 3.25.76
+        specifier: ^4.0.0
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -333,8 +333,8 @@ importers:
   packages/core:
     dependencies:
       zod:
-        specifier: ^3.23.0
-        version: 3.25.76
+        specifier: ^4.0.0
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -411,8 +411,8 @@ importers:
   packages/testing:
     dependencies:
       zod:
-        specifier: ^3.23.0
-        version: 3.25.76
+        specifier: ^4.0.0
+        version: 4.4.3
     devDependencies:
       '@capixjs/core':
         specifier: workspace:*
@@ -449,8 +449,8 @@ importers:
         specifier: ^1.6.0
         version: 1.6.1(@types/node@20.19.41)
       zod:
-        specifier: ^3.23.0
-        version: 3.25.76
+        specifier: ^4.0.0
+        version: 4.4.3
 
   packages/transports/queue:
     devDependencies:
@@ -473,8 +473,8 @@ importers:
         specifier: ^1.6.0
         version: 1.6.1(@types/node@20.19.41)
       zod:
-        specifier: ^3.23.0
-        version: 3.25.76
+        specifier: ^4.0.0
+        version: 4.4.3
 
   packages/transports/rest:
     dependencies:
@@ -485,11 +485,8 @@ importers:
         specifier: ^6.4.0
         version: 6.4.0
       zod:
-        specifier: ^3.23.0
-        version: 3.25.76
-      zod-to-json-schema:
-        specifier: ^3.25.2
-        version: 3.25.2(zod@3.25.76)
+        specifier: ^4.0.0
+        version: 4.4.3
     devDependencies:
       '@capixjs/core':
         specifier: workspace:*
@@ -535,8 +532,8 @@ importers:
         specifier: ^1.6.0
         version: 1.6.1(@types/node@20.19.41)
       zod:
-        specifier: ^3.0.0
-        version: 3.25.76
+        specifier: ^4.0.0
+        version: 4.4.3
 
   test/integration:
     dependencies:
@@ -559,8 +556,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/transports/ws
       zod:
-        specifier: ^3.23.0
-        version: 3.25.76
+        specifier: ^4.0.0
+        version: 4.4.3
     devDependencies:
       '@types/node':
         specifier: ^20.0.0
@@ -2768,13 +2765,8 @@ packages:
     resolution: {integrity: sha512-4LCcse/U2MHZ63HAJVE+v71o7yOdIe4cZ70Wpf8D/IyjDKYQLV5GD46B+hSTjJsvV5PztjvHoU580EftxjDZFQ==}
     engines: {node: '>=12.20'}
 
-  zod-to-json-schema@3.25.2:
-    resolution: {integrity: sha512-O/PgfnpT1xKSDeQYSCfRI5Gy3hPf91mKVDuYLUHZJMiDFptvP41MSnWofm8dnCm0256ZNfZIM7DSzuSMAFnjHA==}
-    peerDependencies:
-      zod: ^3.25.28 || ^4
-
-  zod@3.25.76:
-    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+  zod@4.4.3:
+    resolution: {integrity: sha512-ytENFjIJFl2UwYglde2jchW2Hwm4GJFLDiSXWdTrJQBIN9Fcyp7n4DhxJEiWNAJMV1/BqWfW/kkg71UDcHJyTQ==}
 
   zwitch@2.0.4:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
@@ -5012,10 +5004,6 @@ snapshots:
 
   yocto-queue@1.2.2: {}
 
-  zod-to-json-schema@3.25.2(zod@3.25.76):
-    dependencies:
-      zod: 3.25.76
-
-  zod@3.25.76: {}
+  zod@4.4.3: {}
 
   zwitch@2.0.4: {}

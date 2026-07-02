@@ -53,7 +53,7 @@ describe('buildCoercionMaps', () => {
   it('returns no map for record, no-schema, and string-only capabilities', () => {
     const reg = compileRegistry({
       g: {
-        rec: capability(z.record(z.unknown()), (i) => i),
+        rec: capability(z.record(z.string(), z.unknown()), (i) => i),
         none: capability(() => 'ok'),
         strs: capability(z.object({ a: z.string() }), (i) => i),
       },

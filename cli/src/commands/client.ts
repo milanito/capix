@@ -6,39 +6,49 @@ import { generateRoutes } from '@capixjs/transport-rest';
 import type { RouteDefinition, HttpOverride } from '@capixjs/transport-rest';
 import type { AnyCapability, CapabilityRegistry } from '@capixjs/core';
 
-function zodTypeToTs(def: unknown): string {
-  const d = def as { _def?: { typeName?: string; innerType?: unknown; shape?: Record<string, unknown>; type?: unknown; options?: unknown[] } };
-  const typeName = d._def?.typeName ?? '';
+/** Zod 4 internal def — schema._zod.def. */
+type ClientZodDef = {
+  type?: string;
+  innerType?: unknown;
+  element?: unknown;
+  shape?: Record<string, unknown>;
+  options?: unknown[];
+};
 
-  switch (typeName) {
-    case 'ZodString': return 'string';
-    case 'ZodNumber': return 'number';
-    case 'ZodBoolean': return 'boolean';
-    case 'ZodNull': return 'null';
-    case 'ZodUndefined': return 'undefined';
-    case 'ZodAny': return 'unknown';
-    case 'ZodUnknown': return 'unknown';
-    case 'ZodOptional': {
-      const inner = zodTypeToTs(d._def?.innerType);
+function zodDefOf(schema: unknown): ClientZodDef {
+  return (schema as { _zod?: { def?: ClientZodDef } })?._zod?.def ?? {};
+}
+
+function zodTypeToTs(schema: unknown): string {
+  const def = zodDefOf(schema);
+
+  switch (def.type) {
+    case 'string': return 'string';
+    case 'number': return 'number';
+    case 'boolean': return 'boolean';
+    case 'null': return 'null';
+    case 'undefined': return 'undefined';
+    case 'any': return 'unknown';
+    case 'unknown': return 'unknown';
+    case 'optional': {
+      const inner = zodTypeToTs(def.innerType);
       return `${inner} | undefined`;
     }
-    case 'ZodNullable': {
-      const inner = zodTypeToTs(d._def?.innerType);
+    case 'nullable': {
+      const inner = zodTypeToTs(def.innerType);
       return `${inner} | null`;
     }
-    case 'ZodArray': {
-      const inner = zodTypeToTs(d._def?.type);
+    case 'array': {
+      const inner = zodTypeToTs(def.element);
       return `Array<${inner}>`;
     }
-    case 'ZodObject': {
-      const shapeFn = (d._def as unknown as { shape?: () => Record<string, unknown> })?.shape;
-      const shape: Record<string, unknown> = typeof shapeFn === 'function' ? shapeFn() : {};
-      const entries = Object.entries(shape);
+    case 'object': {
+      const entries = Object.entries(def.shape ?? {});
       if (entries.length === 0) return 'Record<string, never>';
       return `{ ${renderFields(entries)} }`;
     }
-    case 'ZodUnion': {
-      const opts = ((d._def as { options?: unknown[] })?.options ?? []).map(zodTypeToTs);
+    case 'union': {
+      const opts = (def.options ?? []).map(zodTypeToTs);
       return opts.join(' | ');
     }
     default:
@@ -48,13 +58,13 @@ function zodTypeToTs(def: unknown): string {
 
 /**
  * Renders object fields as TypeScript property declarations.
- * ZodOptional fields use the `key?: T` syntax rather than `key: T | undefined`.
+ * Optional fields use the `key?: T` syntax rather than `key: T | undefined`.
  */
 function renderFields(entries: Array<[string, unknown]>): string {
   return entries.map(([k, v]) => {
-    const d = v as { _def?: { typeName?: string; innerType?: unknown } };
-    if (d._def?.typeName === 'ZodOptional') {
-      return `${k}?: ${zodTypeToTs(d._def?.innerType)}`;
+    const def = zodDefOf(v);
+    if (def.type === 'optional') {
+      return `${k}?: ${zodTypeToTs(def.innerType)}`;
     }
     return `${k}: ${zodTypeToTs(v)}`;
   }).join('; ');
@@ -71,9 +81,7 @@ function extractPathParams(routePath: string): string[] {
 
 /** Returns the Zod schema's shape, or an empty object if not available. */
 function getShape(cap: AnyCapability): Record<string, unknown> {
-  const schema = cap.inputSchema as { _def?: { shape?: () => Record<string, unknown> } } | null;
-  const shapeFn = schema?._def?.shape;
-  return typeof shapeFn === 'function' ? shapeFn() : {};
+  return zodDefOf(cap.inputSchema).shape ?? {};
 }
 
 function capNameToFn(name: string): string {
@@ -140,10 +148,7 @@ export function generateClient(
 
     // Body or query param for remaining fields
     if (hasRemaining) {
-      const allOptional = remainingEntries.every(([, v]) => {
-        const d = v as { _def?: { typeName?: string } };
-        return d._def?.typeName === 'ZodOptional';
-      });
+      const allOptional = remainingEntries.every(([, v]) => zodDefOf(v).type === 'optional');
       const fieldsType = `{ ${renderFields(remainingEntries)} }`;
       if (isReadOnly) {
         // Query params are always optional — callers may omit them

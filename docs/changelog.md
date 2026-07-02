@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.1.0-alpha.14 — 2026-07-02
+
+### Breaking
+- **Zod 4.** All packages now require `zod@^4` (previously `^3.23`). Your
+  capability schemas keep working unchanged — the public Zod API used in
+  Capix apps (`z.object`, `z.string`, `.optional()`, `.default()`, guards,
+  enhancers) is the same. What changed under the hood:
+  - Schema introspection (REST coercion, OpenAPI generation, GraphQL schema
+    building, `capix show`/`docs`/`client`) now reads Zod 4's internals
+  - `@capixjs/transport-rest` uses Zod 4's native `z.toJSONSchema` for
+    response serializers and OpenAPI output — the `zod-to-json-schema`
+    dependency is gone
+  - If you use `z.record`, Zod 4 requires an explicit key schema:
+    `z.record(z.unknown())` → `z.record(z.string(), z.unknown())`
+  - Validation error messages follow Zod 4's format (e.g.
+    `Invalid input: expected string, received number`)
+
+### Fixed
+- **npm `latest` tag now tracks the newest release.** `npm install
+  @capixjs/*` previously resolved to `0.1.0-alpha.1` — the first-ever
+  publish claimed `latest` and prerelease publishes never moved it. The
+  publish workflow now retags `latest` on every release
+
+---
+
 ## 0.1.0-alpha.13 — 2026-07-02
 
 ### Added

@@ -12,8 +12,7 @@ function schemaToObject(schema: unknown): Record<string, string> | null {
   if (!s.shape) return null;
   const result: Record<string, string> = {};
   for (const [k, v] of Object.entries(s.shape)) {
-    const typeName = (v as { _def?: { typeName?: string } })._def?.typeName ?? 'unknown';
-    result[k] = typeName.replace('Zod', '').toLowerCase();
+    result[k] = (v as { _zod?: { def?: { type?: string } } })._zod?.def?.type ?? 'unknown';
   }
   return result;
 }

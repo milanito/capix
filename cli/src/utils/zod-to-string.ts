@@ -1,186 +1,172 @@
 /**
  * zod-to-string.ts — human-readable Zod schema introspection
  *
- * Reads Zod's internal _def structure to produce TypeScript-like type strings.
- * Used by `capix docs` and `capix show` to describe capability schemas.
+ * Reads Zod 4's internal def structure (schema._zod.def) to produce
+ * TypeScript-like type strings. Used by `capix docs` and `capix show`
+ * to describe capability schemas.
  */
 
 type ZodDef = {
-  typeName: string;
-  // ZodObject
-  shape?: () => Record<string, ZodLike>;
-  // ZodArray / ZodSet / ZodPromise
-  type?: ZodLike;
-  // ZodOptional / ZodNullable / ZodDefault / ZodCatch / ZodBranded / ZodEffects
+  type: string;
+  // object
+  shape?: Record<string, ZodLike>;
+  // array
+  element?: ZodLike;
+  // set / record / map value
+  valueType?: ZodLike;
+  // record / map key
+  keyType?: ZodLike;
+  // optional / nullable / default / prefault / catch / readonly / nonoptional / promise
   innerType?: ZodLike;
-  schema?: ZodLike;
-  // ZodUnion / ZodDiscriminatedUnion
+  // pipe (.transform(), z.preprocess())
+  in?: ZodLike;
+  // union / discriminated union
   options?: ZodLike[];
-  // ZodIntersection
+  // intersection
   left?: ZodLike;
   right?: ZodLike;
-  // ZodTuple
+  // tuple
   items?: ZodLike[];
   rest?: ZodLike;
-  // ZodRecord / ZodMap
-  keyType?: ZodLike;
-  valueType?: ZodLike;
-  // ZodLiteral
-  value?: unknown;
-  // ZodEnum / ZodNativeEnum
-  values?: unknown[] | Record<string, unknown>;
-  // ZodFunction
-  args?: ZodLike;
-  returns?: ZodLike;
-  // ZodCoerce (same as primitive but under coerce namespace)
-  // ZodEffects
-  effect?: unknown;
+  // literal — v4 literals hold one or more values
+  values?: unknown[];
+  // enum
+  entries?: Record<string, unknown>;
 };
 
-type ZodLike = { _def: ZodDef };
+type ZodLike = { _zod: { def: ZodDef } };
 
 const MAX_DEPTH = 6;
 
+function defOf(schema: unknown): ZodDef | null {
+  if (!schema || typeof schema !== 'object') return null;
+  const def = (schema as { _zod?: { def?: ZodDef } })._zod?.def;
+  return def && typeof def === 'object' ? def : null;
+}
+
 export function zodSchemaToString(schema: unknown, depth = 0): string {
-  if (!schema || typeof schema !== 'object' || !('_def' in (schema as object))) {
-    return 'unknown';
-  }
+  const def = defOf(schema);
+  if (def === null) return 'unknown';
   if (depth > MAX_DEPTH) return '...';
 
-  const def = (schema as ZodLike)._def;
   const d = depth + 1;
 
-  switch (def.typeName) {
-    case 'ZodString':     return 'string';
-    case 'ZodNumber':     return 'number';
-    case 'ZodBigInt':     return 'bigint';
-    case 'ZodBoolean':    return 'boolean';
-    case 'ZodDate':       return 'Date';
-    case 'ZodNull':       return 'null';
-    case 'ZodUndefined':  return 'undefined';
-    case 'ZodVoid':       return 'void';
-    case 'ZodAny':        return 'any';
-    case 'ZodUnknown':    return 'unknown';
-    case 'ZodNever':      return 'never';
-    case 'ZodSymbol':     return 'symbol';
-    case 'ZodNaN':        return 'NaN';
+  switch (def.type) {
+    case 'string':    return 'string';
+    case 'number':
+    case 'int':       return 'number';
+    case 'bigint':    return 'bigint';
+    case 'boolean':   return 'boolean';
+    case 'date':      return 'Date';
+    case 'null':      return 'null';
+    case 'undefined': return 'undefined';
+    case 'void':      return 'void';
+    case 'any':       return 'any';
+    case 'unknown':   return 'unknown';
+    case 'never':     return 'never';
+    case 'symbol':    return 'symbol';
+    case 'nan':       return 'NaN';
 
-    case 'ZodLiteral': {
-      const v = def.value;
-      if (typeof v === 'string') return `"${v}"`;
-      if (typeof v === 'number' || typeof v === 'boolean') return String(v);
-      return 'literal';
+    case 'literal': {
+      const vals = (def.values ?? []).map((v) => {
+        if (typeof v === 'string') return `"${v}"`;
+        if (typeof v === 'number' || typeof v === 'boolean') return String(v);
+        return 'literal';
+      });
+      return vals.length > 0 ? vals.join(' | ') : 'literal';
     }
 
-    case 'ZodEnum': {
-      const vals = def.values;
-      if (Array.isArray(vals)) return vals.map((v) => `"${v}"`).join(' | ');
-      return 'enum';
+    case 'enum': {
+      const vals = Object.values(def.entries ?? {});
+      if (vals.length === 0) return 'enum';
+      return vals
+        .map((v) => (typeof v === 'string' ? `"${v}"` : String(v)))
+        .join(' | ');
     }
 
-    case 'ZodNativeEnum':
-      return 'enum';
-
-    case 'ZodObject': {
+    case 'object': {
       if (depth > 2) return '{ ... }';
-      if (!def.shape) return 'object';
-      const shape = def.shape();
+      const shape = def.shape ?? {};
       const fields = Object.entries(shape)
         .map(([k, v]) => `${k}: ${zodSchemaToString(v, d)}`)
         .join(', ');
       return fields ? `{ ${fields} }` : '{}';
     }
 
-    case 'ZodArray': {
-      const inner = def.type ? zodSchemaToString(def.type, d) : 'unknown';
+    case 'array': {
+      const inner = def.element ? zodSchemaToString(def.element, d) : 'unknown';
       const needsParens = inner.includes(' ') && !inner.startsWith('{') && !inner.startsWith('[');
       return needsParens ? `(${inner})[]` : `${inner}[]`;
     }
 
-    case 'ZodTuple': {
+    case 'tuple': {
       const items = (def.items ?? []).map((item) => zodSchemaToString(item, d));
       const rest = def.rest ? `, ...${zodSchemaToString(def.rest, d)}[]` : '';
       return `[${items.join(', ')}${rest}]`;
     }
 
-    case 'ZodRecord': {
+    case 'record': {
       const k = def.keyType ? zodSchemaToString(def.keyType, d) : 'string';
       const v = def.valueType ? zodSchemaToString(def.valueType, d) : 'unknown';
       return `Record<${k}, ${v}>`;
     }
 
-    case 'ZodMap': {
+    case 'map': {
       const k = def.keyType ? zodSchemaToString(def.keyType, d) : 'unknown';
       const v = def.valueType ? zodSchemaToString(def.valueType, d) : 'unknown';
       return `Map<${k}, ${v}>`;
     }
 
-    case 'ZodSet': {
-      const inner = def.type ? zodSchemaToString(def.type, d) : 'unknown';
+    case 'set': {
+      const inner = def.valueType ? zodSchemaToString(def.valueType, d) : 'unknown';
       return `Set<${inner}>`;
     }
 
-    case 'ZodOptional': {
+    case 'optional': {
       const inner = def.innerType ? zodSchemaToString(def.innerType, d) : 'unknown';
       return `${inner} | undefined`;
     }
 
-    case 'ZodNullable': {
+    case 'nullable': {
       const inner = def.innerType ? zodSchemaToString(def.innerType, d) : 'unknown';
       return `${inner} | null`;
     }
 
-    case 'ZodDefault': {
-      const inner = def.innerType ? zodSchemaToString(def.innerType, d) : 'unknown';
-      return inner;
-    }
+    case 'default':
+    case 'prefault':
+    case 'catch':
+    case 'nonoptional':
+      return def.innerType ? zodSchemaToString(def.innerType, d) : 'unknown';
 
-    case 'ZodCatch':
-    case 'ZodBranded':
-      return def.type ? zodSchemaToString(def.type, d) : 'unknown';
+    case 'pipe':
+      // .transform() / z.preprocess() — describe the input side
+      return def.in ? zodSchemaToString(def.in, d) : 'unknown';
 
-    case 'ZodEffects':
-      return def.schema ? zodSchemaToString(def.schema, d) : 'unknown';
-
-    case 'ZodUnion': {
+    case 'union': {
       const opts = def.options ?? [];
       return opts.map((o) => zodSchemaToString(o, d)).join(' | ');
     }
 
-    case 'ZodDiscriminatedUnion': {
-      const opts = def.options ?? [];
-      return opts.map((o) => zodSchemaToString(o, d)).join(' | ');
-    }
-
-    case 'ZodIntersection': {
+    case 'intersection': {
       const left = def.left ? zodSchemaToString(def.left, d) : 'unknown';
       const right = def.right ? zodSchemaToString(def.right, d) : 'unknown';
       return `${left} & ${right}`;
     }
 
-    case 'ZodPromise': {
-      const inner = def.type ? zodSchemaToString(def.type, d) : 'unknown';
+    case 'promise': {
+      const inner = def.innerType ? zodSchemaToString(def.innerType, d) : 'unknown';
       return `Promise<${inner}>`;
     }
 
-    case 'ZodFunction': {
-      const args = def.args ? zodSchemaToString(def.args, d) : '()';
-      const returns = def.returns ? zodSchemaToString(def.returns, d) : 'unknown';
-      return `${args} => ${returns}`;
-    }
-
-    case 'ZodLazy':
+    case 'lazy':
       return '...';
 
-    case 'ZodReadonly': {
+    case 'readonly': {
       const inner = def.innerType ? zodSchemaToString(def.innerType, d) : 'unknown';
       return `Readonly<${inner}>`;
     }
 
-    case 'ZodPipeline':
-      return 'unknown';
-
     default:
-      return def.typeName?.replace('Zod', '').toLowerCase() ?? 'unknown';
+      return def.type ?? 'unknown';
   }
 }

@@ -43,10 +43,10 @@ const getMetrics = capability(
 );
 
 // searchEchoes → query (search*) → GET /echoes; record schema passes arbitrary keys through
-const searchEchoes = capability(z.record(z.unknown()), (input) => ({ echoed: input }));
+const searchEchoes = capability(z.record(z.string(), z.unknown()), (input) => ({ echoed: input }));
 
 // createEcho → mutation (create*) → POST /echoes
-const createEcho = capability(z.record(z.unknown()), (input) => ({ echoed: input }));
+const createEcho = capability(z.record(z.string(), z.unknown()), (input) => ({ echoed: input }));
 
 // findPeople → query collection → GET /people (schema-aware coercion fixture)
 const findPeople = capability(

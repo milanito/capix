@@ -47,47 +47,49 @@ export const JSONScalar = new GraphQLScalarType({
 type GQLContext = { readonly headers: Record<string, string> };
 type OutputTypeCache = Map<string, GraphQLObjectType>;
 type InputTypeCache = Map<string, GraphQLInputObjectType>;
+/** Zod 4 internal def — schema._zod.def (see zod's library-authors guide). */
 type ZodDef = {
-  typeName?: string;
+  type?: string;
   innerType?: unknown;
-  schema?: unknown;   // ZodEffects inner schema
-  shape?: (() => Record<string, unknown>) | Record<string, unknown>;
-  type?: unknown;
-  values?: string[];
+  in?: unknown;       // pipe (.transform()) input side
+  element?: unknown;  // array element
+  shape?: Record<string, unknown>;
+  entries?: Record<string, unknown>; // enum values
 };
 
 function zodDef(schema: unknown): ZodDef {
-  return (schema as { _def?: ZodDef })?._def ?? {};
+  return (schema as { _zod?: { def?: ZodDef } })?._zod?.def ?? {};
 }
 
 function resolveShape(d: ZodDef): Record<string, unknown> {
-  return typeof d.shape === 'function' ? d.shape() : (d.shape ?? {});
+  return d.shape ?? {};
 }
 
 function zodToGqlOutput(schema: unknown, typeName: string, cache: OutputTypeCache): GraphQLOutputType {
   const d = zodDef(schema);
-  switch (d.typeName) {
-    case 'ZodString': return new GraphQLNonNull(GraphQLString);
-    case 'ZodNumber': return new GraphQLNonNull(GraphQLFloat);
-    case 'ZodBoolean': return new GraphQLNonNull(GraphQLBoolean);
-    case 'ZodDefault': {
+  switch (d.type) {
+    case 'string': return new GraphQLNonNull(GraphQLString);
+    case 'number': return new GraphQLNonNull(GraphQLFloat);
+    case 'boolean': return new GraphQLNonNull(GraphQLBoolean);
+    case 'default':
+    case 'prefault': {
       // Unwrap default — value is optional in GraphQL (no NonNull)
       const inner = zodToGqlOutput(d.innerType, typeName, cache);
       return inner instanceof GraphQLNonNull ? (inner.ofType as GraphQLOutputType) : inner;
     }
-    case 'ZodEffects':
-      // z.coerce.* and z.preprocess() — unwrap to inner schema
-      return zodToGqlOutput(d.schema, typeName, cache);
-    case 'ZodOptional':
-    case 'ZodNullable': {
+    case 'pipe':
+      // .transform() / z.preprocess() — unwrap to the base schema
+      return zodToGqlOutput(d.in, typeName, cache);
+    case 'optional':
+    case 'nullable': {
       const inner = zodToGqlOutput(d.innerType, typeName, cache);
       return inner instanceof GraphQLNonNull ? (inner.ofType as GraphQLOutputType) : inner;
     }
-    case 'ZodArray': {
-      const inner = zodToGqlOutput(d.type, `${typeName}Item`, cache);
+    case 'array': {
+      const inner = zodToGqlOutput(d.element, `${typeName}Item`, cache);
       return new GraphQLNonNull(new GraphQLList(inner));
     }
-    case 'ZodObject': {
+    case 'object': {
       const cached = cache.get(typeName);
       if (cached) return new GraphQLNonNull(cached);
       const shape = resolveShape(d);
@@ -104,14 +106,14 @@ function zodToGqlOutput(schema: unknown, typeName: string, cache: OutputTypeCach
       cache.set(typeName, objectType);
       return new GraphQLNonNull(objectType);
     }
-    case 'ZodEnum': {
-      const valList = d.values ?? [];
+    case 'enum': {
+      const valList = Object.values(d.entries ?? {});
       const enumValues: Record<string, { value: string }> = {};
       for (const v of valList) enumValues[String(v)] = { value: String(v) };
       return new GraphQLNonNull(new GraphQLEnumType({ name: typeName, values: enumValues }));
     }
-    case 'ZodAny':
-    case 'ZodUnknown':
+    case 'any':
+    case 'unknown':
     default:
       return JSONScalar;
   }
@@ -119,28 +121,29 @@ function zodToGqlOutput(schema: unknown, typeName: string, cache: OutputTypeCach
 
 function zodToGqlInput(schema: unknown, typeName: string, cache: InputTypeCache): GraphQLInputType {
   const d = zodDef(schema);
-  switch (d.typeName) {
-    case 'ZodString': return new GraphQLNonNull(GraphQLString);
-    case 'ZodNumber': return new GraphQLNonNull(GraphQLFloat);
-    case 'ZodBoolean': return new GraphQLNonNull(GraphQLBoolean);
-    case 'ZodDefault': {
+  switch (d.type) {
+    case 'string': return new GraphQLNonNull(GraphQLString);
+    case 'number': return new GraphQLNonNull(GraphQLFloat);
+    case 'boolean': return new GraphQLNonNull(GraphQLBoolean);
+    case 'default':
+    case 'prefault': {
       // Unwrap default — field is optional in GraphQL (no NonNull)
       const inner = zodToGqlInput(d.innerType, typeName, cache);
       return inner instanceof GraphQLNonNull ? (inner.ofType as GraphQLInputType) : inner;
     }
-    case 'ZodEffects':
-      // z.coerce.* and z.preprocess() — unwrap to inner schema
-      return zodToGqlInput(d.schema, typeName, cache);
-    case 'ZodOptional':
-    case 'ZodNullable': {
+    case 'pipe':
+      // .transform() / z.preprocess() — unwrap to the base schema
+      return zodToGqlInput(d.in, typeName, cache);
+    case 'optional':
+    case 'nullable': {
       const inner = zodToGqlInput(d.innerType, typeName, cache);
       return inner instanceof GraphQLNonNull ? (inner.ofType as GraphQLInputType) : inner;
     }
-    case 'ZodArray': {
-      const inner = zodToGqlInput(d.type, `${typeName}Item`, cache);
+    case 'array': {
+      const inner = zodToGqlInput(d.element, `${typeName}Item`, cache);
       return new GraphQLNonNull(new GraphQLList(inner));
     }
-    case 'ZodObject': {
+    case 'object': {
       const cached = cache.get(typeName);
       if (cached) return new GraphQLNonNull(cached);
       const shape = resolveShape(d);
@@ -157,14 +160,14 @@ function zodToGqlInput(schema: unknown, typeName: string, cache: InputTypeCache)
       cache.set(typeName, inputType);
       return new GraphQLNonNull(inputType);
     }
-    case 'ZodEnum': {
-      const valList = d.values ?? [];
+    case 'enum': {
+      const valList = Object.values(d.entries ?? {});
       const enumValues: Record<string, { value: string }> = {};
       for (const v of valList) enumValues[String(v)] = { value: String(v) };
       return new GraphQLNonNull(new GraphQLEnumType({ name: `${typeName}Enum`, values: enumValues }));
     }
-    case 'ZodAny':
-    case 'ZodUnknown':
+    case 'any':
+    case 'unknown':
     default:
       return JSONScalar;
   }

@@ -53,7 +53,7 @@ No `req`/`res`. No `next()`. No middleware stack. The HTTP layer is an optional 
 ## Quick start
 
 ```bash
-npm install @capixjs/core @capixjs/transport-rest zod
+npm install @capixjs/core @capixjs/transport-rest zod@^4
 ```
 
 ```ts

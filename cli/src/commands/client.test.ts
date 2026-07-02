@@ -8,12 +8,12 @@ import { generateClient } from './client.js';
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeRegistry(caps: Record<string, Record<string, ReturnType<typeof capability>>>) {
+function makeRegistry(caps: Parameters<typeof compileRegistry>[0]) {
   return compileRegistry(caps);
 }
 
 function clientFor(
-  caps: Record<string, Record<string, ReturnType<typeof capability>>>,
+  caps: Parameters<typeof compileRegistry>[0],
   overrides: Record<string, HttpOverride> = {},
 ) {
   return generateClient(makeRegistry(caps), 'http://localhost:3000', overrides);

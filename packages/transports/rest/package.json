@@ -1,6 +1,6 @@
 {
   "name": "@capixjs/transport-rest",
-  "version": "0.1.0-alpha.13",
+  "version": "0.1.0-alpha.14",
   "description": "Capix HTTP/REST transport",
   "license": "MIT",
   "type": "module",
@@ -38,8 +38,7 @@
   "dependencies": {
     "busboy": "^1.6.0",
     "fast-json-stringify": "^6.4.0",
-    "zod": "^3.23.0",
-    "zod-to-json-schema": "^3.25.2"
+    "zod": "^4.0.0"
   },
   "peerDependencies": {
     "@capixjs/core": ">=0.1.0-0"

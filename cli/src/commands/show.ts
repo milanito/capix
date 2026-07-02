@@ -32,8 +32,8 @@ export function registerShow(program: Command): void {
       if (cap.inputSchema) {
         print.blank();
         print.bold('Input schema:');
-        const schema = cap.inputSchema as { _def?: { typeName?: string; shape?: () => Record<string, unknown> } };
-        const shape = schema._def?.typeName === 'ZodObject' ? schema._def.shape?.() : undefined;
+        const def = (cap.inputSchema as { _zod?: { def?: { type?: string; shape?: Record<string, unknown> } } })._zod?.def;
+        const shape = def?.type === 'object' ? def.shape : undefined;
         if (shape) {
           for (const [field, def] of Object.entries(shape)) {
             print.item(`  ${field}`, zodSchemaToString(def));

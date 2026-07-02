@@ -54,8 +54,8 @@ describe('zodSchemaToString — collections', () => {
   it('z.object({}) → "{}"', () =>
     expect(zodSchemaToString(z.object({}))).toBe('{}'));
 
-  it('z.record(z.string()) → "Record<string, string>"', () =>
-    expect(zodSchemaToString(z.record(z.string()))).toBe('Record<string, string>'));
+  it('z.record(z.string(), z.string()) → "Record<string, string>"', () =>
+    expect(zodSchemaToString(z.record(z.string(), z.string()))).toBe('Record<string, string>'));
 
   it('z.tuple([z.string(), z.number()]) → "[string, number]"', () =>
     expect(zodSchemaToString(z.tuple([z.string(), z.number()]))).toBe('[string, number]'));

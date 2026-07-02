@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "jsonwebtoken": "^9.0.0",
-    "zod": "^3.23.0",
+    "zod": "^4.0.0",
     "@capixjs/transport-rest": "workspace:*",
     "@capixjs/core": "workspace:*"
   },

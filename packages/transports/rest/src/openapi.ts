@@ -16,7 +16,7 @@
  *   capix openapi --output openapi.json
  */
 
-import { zodToJsonSchema } from 'zod-to-json-schema';
+import { z } from 'zod';
 import type { CapabilityRegistry } from '@capixjs/core';
 import { generateRoutes } from './router.js';
 import type { HttpOverride } from './router.js';
@@ -67,12 +67,18 @@ function errorRef(description: string): Record<string, unknown> {
   };
 }
 
-/** Converts a Zod schema to JSON Schema; null when conversion fails. */
-function toJsonSchema(schema: unknown): JsonSchema | null {
+/**
+ * Converts a Zod schema to JSON Schema; null when conversion fails.
+ * Targets draft 2020-12 — the dialect OpenAPI 3.1 uses natively.
+ * `io` picks the schema side: 'input' for request schemas (fields with
+ * defaults become optional), 'output' for response schemas.
+ */
+function toJsonSchema(schema: unknown, io: 'input' | 'output'): JsonSchema | null {
   try {
-    const js = zodToJsonSchema(schema as Parameters<typeof zodToJsonSchema>[0], {
-      target: 'jsonSchema7',
-      $refStrategy: 'none',
+    const js = z.toJSONSchema(schema as z.ZodType, {
+      io,
+      reused: 'inline',
+      unrepresentable: 'any',
     }) as JsonSchema;
     delete js['$schema'];
     return js;
@@ -115,7 +121,7 @@ export function generateOpenAPI(
     const params = pathParamNames(route.path);
     const paramSet = new Set(params);
 
-    const inputJs = cap.inputSchema !== null ? toJsonSchema(cap.inputSchema) : null;
+    const inputJs = cap.inputSchema !== null ? toJsonSchema(cap.inputSchema, 'input') : null;
     const properties = (inputJs?.['properties'] ?? {}) as Record<string, JsonSchema>;
     const requiredFields = new Set((inputJs?.['required'] ?? []) as string[]);
     // Object schemas split into parameters/body; non-object schemas (z.record,
@@ -174,7 +180,7 @@ export function generateOpenAPI(
       };
     }
 
-    const outputJs = cap.outputSchema !== null ? toJsonSchema(cap.outputSchema) : null;
+    const outputJs = cap.outputSchema !== null ? toJsonSchema(cap.outputSchema, 'output') : null;
 
     const responses: Record<string, unknown> = {
       '200': {

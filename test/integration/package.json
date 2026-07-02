@@ -7,7 +7,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "zod": "^3.23.0",
+    "zod": "^4.0.0",
     "@capixjs/transport-rest": "workspace:*",
     "@capixjs/transport-ws": "workspace:*",
     "@capixjs/plugin-cors": "workspace:*",

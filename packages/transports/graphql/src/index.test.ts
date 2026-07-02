@@ -15,7 +15,7 @@ function makeInvoke(response: CapabilityResponse): InvokeFn {
 }
 
 function makeSchema(
-  caps: Record<string, Record<string, ReturnType<typeof capability>>>,
+  caps: Parameters<typeof compileRegistry>[0],
   invoke: InvokeFn,
 ) {
   const registry = compileRegistry(caps);
