@@ -184,7 +184,7 @@ jobs:
             pkg.dependencies = {
               '@capixjs/core':           'file:$GITHUB_WORKSPACE/packages/core',
               '@capixjs/transport-rest': 'file:$GITHUB_WORKSPACE/packages/transports/rest',
-              'zod': '^3.23.0',
+              'zod': '^4.0.0',
             };
             pkg.devDependencies = {
               'typescript': '^5.4.0',

@@ -6,7 +6,7 @@ export type NewProjectOptions = {
 export function renderPackageJson(opts: NewProjectOptions): string {
   const deps: Record<string, string> = {
     '@capixjs/core': 'alpha',
-    zod: '^3.23.0',
+    zod: '^4.0.0',
   };
 
   if (opts.transport === 'rest' || opts.transport === 'both') {

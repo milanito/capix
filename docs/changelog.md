@@ -16,6 +16,7 @@
     `z.record(z.unknown())` → `z.record(z.string(), z.unknown())`
   - Validation error messages follow Zod 4's format (e.g.
     `Invalid input: expected string, received number`)
+  - `capix new` scaffolds new projects with `zod@^4`
 
 ### Fixed
 - **npm `latest` tag now tracks the newest release.** `npm install
