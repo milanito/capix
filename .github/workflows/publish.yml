@@ -107,6 +107,22 @@ jobs:
           publish_pkg packages/plugins/auth
           publish_pkg cli
 
+      # Until the first stable release, `latest` tracks the newest prerelease.
+      # Without this, `npm install @capixjs/core` resolves to whichever version
+      # grabbed `latest` first (--tag alpha publishes never move it).
+      - name: Point latest at the newest release
+        if: steps.tag.outputs.tag != 'latest'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          VERSION="${{ needs.check-version.outputs.version }}"
+          for pkg in @capixjs/core @capixjs/transport-rest @capixjs/transport-ws \
+                     @capixjs/transport-graphql @capixjs/transport-queue \
+                     @capixjs/testing @capixjs/plugin-cors @capixjs/plugin-helmet \
+                     @capixjs/plugin-logging @capixjs/plugin-auth @capixjs/cli; do
+            npm dist-tag add "$pkg@$VERSION" latest
+          done
+
       - name: Verify published packages work
         run: |
           mkdir /tmp/npm-verify && cd /tmp/npm-verify
