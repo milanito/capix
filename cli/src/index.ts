@@ -9,6 +9,7 @@ import { registerCall } from './commands/call.js';
 import { registerCheck } from './commands/check.js';
 import { registerDocs } from './commands/docs.js';
 import { registerClient } from './commands/client.js';
+import { registerOpenapi } from './commands/openapi.js';
 import { registerDiff } from './commands/diff.js';
 import { registerAiContext } from './commands/ai-context.js';
 
@@ -28,6 +29,7 @@ registerCall(program);
 registerCheck(program);
 registerDocs(program);
 registerClient(program);
+registerOpenapi(program);
 registerDiff(program);
 registerAiContext(program);
 

@@ -372,10 +372,10 @@ Capix's REST transport trails Fastify by ~3% in a hello-world microbenchmark and
 | Hono | 23,970 | 21,365 |
 | Express | 16,632 | 16,239 |
 
-## 497 tests passing
+## 511 tests passing
 
 ```
-pnpm -r test  →  497 tests, 0 failures
+pnpm -r test  →  511 tests, 0 failures
 ```
 
 ## CLI
@@ -392,6 +392,7 @@ npm install -g @capixjs/cli
 | `capix docs` | Print capability docs as Markdown |
 | `capix generate capability <group> <name>` | Generate a capability file |
 | `capix client` | Generate a typed fetch client |
+| `capix openapi` | Generate an OpenAPI 3.1 spec |
 
 See [docs/cli.md](docs/cli.md) for all commands.
 

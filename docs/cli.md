@@ -157,6 +157,30 @@ Generate a typed TypeScript fetch client from your capability registry.
 capix client --output src/client.ts
 ```
 
+### `capix openapi`
+
+Generate an OpenAPI 3.1 specification from your capability registry. Routes, parameters, request bodies, and response schemas are derived from the same route inference the REST transport uses, so the spec matches the running server.
+
+```bash
+capix openapi                                  # print to stdout
+capix openapi --output openapi.json            # write to file
+capix openapi --title "My API" --api-version 1.2.0 --server https://api.example.com
+```
+
+Options:
+
+| Flag | Description |
+|---|---|
+| `--config <path>` | Path to capabilities file |
+| `--output <file>` | Write the spec to a file instead of stdout |
+| `--title <title>` | API title (default `Capix API`) |
+| `--api-version <version>` | API version string (default `0.1.0`) |
+| `--description <text>` | API description |
+| `--server <url>` | Server URL to include in the spec |
+| `--url-case <case>` | URL segment case: `kebab` \| `camel` \| `snake` — must match your `restTransport` config |
+
+The spec is also available programmatically via `generateOpenAPI(registry, options)` from `@capixjs/transport-rest` — useful for serving it from an endpoint or feeding Swagger UI.
+
 ---
 
 ## Comparison

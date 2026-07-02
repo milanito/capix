@@ -131,6 +131,26 @@ restTransport({ port: 3000, urlCase: 'snake' }) // bulkStatus → bulk_status
 restTransport({ port: 3000, urlCase: 'camel' }) // bulkStatus → bulkStatus
 ```
 
+## OpenAPI generation
+
+Generate an OpenAPI 3.1 spec from a compiled registry with `generateOpenAPI`. It reuses the transport's route inference, so paths, methods, parameters, and bodies match the running server exactly:
+
+```ts
+import { compileRegistry } from '@capixjs/core';
+import { generateOpenAPI } from '@capixjs/transport-rest';
+
+const registry = compileRegistry({ users: { getUser, createUser } });
+const spec = generateOpenAPI(registry, {
+  title: 'My API',
+  version: '1.2.0',
+  servers: [{ url: 'https://api.example.com' }],
+});
+```
+
+Pass the same `urlCase` and `overrides` you give `restTransport` so the generated paths line up. Path parameters, query parameters (for GET/DELETE), JSON request bodies (for POST/PATCH/PUT), the `{ data }` response envelope, and the error response shape are all derived from your Zod schemas.
+
+The CLI wraps this as [`capix openapi`](../cli.md#capix-openapi).
+
 ## CORS
 
 ```ts

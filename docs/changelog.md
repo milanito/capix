@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.1.0-alpha.13 — 2026-07-02
+
+### Added
+- **OpenAPI 3.1 generation.** New `generateOpenAPI(registry, options)` export in
+  `@capixjs/transport-rest` builds an OpenAPI 3.1 document from a compiled
+  registry using the same route inference as the running server: path
+  parameters from `:id` segments, query parameters for GET/DELETE, JSON
+  request bodies for POST/PATCH/PUT (with required lists derived from the Zod
+  schema), the `{ data }` response envelope, per-operation `400` responses for
+  schema-validated capabilities, and a shared `ErrorResponse` component.
+  Supports `title`, `version`, `description`, `servers`, `urlCase`, and route
+  `overrides`
+- **New CLI command: `capix openapi`.** Generates the spec from your
+  capabilities file and prints it to stdout or writes it with `--output`.
+  Flags: `--config`, `--title`, `--api-version`, `--description`, `--server`,
+  `--url-case`
+
+---
+
 ## 0.1.0-alpha.12 — 2026-06-12
 
 ### Changed
