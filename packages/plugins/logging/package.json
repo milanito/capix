@@ -1,6 +1,6 @@
 {
   "name": "@capixjs/plugin-logging",
-  "version": "0.1.0-alpha.18",
+  "version": "0.1.0-alpha.19",
   "description": "Structured request logging plugin for Capix using pino",
   "license": "MIT",
   "type": "module",
@@ -29,7 +29,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -41,6 +41,8 @@
   "devDependencies": {
     "@types/node": "^20.0.0",
     "typescript": "^5.5.0",
-    "@capixjs/core": "workspace:*"
+    "@capixjs/core": "workspace:*",
+    "vitest": "^1.6.0",
+    "zod": "^4.0.0"
   }
 }

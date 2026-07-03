@@ -1,6 +1,6 @@
 {
   "name": "@capixjs/testing",
-  "version": "0.1.0-alpha.18",
+  "version": "0.1.0-alpha.19",
   "description": "Capix testing utilities",
   "license": "MIT",
   "type": "module",
@@ -29,7 +29,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

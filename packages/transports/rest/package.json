@@ -1,6 +1,6 @@
 {
   "name": "@capixjs/transport-rest",
-  "version": "0.1.0-alpha.18",
+  "version": "0.1.0-alpha.19",
   "description": "Capix HTTP/REST transport",
   "license": "MIT",
   "type": "module",

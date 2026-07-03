@@ -9,6 +9,42 @@ on:
   workflow_call:
 
 jobs:
+  # Verify the engines range we publish (node >=20) on the versions we claim,
+  # and keep an eye on Windows. Windows is non-blocking until it has a track
+  # record — an untested platform must not wedge the release pipeline.
+  test-matrix:
+    name: Tests (Node ${{ matrix.node }} on ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    continue-on-error: ${{ matrix.experimental }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest,  node: 20, experimental: false }
+          - { os: ubuntu-latest,  node: 24, experimental: false }
+          - { os: windows-latest, node: 22, experimental: true }
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build all packages
+        run: pnpm build
+
+      - name: Run test suite
+        run: pnpm test
+
   audit:
     name: Full pre-publish audit
     runs-on: ubuntu-latest
@@ -44,6 +80,7 @@ jobs:
         run: |
           for pkg in packages/core packages/transports/rest packages/transports/ws \
                      packages/transports/graphql packages/transports/queue \
+                     packages/transports/mcp \
                      packages/testing packages/plugins/cors packages/plugins/helmet \
                      packages/plugins/logging packages/plugins/auth cli; do
             echo "Checking $pkg..."
@@ -57,6 +94,7 @@ jobs:
           FAILED=0
           for pkg in packages/core packages/transports/rest packages/transports/ws \
                      packages/transports/graphql packages/transports/queue \
+                     packages/transports/mcp \
                      packages/testing packages/plugins/cors packages/plugins/helmet \
                      packages/plugins/logging packages/plugins/auth cli; do
             name=$(node -p "require('./$pkg/package.json').name")
@@ -75,6 +113,7 @@ jobs:
           FAILED=0
           for pkg in packages/transports/rest packages/transports/ws \
                      packages/transports/graphql packages/transports/queue \
+                     packages/transports/mcp \
                      packages/testing packages/plugins/cors packages/plugins/helmet \
                      packages/plugins/logging packages/plugins/auth cli; do
             ver=$(node -p "require('./$pkg/package.json').version")
@@ -93,6 +132,7 @@ jobs:
           # Packages that peer on @capixjs/core
           for pkg in packages/transports/rest packages/transports/ws \
                      packages/transports/graphql packages/transports/queue \
+                     packages/transports/mcp \
                      packages/testing packages/plugins/logging packages/plugins/auth; do
             peer=$(node -p "require('./$pkg/package.json').peerDependencies?.['@capixjs/core'] || ''")
             if [[ "$peer" != *"-0"* ]]; then
@@ -119,6 +159,7 @@ jobs:
           FAILED=0
           for pkg in packages/core packages/transports/rest packages/transports/ws \
                      packages/transports/graphql packages/transports/queue \
+                     packages/transports/mcp \
                      packages/testing packages/plugins/cors packages/plugins/helmet \
                      packages/plugins/logging packages/plugins/auth cli; do
             [ -f "$pkg/LICENSE" ]   || { echo "✗ $pkg: missing LICENSE";   FAILED=1; }
@@ -132,6 +173,7 @@ jobs:
           FAILED=0
           for pkg in packages/core packages/transports/rest packages/transports/ws \
                      packages/transports/graphql packages/transports/queue \
+                     packages/transports/mcp \
                      packages/testing packages/plugins/cors packages/plugins/helmet \
                      packages/plugins/logging packages/plugins/auth cli; do
             cd "$pkg"

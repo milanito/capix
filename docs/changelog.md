@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.1.0-alpha.19 — 2026-07-03
+
+### Added
+- **Every package now has tests.** `plugin-cors`, `plugin-helmet`,
+  `plugin-logging`, and `@capixjs/testing` shipped with zero tests (two of
+  them hid behind `--passWithNoTests`); they now have 27 tests covering
+  origin matching and Vary handling, security header defaults/overrides and
+  `mergeHooks`, the logging enhancer's success/error paths and
+  input/output redaction defaults, and the full `testServer` surface
+- **CI now tests the Node versions we claim.** The audit workflow gained a
+  matrix: Node 20 and 24 on Ubuntu (blocking — `engines` promises `>=20`
+  but only 22 was ever tested) and Node 22 on Windows (non-blocking until
+  it has a track record)
+
+### Fixed
+- The pre-publish audit's typecheck, version-consistency, peer-dependency,
+  LICENSE/README, and pack-integrity checks never included
+  `@capixjs/transport-mcp` — it is now covered by all of them
+
+---
+
 ## 0.1.0-alpha.18 — 2026-07-03
 
 ### Added
