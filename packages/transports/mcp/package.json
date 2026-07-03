@@ -1,6 +1,6 @@
 {
   "name": "@capixjs/transport-mcp",
-  "version": "0.1.0-alpha.21",
+  "version": "0.1.0-alpha.22",
   "description": "Capix MCP transport — expose capabilities as Model Context Protocol tools",
   "license": "MIT",
   "type": "module",

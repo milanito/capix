@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.1.0-alpha.22 — 2026-07-03
+
+### Added
+- **RS256 and JWKS verification in `@capixjs/plugin-auth`.** All auth entry
+  points now accept exactly one of: `secret` (HS family, as before),
+  `publicKey`/`privateKey` PEM pair (RS/ES/PS families), or
+  `jwks: { url }` — verify against an issuer's JWKS endpoint (Auth0,
+  Clerk, Cognito, Keycloak) with kid-based key resolution, a cached key
+  set, rate-limited refetch on rotation, and stale-serving when the
+  endpoint is down. No new dependencies — JWK conversion uses Node's
+  native crypto
+
+### Security
+- **Verification algorithms are now always pinned.** `jwt.verify` was
+  called without an `algorithms` list; each mode now pins its family
+  (HS for `secret`, RS/ES/PS for keys and JWKS), rejecting
+  algorithm-confusion tokens such as an HS256 token signed with the
+  RS256 public key as its secret
+
+---
+
 ## 0.1.0-alpha.21 — 2026-07-03
 
 ### Added

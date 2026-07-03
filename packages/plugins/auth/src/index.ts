@@ -3,17 +3,47 @@ import { defineGuard, defaultErrors, defineContext } from '@capixjs/core';
 import type { BaseContext, RawRequest, ContextBuilder } from '@capixjs/core';
 import { JWTCache } from './jwt-cache.js';
 import type { JWTCacheOptions } from './jwt-cache.js';
+import { JwksKeyResolver } from './jwks.js';
+import type { JwksOptions } from './jwks.js';
 
-export { JWTCache };
-export type { JWTCacheOptions };
+export { JWTCache, JwksKeyResolver };
+export type { JWTCacheOptions, JwksOptions };
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
+const HS_ALGORITHMS: jwt.Algorithm[] = ['HS256', 'HS384', 'HS512'];
+const ASYMMETRIC_ALGORITHMS: jwt.Algorithm[] = ['RS256', 'RS384', 'RS512', 'ES256', 'ES384', 'ES512', 'PS256', 'PS384', 'PS512'];
+
 export type JWTAuthOptions<TUser> = {
-  /** Secret used to sign and verify tokens. */
-  readonly secret: string;
+  /**
+   * Shared secret for HS256-family sign and verify.
+   * Provide exactly one of `secret`, `publicKey`, or `jwks`.
+   */
+  readonly secret?: string;
+  /**
+   * PEM-encoded public key for RS/ES/PS-family verification.
+   * Pair with `privateKey` to also sign tokens.
+   */
+  readonly publicKey?: string;
+  /** PEM-encoded private key for signing when using `publicKey`. */
+  readonly privateKey?: string;
+  /**
+   * Verify against an issuer's JWKS endpoint (Auth0, Clerk, Cognito,
+   * Keycloak, ...). Keys are resolved by the token's `kid` header and
+   * cached; rotation triggers a rate-limited refetch. Verify-only —
+   * the issuer holds the private keys.
+   */
+  readonly jwks?: JwksOptions;
+  /**
+   * Accepted verification algorithms. Always pinned — a token whose `alg`
+   * is not in this list is rejected, which blocks algorithm-confusion
+   * attacks (e.g. an RS256 public key replayed as an HS256 secret).
+   * Defaults: HS256/384/512 for `secret`; RS/ES/PS families for
+   * `publicKey` and `jwks`.
+   */
+  readonly algorithms?: readonly jwt.Algorithm[];
   /** Token expiry passed to jwt.sign (e.g. '7d', 3600). Defaults to '7d'. */
   readonly expiresIn?: string | number;
   /**
@@ -53,6 +83,7 @@ export type AuthenticatedContext<TUser> = BaseContext & {
 export type JWTHelpers<TUser> = {
   /**
    * Sign a payload and return a JWT string.
+   * Throws for JWKS-configured helpers — the issuer holds the private keys.
    */
   sign(payload: jwt.JwtPayload): string;
   /**
@@ -77,18 +108,56 @@ export type JWTHelpers<TUser> = {
  * const token = jwt.sign({ sub: user.id, role: user.role });
  */
 export function createJWTHelpers<TUser>(options: JWTAuthOptions<TUser>): JWTHelpers<TUser> {
-  const { secret, expiresIn = '7d', userFromToken } = options;
+  const { secret, publicKey, privateKey, jwks, expiresIn = '7d', userFromToken } = options;
+
+  const modes = [secret, publicKey, jwks].filter((m) => m !== undefined).length;
+  if (modes !== 1) {
+    throw new Error(
+      "[capix:auth] Provide exactly one of 'secret' (HS256), 'publicKey' (RS/ES/PS), or 'jwks' (issuer endpoint).",
+    );
+  }
+
+  const algorithms = [...(options.algorithms ?? (secret !== undefined ? HS_ALGORITHMS : ASYMMETRIC_ALGORITHMS))];
+  const jwksResolver = jwks !== undefined ? new JwksKeyResolver(jwks) : null;
 
   const verifyCache: JWTCache<TUser | null> | null = options.cache
     ? new JWTCache<TUser | null>(typeof options.cache === 'object' ? options.cache : {})
     : null;
 
+  const signOptions = (alg?: jwt.Algorithm): jwt.SignOptions => ({
+    ...(alg !== undefined ? { algorithm: alg } : {}),
+    ...(expiresIn !== undefined ? { expiresIn: expiresIn as jwt.SignOptions['expiresIn'] & {} } : {}),
+  });
+
+  async function verifyToken(token: string): Promise<jwt.JwtPayload> {
+    if (secret !== undefined) {
+      return jwt.verify(token, secret, { algorithms }) as jwt.JwtPayload;
+    }
+    if (publicKey !== undefined) {
+      return jwt.verify(token, publicKey, { algorithms }) as jwt.JwtPayload;
+    }
+    // JWKS — resolve the key by the token's kid header
+    const decoded = jwt.decode(token, { complete: true });
+    const kid = decoded?.header.kid;
+    if (typeof kid !== 'string') throw new Error('token has no kid header');
+    const key = await jwksResolver!.getKey(kid);
+    if (key === null) throw new Error(`no JWKS key for kid '${kid}'`);
+    return jwt.verify(token, key, { algorithms }) as jwt.JwtPayload;
+  }
+
   return {
     sign(payload) {
-      if (expiresIn !== undefined) {
-        return jwt.sign(payload, secret, { expiresIn: expiresIn as jwt.SignOptions['expiresIn'] & {} });
+      if (secret !== undefined) {
+        return jwt.sign(payload, secret, signOptions());
       }
-      return jwt.sign(payload, secret);
+      if (privateKey !== undefined) {
+        const alg = (options.algorithms?.[0] ?? 'RS256') as jwt.Algorithm;
+        return jwt.sign(payload, privateKey, signOptions(alg));
+      }
+      throw new Error(
+        '[capix:auth] Cannot sign: JWKS-configured helpers are verify-only (the issuer holds the private keys). ' +
+        "Provide 'privateKey' with 'publicKey', or use 'secret'.",
+      );
     },
 
     async verify(token) {
@@ -97,7 +166,7 @@ export function createJWTHelpers<TUser>(options: JWTAuthOptions<TUser>): JWTHelp
         if (cached !== undefined) return cached;
       }
       try {
-        const payload = jwt.verify(token, secret) as jwt.JwtPayload;
+        const payload = await verifyToken(token);
         const user = await userFromToken(payload);
         verifyCache?.set(token, user);
         return user;
@@ -200,21 +269,11 @@ export function authPlugin<TUser>(options: JWTAuthOptions<TUser>): {
 // jwtContextBuilder — standalone ContextBuilder with optional extra context
 // ---------------------------------------------------------------------------
 
-export type JWTContextBuilderOptions<TUser, TExtra extends Record<string, unknown> = Record<never, never>> = {
-  /** JWT signing secret. */
-  readonly secret: string;
-  /** Token expiry for jwt.sign. Defaults to '7d'. */
-  readonly expiresIn?: string | number;
-  /** Extract user from verified token payload. Return null for unauthenticated. */
-  readonly userFromToken: (payload: jwt.JwtPayload) => TUser | null | Promise<TUser | null>;
-  /** Build additional context fields from the raw request. Called once per request. */
-  readonly extraContext?: (req: RawRequest) => TExtra | Promise<TExtra>;
-  /**
-   * Enable in-memory caching of JWT verification results. See {@link JWTAuthOptions.cache}
-   * for the full security tradeoff documentation.
-   */
-  readonly cache?: boolean | JWTCacheOptions;
-};
+export type JWTContextBuilderOptions<TUser, TExtra extends Record<string, unknown> = Record<never, never>> =
+  JWTAuthOptions<TUser> & {
+    /** Build additional context fields from the raw request. Called once per request. */
+    readonly extraContext?: (req: RawRequest) => TExtra | Promise<TExtra>;
+  };
 
 /**
  * Builds a full `ContextBuilder` that handles JWT verification and any additional

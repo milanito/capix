@@ -1,6 +1,6 @@
 {
   "name": "@capixjs/store-redis",
-  "version": "0.1.0-alpha.21",
+  "version": "0.1.0-alpha.22",
   "description": "Redis-backed cache and rate-limit stores for Capix enhancers",
   "license": "MIT",
   "type": "module",

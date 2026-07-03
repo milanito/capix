@@ -169,3 +169,30 @@ const user = await jwt.verify(token);
 ```
 
 Tokens are cached after first verification (LRU, 500 entries by default). The cache is cleared when a token expires.
+
+## RS256 and JWKS (Auth0, Clerk, Cognito, Keycloak)
+
+Every auth entry point (`authPlugin`, `jwtContextBuilder`, `createJWTHelpers`) accepts exactly one of three verification modes:
+
+```ts
+// 1. Shared secret — HS256 family (sign + verify)
+{ secret: process.env.JWT_SECRET! }
+
+// 2. PEM key pair — RS/ES/PS families (verify; sign too if privateKey given)
+{ publicKey: PUBLIC_PEM, privateKey: PRIVATE_PEM }
+
+// 3. Issuer JWKS endpoint — verify-only, keys resolved by the token's kid
+{ jwks: { url: 'https://your-tenant.auth0.com/.well-known/jwks.json' } }
+```
+
+With `jwks`, the key set is fetched once and cached (10 minutes by default); an unknown `kid` triggers a rate-limited refetch, so issuer key rotation works without restarts, and a flood of forged tokens cannot hammer the endpoint. If the endpoint goes down, the previously fetched keys keep serving.
+
+```ts
+export const buildContext = jwtContextBuilder<AppUser, { db: DB }>({
+  jwks: { url: `https://${process.env.AUTH0_DOMAIN}/.well-known/jwks.json` },
+  userFromToken: async (payload) => db.users.bySub(payload['sub'] as string),
+  extraContext: async () => ({ db }),
+});
+```
+
+Verification algorithms are always pinned (HS family for `secret`, RS/ES/PS families for keys and JWKS) — a token whose `alg` header falls outside the configured family is rejected, which blocks algorithm-confusion attacks. Override with `algorithms` if you need to narrow further (e.g. `['RS256']`).
