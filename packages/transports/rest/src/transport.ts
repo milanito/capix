@@ -10,6 +10,7 @@
 
 import * as http from 'node:http';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { closeHttpServerGracefully } from '@capixjs/core';
 import type { Transport, MountOptions, InvokeFn, CapabilityResponse, GroupTree, TransportWithCapabilities } from '@capixjs/core';
 import { compileRouter, generateRoutes } from './router.js';
 import type { Router, HttpOverride } from './router.js';
@@ -67,6 +68,12 @@ export type RestTransportOptions = {
    * Use to prevent non-REST capabilities from getting HTTP endpoints.
    */
   readonly capabilities?: GroupTree;
+  /**
+   * How long unmount() waits for in-flight requests before force-closing
+   * their connections, in milliseconds. Idle keep-alive connections are
+   * dropped immediately. Default: 10_000.
+   */
+  readonly shutdownTimeoutMs?: number;
 };
 
 /** Creates a REST transport using node:http. */
@@ -428,13 +435,10 @@ export function restTransport(options: RestTransportOptions): TransportWithCapab
     },
 
     async unmount(): Promise<void> {
-      return new Promise((resolve, reject) => {
-        if (!server) return resolve();
-        server.close((err) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      });
+      if (!server) return;
+      const s = server;
+      server = null;
+      await closeHttpServerGracefully(s, options.shutdownTimeoutMs ?? 10_000);
     },
   };
 }

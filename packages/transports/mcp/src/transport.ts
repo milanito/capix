@@ -16,6 +16,7 @@ import * as http from 'node:http';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { closeHttpServerGracefully } from '@capixjs/core';
 import type { Transport, MountOptions, InvokeFn, GroupTree, TransportWithCapabilities } from '@capixjs/core';
 import { buildMcpServer } from './server-builder.js';
 import type { McpServerOptions } from './server-builder.js';
@@ -35,6 +36,11 @@ export type McpTransportOptions = McpServerOptions & {
   readonly path?: string;
   /** Capability registry for this transport only. Overrides the server-level default. */
   readonly capabilities?: GroupTree;
+  /**
+   * How long unmount() waits for in-flight requests before force-closing
+   * their connections in http mode, in milliseconds. Default: 10_000.
+   */
+  readonly shutdownTimeoutMs?: number;
 };
 
 export function mcpTransport(options: McpTransportOptions = {}): TransportWithCapabilities {
@@ -110,14 +116,10 @@ export function mcpTransport(options: McpTransportOptions = {}): TransportWithCa
         await stdioServer.close();
         stdioServer = null;
       }
-      return new Promise((resolve, reject) => {
-        if (!httpServer) return resolve();
-        httpServer.close((err) => {
-          if (err) reject(err);
-          else resolve();
-        });
-        httpServer = null;
-      });
+      if (!httpServer) return;
+      const s = httpServer;
+      httpServer = null;
+      await closeHttpServerGracefully(s, options.shutdownTimeoutMs ?? 10_000);
     },
   };
 }

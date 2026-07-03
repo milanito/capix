@@ -8,6 +8,7 @@
 import * as http from 'node:http';
 import { createHandler } from 'graphql-http/lib/use/node';
 import { buildGraphQLSchema } from './schema-builder.js';
+import { closeHttpServerGracefully } from '@capixjs/core';
 import type { Transport, MountOptions, InvokeFn, GroupTree, TransportWithCapabilities } from '@capixjs/core';
 
 export type GraphQLTransportOptions = {
@@ -22,6 +23,11 @@ export type GraphQLTransportOptions = {
   readonly playground?: boolean;
   /** Capability registry for this transport only. Overrides the server-level default. */
   readonly capabilities?: GroupTree;
+  /**
+   * How long unmount() waits for in-flight requests before force-closing
+   * their connections, in milliseconds. Default: 10_000.
+   */
+  readonly shutdownTimeoutMs?: number;
 };
 
 function playgroundHtml(endpoint: string): string {
@@ -115,13 +121,10 @@ export function graphqlTransport(options: GraphQLTransportOptions): TransportWit
     },
 
     async unmount(): Promise<void> {
-      return new Promise((resolve, reject) => {
-        if (!server) return resolve();
-        server.close((err) => {
-          if (err) reject(err);
-          else resolve();
-        });
-      });
+      if (!server) return;
+      const s = server;
+      server = null;
+      await closeHttpServerGracefully(s, options.shutdownTimeoutMs ?? 10_000);
     },
   };
 }

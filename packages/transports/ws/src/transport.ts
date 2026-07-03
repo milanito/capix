@@ -16,6 +16,11 @@ export type WsTransportOptions = {
   readonly eventBus?: EventBus<EventMap>;
   /** Capability registry for this transport only. Overrides the server-level default. */
   readonly capabilities?: GroupTree;
+  /**
+   * How long unmount() waits for clients to complete the close handshake
+   * before terminating their sockets, in milliseconds. Default: 10_000.
+   */
+  readonly shutdownTimeoutMs?: number;
 };
 
 type IncomingMessage_ =
@@ -134,9 +139,26 @@ export function wsTransport(options: WsTransportOptions): TransportWithCapabilit
     },
 
     async unmount(): Promise<void> {
-      return new Promise((resolve, reject) => {
-        if (!wss) return resolve();
-        wss.close((err) => {
+      if (!wss) return;
+      const server = wss;
+      wss = null;
+
+      // Ask every client to close cleanly (1001 = going away). wss.close()
+      // only stops accepting connections — its callback waits for clients,
+      // so without this the shutdown would hang on any connected client.
+      for (const client of server.clients) {
+        client.close(1001, 'Server shutting down');
+      }
+
+      // Terminate stragglers that never finish the close handshake
+      const timer = setTimeout(() => {
+        for (const client of server.clients) client.terminate();
+      }, options.shutdownTimeoutMs ?? 10_000);
+      timer.unref();
+
+      await new Promise<void>((resolve, reject) => {
+        server.close((err) => {
+          clearTimeout(timer);
           if (err) reject(err);
           else resolve();
         });

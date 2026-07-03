@@ -181,3 +181,33 @@ describe('wsTransport with eventBus', () => {
     client.close();
   });
 });
+
+describe('graceful shutdown', () => {
+  it('closes connected clients with 1001 going-away and unmount resolves', async () => {
+    const p = nextPort();
+    const server = await makeServer(p);
+    const ws = await connect(p);
+
+    const closed = new Promise<{ code: number; reason: string }>((resolve) => {
+      ws.once('close', (code, reason) => resolve({ code, reason: reason.toString() }));
+    });
+
+    const started = Date.now();
+    await server.stop();
+    const elapsed = Date.now() - started;
+
+    const { code, reason } = await closed;
+    expect(code).toBe(1001);
+    expect(reason).toBe('Server shutting down');
+    // A connected client must not stall shutdown for the full drain window
+    expect(elapsed).toBeLessThan(5000);
+  });
+
+  it('unmount resolves with no clients connected', async () => {
+    const p = nextPort();
+    const server = await makeServer(p);
+    await server.stop();
+    // Second stop is a no-op, not a hang or throw
+    await server.stop();
+  });
+});

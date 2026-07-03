@@ -54,6 +54,7 @@ export type {
 
 // Execution engine
 export { createExecutionEngine } from './execution-engine.js';
+export { closeHttpServerGracefully } from './http-shutdown.js';
 export type {
   CapabilityRequest,
   CapabilityResponse,

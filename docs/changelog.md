@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.0-alpha.17 — 2026-07-03
+
+### Added
+- **Graceful shutdown on every transport.** `server.stop()` now drains
+  instead of dropping: the HTTP transports (REST, GraphQL, MCP) stop
+  accepting connections, drop idle keep-alive sockets immediately, give
+  in-flight requests a drain window, then force-close stragglers — before
+  this, a single keep-alive connection made `stop()` hang forever. The
+  WebSocket transport sends clients a clean `1001` close frame and
+  terminates sockets that never finish the handshake. New per-transport
+  option: `shutdownTimeoutMs` (default `10_000`)
+- **New core export: `closeHttpServerGracefully(server, drainMs)`** —
+  the shared drain sequence, for custom HTTP transports
+
+---
+
 ## 0.1.0-alpha.16 — 2026-07-03
 
 ### Changed

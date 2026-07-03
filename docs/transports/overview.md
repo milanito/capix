@@ -55,6 +55,30 @@ createServer({
 
 If every transport specifies its own `capabilities`, the top-level field can be omitted. Capix throws at startup if a transport has no capabilities and no server-level default is provided.
 
+## Graceful shutdown
+
+`server.stop()` drains every transport instead of dropping connections:
+
+- **HTTP transports (REST, GraphQL, MCP)** stop accepting new connections, drop idle keep-alive sockets immediately, give in-flight requests a drain window, then force-close whatever remains.
+- **WebSocket** sends every client a clean close frame (`1001` going away) and terminates sockets that never finish the close handshake.
+- **Queue** adapters finish the jobs they are processing before workers close.
+
+The drain window is `shutdownTimeoutMs` on each transport (default `10_000`):
+
+```ts
+restTransport({ port: 3000, shutdownTimeoutMs: 5_000 })
+```
+
+Wire it to process signals for zero-downtime deploys:
+
+```ts
+const server = createServer({ ... });
+await server.start();
+process.on('SIGTERM', () => void server.stop().then(() => process.exit(0)));
+```
+
+Custom HTTP transports get the same behavior from `closeHttpServerGracefully(server, drainMs)` in `@capixjs/core`.
+
 ## What transports can and cannot do
 
 Transports can:

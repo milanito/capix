@@ -373,10 +373,10 @@ Capix's REST transport trails Fastify by ~3% in a hello-world microbenchmark and
 | Hono | 23,970 | 21,365 |
 | Express | 16,632 | 16,239 |
 
-## 530 tests passing
+## 535 tests passing
 
 ```
-pnpm -r test  →  530 tests, 0 failures
+pnpm -r test  →  535 tests, 0 failures
 ```
 
 ## CLI

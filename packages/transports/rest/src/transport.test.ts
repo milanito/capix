@@ -490,3 +490,71 @@ describe('schema-aware coercion', () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe('graceful shutdown', () => {
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  async function bootServer(
+    caps: NonNullable<Parameters<typeof createServer>[0]['capabilities']>,
+    shutdownTimeoutMs: number,
+  ) {
+    const port = await getFreePort();
+    const server = createServer({
+      context: buildContext,
+      capabilities: caps,
+      transports: [restTransport({ port, shutdownTimeoutMs })],
+    });
+    await server.start();
+    return { server, port };
+  }
+
+  it('in-flight requests complete during the drain window', async () => {
+    const slowEcho = capability(z.object({}), async () => {
+      await sleep(300);
+      return { done: true };
+    }, 'query');
+    const { server, port } = await bootServer({ jobs: { slowEcho } }, 5000);
+
+    const pending = fetch(`http://127.0.0.1:${port}/jobs/slow-echo`);
+    await sleep(50); // request is in flight
+    const stopping = server.stop();
+
+    const res = await pending;
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ data: { done: true } });
+    await stopping;
+  });
+
+  it('idle keep-alive connections do not block shutdown', async () => {
+    const getPing = capability(() => ({ pong: true }));
+    const { server, port } = await bootServer({ sys: { getPing } }, 10_000);
+
+    // Completed fetch leaves a keep-alive socket open in undici's pool
+    const res = await fetch(`http://127.0.0.1:${port}/sys/ping`);
+    expect(res.status).toBe(200);
+    await res.arrayBuffer();
+
+    const started = Date.now();
+    await server.stop();
+    // With close() alone this would hang until the keep-alive socket dies
+    expect(Date.now() - started).toBeLessThan(2000);
+  });
+
+  it('hung requests are force-closed at the drain deadline', async () => {
+    const getStuck = capability(async () => {
+      await sleep(1500);
+      return { late: true };
+    }, 'query');
+    const { server, port } = await bootServer({ sys: { getStuck } }, 150);
+
+    const pending = fetch(`http://127.0.0.1:${port}/sys/stuck`);
+    await sleep(50);
+
+    const started = Date.now();
+    await server.stop();
+    expect(Date.now() - started).toBeLessThan(1200);
+
+    // The hung request's socket was destroyed, not left dangling
+    await expect(pending).rejects.toThrow();
+  });
+});
