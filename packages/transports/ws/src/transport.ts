@@ -21,6 +21,29 @@ export type WsTransportOptions = {
    * before terminating their sockets, in milliseconds. Default: 10_000.
    */
   readonly shutdownTimeoutMs?: number;
+  /**
+   * Maximum inbound message size in bytes. Connections sending larger frames
+   * are closed with 1009 (message too big). Default: 1 MiB — matches the REST
+   * transport's default body limit. (The `ws` library default is 100 MiB.)
+   */
+  readonly maxPayloadBytes?: number;
+  /**
+   * Heartbeat interval in milliseconds. Every interval the server pings each
+   * client and terminates any client that did not answer the previous ping —
+   * otherwise dead connections (crashed clients, dropped networks) hold their
+   * subscriptions forever. Default: 30_000. Set `false` to disable.
+   */
+  readonly heartbeatIntervalMs?: number | false;
+  /**
+   * Authorizes subscribe messages. Called with the event name and the headers
+   * from the HTTP upgrade request; return false (or throw) to reject the
+   * subscription with a Forbidden error. Without this option any connected
+   * client may subscribe to any event.
+   */
+  readonly authorizeSubscribe?: (
+    event: string,
+    headers: Record<string, string>,
+  ) => boolean | Promise<boolean>;
 };
 
 type IncomingMessage_ =
@@ -34,6 +57,9 @@ function isCapabilityMessage(msg: IncomingMessage_): msg is { id?: string; capab
 /** Creates a WebSocket transport using the 'ws' package. */
 export function wsTransport(options: WsTransportOptions): TransportWithCapabilities {
   let wss: WebSocketServer | null = null;
+  let heartbeat: NodeJS.Timeout | null = null;
+  // Clients that answered the last ping (or just connected/ponged)
+  const alive = new WeakSet<WebSocket>();
 
   function send(ws: WebSocket, payload: Record<string, unknown>): void {
     ws.send(JSON.stringify(payload));
@@ -41,6 +67,8 @@ export function wsTransport(options: WsTransportOptions): TransportWithCapabilit
 
   function handleConnection(ws: WebSocket, req: IncomingMessage, invoke: InvokeFn): void {
     const clientId = randomUUID();
+    alive.add(ws);
+    ws.on('pong', () => alive.add(ws));
     // Track per-event unsubscribe fns so individual events can be removed
     const unsubscribeFns = new Map<string, () => void>();
 
@@ -71,6 +99,23 @@ export function wsTransport(options: WsTransportOptions): TransportWithCapabilit
           return;
         }
         if (msg.action === 'subscribe') {
+          if (options.authorizeSubscribe !== undefined) {
+            let allowed = false;
+            try {
+              allowed = await options.authorizeSubscribe(msg.event, rawHeaders);
+            } catch {
+              allowed = false;
+            }
+            if (!allowed) {
+              send(ws, {
+                id: msg.id,
+                ok: false,
+                error: 'Forbidden',
+                message: `Subscription to '${msg.event}' denied`,
+              });
+              return;
+            }
+          }
           // Idempotent: replace any existing subscription for this event
           unsubscribeFns.get(msg.event)?.();
           const unsub = options.eventBus.subscribe(clientId, msg.event, (eventData) => {
@@ -123,7 +168,11 @@ export function wsTransport(options: WsTransportOptions): TransportWithCapabilit
 
     async mount(invoke: InvokeFn, _options: MountOptions): Promise<void> {
       return new Promise((resolve, reject) => {
-        wss = new WebSocketServer({ port: options.port, host: options.host });
+        wss = new WebSocketServer({
+          port: options.port,
+          host: options.host,
+          maxPayload: options.maxPayloadBytes ?? 1024 * 1024,
+        });
 
         wss.on('error', reject);
 
@@ -135,6 +184,23 @@ export function wsTransport(options: WsTransportOptions): TransportWithCapabilit
           console.log(`  ✓ WS     ws://localhost:${options.port}`);
           resolve();
         });
+
+        const intervalMs = options.heartbeatIntervalMs ?? 30_000;
+        if (intervalMs !== false) {
+          const server = wss;
+          heartbeat = setInterval(() => {
+            for (const client of server.clients) {
+              if (!alive.has(client)) {
+                // Missed a full interval — the connection is dead
+                client.terminate();
+                continue;
+              }
+              alive.delete(client);
+              client.ping();
+            }
+          }, intervalMs);
+          heartbeat.unref();
+        }
       });
     },
 
@@ -142,6 +208,10 @@ export function wsTransport(options: WsTransportOptions): TransportWithCapabilit
       if (!wss) return;
       const server = wss;
       wss = null;
+      if (heartbeat !== null) {
+        clearInterval(heartbeat);
+        heartbeat = null;
+      }
 
       // Ask every client to close cleanly (1001 = going away). wss.close()
       // only stops accepting connections — its callback waits for clients,

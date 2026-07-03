@@ -65,15 +65,31 @@ Subscriptions are cleaned up automatically on disconnect.
 
 ## Auth over WebSocket
 
-Headers are passed per-message, not per-connection. Include `headers.authorization` in each message that requires authentication, or set it once in a `connect` event and cache the result in a session store keyed by connection ID.
+Authentication uses the headers from the HTTP upgrade request — send your token when opening the connection:
 
-The simplest approach is per-message:
-
-```json
-{ "id": "1", "capability": "users.getProfile", "input": {}, "headers": { "authorization": "Bearer eyJ..." } }
+```ts
+const ws = new WebSocket('ws://localhost:3001', {
+  headers: { authorization: 'Bearer eyJ...' },
+});
 ```
 
-`buildContext` is called for each message and receives the per-message headers.
+`buildContext` is called for each message and receives those connection headers, so guards behave exactly as they do over REST. Browsers cannot set custom WebSocket headers — pass the token as a query parameter (`ws://host/?token=...`) and read it in `buildContext`, or use a cookie.
+
+## Connection hardening
+
+```ts
+wsTransport({
+  port: 3001,
+  maxPayloadBytes: 256 * 1024,      // close oversized senders with 1009 (default 1 MiB)
+  heartbeatIntervalMs: 30_000,      // terminate dead connections (default 30s, false to disable)
+  authorizeSubscribe: (event, headers) =>
+    !event.startsWith('admin:') || headers['x-role'] === 'admin',
+})
+```
+
+- **`maxPayloadBytes`** — inbound frames larger than this close the connection with `1009` (message too big). Defaults to 1 MiB, matching the REST body limit.
+- **`heartbeatIntervalMs`** — the server pings every client each interval and terminates clients that missed the previous ping. Without it, crashed clients and dropped networks hold their subscriptions forever.
+- **`authorizeSubscribe(event, headers)`** — called before a `subscribe` message takes effect, with the upgrade-request headers. Return `false` (or throw) to reject with a `Forbidden` reply. Without it, any connected client may subscribe to any event.
 
 ## Event bus
 

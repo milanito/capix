@@ -211,3 +211,120 @@ describe('graceful shutdown', () => {
     await server.stop();
   });
 });
+
+describe('hardening', () => {
+  it('closes connections that exceed maxPayloadBytes with 1009', async () => {
+    const p = nextPort();
+    const server = createServer({
+      context: buildContext,
+      capabilities: { echo: capability(z.object({ msg: z.string() }), ({ msg }) => ({ echoed: msg })) },
+      transports: [wsTransport({ port: p, maxPayloadBytes: 1024 })],
+    });
+    await server.start();
+
+    const ws = await connect(p);
+    const closed = new Promise<number>((resolve) => ws.once('close', (code) => resolve(code)));
+    ws.send(JSON.stringify({ capability: 'echo', input: { msg: 'x'.repeat(4096) } }));
+
+    expect(await closed).toBe(1009);
+    await server.stop();
+  });
+
+  it('rejects unauthorized subscriptions with Forbidden', async () => {
+    const p = nextPort();
+    const eventBus = createEventBus<TestEvents>();
+    const server = createServer({
+      context: buildContext,
+      capabilities: { echo: capability(z.object({ msg: z.string() }), ({ msg }) => ({ echoed: msg })) },
+      transports: [wsTransport({
+        port: p,
+        eventBus,
+        authorizeSubscribe: (event, headers) => event !== 'order:paid' || headers['x-role'] === 'admin',
+      })],
+    });
+    await server.start();
+
+    // No admin header — order:paid denied, ping allowed
+    const ws = await connect(p);
+    const replies: Array<Record<string, unknown>> = [];
+    ws.on('message', (d) => replies.push(JSON.parse(d.toString()) as Record<string, unknown>));
+
+    ws.send(JSON.stringify({ id: '1', action: 'subscribe', event: 'order:paid' }));
+    ws.send(JSON.stringify({ id: '2', action: 'subscribe', event: 'ping' }));
+    await new Promise((r) => setTimeout(r, 150));
+
+    const denied = replies.find((m) => m['id'] === '1')!;
+    expect(denied['ok']).toBe(false);
+    expect(denied['error']).toBe('Forbidden');
+    const allowed = replies.find((m) => m['id'] === '2')!;
+    expect(allowed['ok']).toBe(true);
+
+    // Denied subscription must not receive events
+    eventBus.publish('order:paid', { orderId: 'o1' });
+    await new Promise((r) => setTimeout(r, 100));
+    expect(replies.find((m) => m['event'] === 'order:paid')).toBeUndefined();
+
+    // Admin header passes
+    const admin = await new Promise<WebSocket>((resolve, reject) => {
+      const c = new WebSocket(`ws://localhost:${p}`, { headers: { 'x-role': 'admin' } });
+      c.once('open', () => resolve(c));
+      c.once('error', reject);
+    });
+    const adminReplies: Array<Record<string, unknown>> = [];
+    admin.on('message', (d) => adminReplies.push(JSON.parse(d.toString()) as Record<string, unknown>));
+    admin.send(JSON.stringify({ id: '3', action: 'subscribe', event: 'order:paid' }));
+    await new Promise((r) => setTimeout(r, 150));
+    expect(adminReplies.find((m) => m['id'] === '3')!['ok']).toBe(true);
+
+    await server.stop();
+  });
+
+  it('pings clients on the heartbeat interval and keeps responsive ones alive', async () => {
+    const p = nextPort();
+    const server = createServer({
+      context: buildContext,
+      capabilities: { echo: capability(z.object({ msg: z.string() }), ({ msg }) => ({ echoed: msg })) },
+      transports: [wsTransport({ port: p, heartbeatIntervalMs: 100 })],
+    });
+    await server.start();
+
+    const ws = await connect(p);
+    let pings = 0;
+    ws.on('ping', () => pings++);
+    await new Promise((r) => setTimeout(r, 450));
+
+    expect(pings).toBeGreaterThanOrEqual(2); // heartbeat is running
+    expect(ws.readyState).toBe(WebSocket.OPEN); // responsive client survives
+    await server.stop();
+  });
+
+  it('terminates clients that stop answering pings', async () => {
+    const p = nextPort();
+    const server = createServer({
+      context: buildContext,
+      capabilities: { echo: capability(z.object({ msg: z.string() }), ({ msg }) => ({ echoed: msg })) },
+      transports: [wsTransport({ port: p, heartbeatIntervalMs: 100 })],
+    });
+    await server.start();
+
+    const ws = await connect(p);
+    const closed = new Promise<void>((resolve) => ws.once('close', () => resolve()));
+    ws.once('error', () => { /* ECONNRESET from the server-side terminate is expected */ });
+    // Pause the client socket: it stops reading pings, so it never pongs —
+    // simulates a dead connection the TCP layer hasn't noticed yet
+    const socket = (ws as unknown as { _socket: { pause(): void; resume(): void } })._socket;
+    socket.pause();
+
+    // Several heartbeat cycles pass; the server terminates the silent client
+    await new Promise((r) => setTimeout(r, 500));
+    // Resume so the client-side socket can observe the termination
+    socket.resume();
+
+    await Promise.race([
+      closed,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('client was not terminated')), 2000)),
+    ]);
+
+    await server.stop();
+  });
+});

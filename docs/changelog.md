@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.1.0-alpha.18 — 2026-07-03
+
+### Added
+- **WebSocket hardening.** Three new `wsTransport` options:
+  - `maxPayloadBytes` (default 1 MiB, was the `ws` library's 100 MiB) —
+    oversized frames close the connection with `1009`
+  - `heartbeatIntervalMs` (default 30 s) — the server pings each client
+    every interval and terminates clients that missed the previous ping,
+    so dead connections stop holding subscriptions forever
+  - `authorizeSubscribe(event, headers)` — reject event subscriptions with
+    a `Forbidden` reply; headers come from the HTTP upgrade request
+
+### Fixed
+- **Docs: WebSocket auth section described per-message headers, which the
+  transport never supported.** It now documents the actual behavior:
+  context is built from the upgrade-request headers on every message
+
+---
+
 ## 0.1.0-alpha.17 — 2026-07-03
 
 ### Added
