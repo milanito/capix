@@ -51,6 +51,9 @@ type Context = {
   user: AuthUser | null;
 };
 
+// Pre-bind the context type so guards typed for Context are accepted.
+const cap = capability.withContext<Context>();
+
 const buildContext = defineContext(async (req): Promise<Context> => {
   const authorization = req.headers['authorization'];
   const token =
@@ -92,15 +95,15 @@ const mustBeAdmin = defineGuard(
 // ---------------------------------------------------------------------------
 
 // Public: no guard
-const ping = capability(() => ({ message: 'pong', timestamp: Date.now() }));
+const ping = cap(() => ({ message: 'pong', timestamp: Date.now() }));
 
 // Authenticated users only
-const getProfile = capability(z.object({}), async (_, ctx: Context) => {
+const getProfile = cap(z.object({}), async (_, ctx: Context) => {
   return { id: ctx.user?.id, email: ctx.user?.email, role: ctx.user?.role };
 }).guard(mustBeAuthenticated);
 
 // User-level access
-const listPosts = capability(
+const listPosts = cap(
   z.object({ page: z.number().int().min(1).default(1) }),
   async ({ page }, _ctx: Context) => {
     return { posts: [`Post ${page}-1`, `Post ${page}-2`], page };
@@ -108,7 +111,7 @@ const listPosts = capability(
 ).guard(mustBeUser);
 
 // Admin only
-const deletePost = capability(
+const deletePost = cap(
   z.object({ id: z.string() }),
   async ({ id }) => {
     return { deleted: id };

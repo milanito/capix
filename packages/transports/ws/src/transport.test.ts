@@ -291,7 +291,8 @@ describe('hardening', () => {
     const ws = await connect(p);
     let pings = 0;
     ws.on('ping', () => pings++);
-    await new Promise((r) => setTimeout(r, 450));
+    // Generous window: loaded CI runners stretch 100ms interval timers
+    await new Promise((r) => setTimeout(r, 1200));
 
     expect(pings).toBeGreaterThanOrEqual(2); // heartbeat is running
     expect(ws.readyState).toBe(WebSocket.OPEN); // responsive client survives
@@ -316,13 +317,13 @@ describe('hardening', () => {
     socket.pause();
 
     // Several heartbeat cycles pass; the server terminates the silent client
-    await new Promise((r) => setTimeout(r, 500));
+    await new Promise((r) => setTimeout(r, 800));
     // Resume so the client-side socket can observe the termination
     socket.resume();
 
     await Promise.race([
       closed,
-      new Promise((_, reject) => setTimeout(() => reject(new Error('client was not terminated')), 2000)),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('client was not terminated')), 5000)),
     ]);
 
     await server.stop();

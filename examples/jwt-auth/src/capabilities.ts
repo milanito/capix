@@ -17,6 +17,14 @@ export type Context = {
   user: JwtPayload | null;
 };
 
+// Pre-bind the context type so guards typed for Context are accepted
+// without annotation — see "Typing your context" in the README.
+const cap = capability.withContext<Context>();
+
+// Authenticated capabilities: guards narrow at runtime; authCap pre-types
+// the resolver so ctx.user is non-null — see "Typing your context".
+const authCap = capability.withContext<Context & { user: JwtPayload }>();
+
 export const mustBeAuthenticated = defineGuard(
   (ctx: Context): asserts ctx is Context & { user: JwtPayload } => {
     if (!ctx.user) throw errors.Unauthorized();
@@ -29,7 +37,7 @@ export const mustBeAdmin = defineGuard(
   },
 );
 
-const getProfile = capability(
+const getProfile = authCap(
   (_input: undefined, ctx: Context & { user: JwtPayload }) => ({
     id: ctx.user.sub,
     name: ctx.user.name,
@@ -37,13 +45,13 @@ const getProfile = capability(
   }),
 ).guard(mustBeAuthenticated);
 
-const getAdminStats = capability(
+const getAdminStats = authCap(
   () => ({ totalUsers: 42, activeToday: 7, revenueUsd: 12340 }),
 )
   .guard(mustBeAuthenticated)
   .guard(mustBeAdmin);
 
-const listRoles = capability(() => ['user', 'admin'] as const);
+const listRoles = cap(() => ['user', 'admin'] as const);
 
 export const capabilities = {
   auth: { getProfile, getAdminStats, listRoles },

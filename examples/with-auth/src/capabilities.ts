@@ -14,6 +14,10 @@ type Context = {
   user: AuthUser | null;
 };
 
+// Pre-bind the context type so guards typed for Context are accepted
+// without annotation — see "Typing your context" in the README.
+const cap = capability.withContext<Context>();
+
 const errors = {
   Unauthorized: defineError(401, 'Unauthorized'),
   Forbidden: defineError(403, 'Forbidden'),
@@ -40,20 +44,20 @@ const mustBeAdmin = defineGuard(
   },
 );
 
-const ping = capability(() => ({ message: 'pong', timestamp: Date.now() }));
+const ping = cap(() => ({ message: 'pong', timestamp: Date.now() }));
 
-const getProfile = capability(z.object({}), async (_, ctx: Context) => {
+const getProfile = cap(z.object({}), async (_, ctx: Context) => {
   return { id: ctx.user?.id, email: ctx.user?.email, role: ctx.user?.role };
 }).guard(mustBeAuthenticated);
 
-const listPosts = capability(
+const listPosts = cap(
   z.object({ page: z.number().int().min(1).default(1) }),
   async ({ page }, _ctx: Context) => {
     return { posts: [`Post ${page}-1`, `Post ${page}-2`], page };
   },
 ).guard(mustBeUser);
 
-const deletePost = capability(
+const deletePost = cap(
   z.object({ id: z.string() }),
   async ({ id }) => {
     return { deleted: id };

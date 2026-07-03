@@ -20,6 +20,10 @@ type Context = {
   user: User | null;
 };
 
+// Pre-bind the context type so guards typed for Context are accepted
+// without annotation — see "Typing your context" in the README.
+const cap = capability.withContext<Context>();
+
 const mustBeUser = defineGuard((ctx: Context): asserts ctx is Context & { user: User } => {
   if (!ctx.user) throw errors.Unauthorized();
 });
@@ -38,7 +42,7 @@ const UserSchema = z.object({
   role: z.enum(['user', 'admin']),
 });
 
-const getUser = capability(
+const getUser = cap(
   z.object({ id: z.string() }),
   async ({ id }) => {
     const user = USERS.find((u) => u.id === id);
@@ -49,9 +53,9 @@ const getUser = capability(
   .guard(mustBeUser)
   .output(UserSchema);
 
-const listUsers = capability(z.object({}), async () => USERS).guard(mustBeUser);
+const listUsers = cap(z.object({}), async () => USERS).guard(mustBeUser);
 
-const createUser = capability(
+const createUser = cap(
   z.object({ name: z.string(), email: z.string() }),
   async ({ name, email }) => {
     if (USERS.some((u) => u.email === email)) throw errors.Conflict({ email });
@@ -61,7 +65,7 @@ const createUser = capability(
   },
 ).guard(mustBeAdmin);
 
-const updateUser = capability(
+const updateUser = cap(
   z.object({ id: z.string(), name: z.string().optional(), email: z.string().optional() }),
   async ({ id, name, email }) => {
     const user = USERS.find((u) => u.id === id);
@@ -72,7 +76,7 @@ const updateUser = capability(
   },
 ).guard(mustBeAdmin);
 
-const deleteUser = capability(
+const deleteUser = cap(
   z.object({ id: z.string() }),
   async ({ id }) => {
     const idx = USERS.findIndex((u) => u.id === id);

@@ -11,6 +11,10 @@ type User = { id: string; name: string };
 
 export type Context = { requestId: string; user: User | null };
 
+// Pre-bind the context type so guards typed for Context are accepted
+// without annotation — see "Typing your context" in the README.
+const cap = capability.withContext<Context>();
+
 export const mustBeUser = defineGuard(
   (ctx: Context): asserts ctx is Context & { user: User } => {
     if (!ctx.user) throw errors.Unauthorized();
@@ -27,7 +31,7 @@ const uploads = new Map<string, {
   uploadedAt: string;
 }>();
 
-export const createUpload = capability(
+export const createUpload = cap(
   z.object({
     file: uploadedFile({
       maxSize: 10 * 1024 * 1024,
@@ -51,7 +55,7 @@ export const createUpload = capability(
   },
 ).guard(mustBeUser);
 
-export const getUpload = capability(
+export const getUpload = cap(
   z.object({ id: z.string() }),
   ({ id }) => {
     const record = uploads.get(id);
@@ -61,7 +65,7 @@ export const getUpload = capability(
   'query',
 ).guard(mustBeUser);
 
-export const listUploads = capability(
+export const listUploads = cap(
   z.object({}),
   () => Array.from(uploads.values()),
   'query',

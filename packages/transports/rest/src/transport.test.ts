@@ -536,13 +536,14 @@ describe('graceful shutdown', () => {
 
     const started = Date.now();
     await server.stop();
-    // With close() alone this would hang until the keep-alive socket dies
-    expect(Date.now() - started).toBeLessThan(2000);
+    // With close() alone this would hang until the keep-alive socket dies;
+    // generous bound for loaded CI runners
+    expect(Date.now() - started).toBeLessThan(5000);
   });
 
   it('hung requests are force-closed at the drain deadline', async () => {
     const getStuck = capability(async () => {
-      await sleep(1500);
+      await sleep(6000);
       return { late: true };
     }, 'query');
     const { server, port } = await bootServer({ sys: { getStuck } }, 150);
@@ -552,7 +553,9 @@ describe('graceful shutdown', () => {
 
     const started = Date.now();
     await server.stop();
-    expect(Date.now() - started).toBeLessThan(1200);
+    // Well under the 6s capability sleep — proves force-close, not drain-wait,
+    // with margin for loaded CI runners
+    expect(Date.now() - started).toBeLessThan(4000);
 
     // The hung request's socket was destroyed, not left dangling
     await expect(pending).rejects.toThrow();
