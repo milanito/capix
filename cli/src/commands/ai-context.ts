@@ -5,6 +5,7 @@ import { loadRegistry } from '../utils/loader.js';
 import { generateRoutes } from '@capixjs/transport-rest';
 import type { RouteDefinition } from '@capixjs/transport-rest';
 import type { CapabilityRegistry } from '@capixjs/core';
+import { effectiveIntent } from '../utils/intent.js';
 
 function schemaToObject(schema: unknown): Record<string, string> | null {
   if (!schema) return null;
@@ -30,7 +31,7 @@ function buildAiContext(registry: CapabilityRegistry, projectName: string): stri
     const route = routes.find((r) => r.capability === name);
     caps.push({
       name,
-      intent: cap.intent,
+      intent: effectiveIntent(name, cap),
       guards: cap.guards.length,
       input: schemaToObject(cap.inputSchema),
       http: route ? { method: route.method, path: route.path } : undefined,

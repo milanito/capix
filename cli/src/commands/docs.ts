@@ -5,6 +5,7 @@ import { zodSchemaToString } from '../utils/zod-to-string.js';
 import { generateRoutes } from '@capixjs/transport-rest';
 import type { RouteDefinition } from '@capixjs/transport-rest';
 import type { AnyCapability } from '@capixjs/core';
+import { effectiveIntent } from '../utils/intent.js';
 
 function capabilityToMarkdown(name: string, cap: AnyCapability, routes: RouteDefinition[]): string {
   const route = routes.find((r) => r.capability === name);
@@ -13,7 +14,7 @@ function capabilityToMarkdown(name: string, cap: AnyCapability, routes: RouteDef
   lines.push(`### \`${name}\``);
   lines.push('');
 
-  lines.push(`**Intent:** ${cap.intent}`);
+  lines.push(`**Intent:** ${effectiveIntent(name, cap)}`);
 
   if (route) {
     lines.push(`**HTTP:** \`${route.method} ${route.path}\``);

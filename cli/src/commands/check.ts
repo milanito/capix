@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import * as print from '../utils/print.js';
 import { loadRegistry } from '../utils/loader.js';
 import { generateRoutes } from '@capixjs/transport-rest';
+import { effectiveIntent } from '../utils/intent.js';
 
 export function registerCheck(program: Command): void {
   program
@@ -19,7 +20,7 @@ export function registerCheck(program: Command): void {
 
       // 1. Check for capabilities with no guards and no schema (may be unintentional)
       for (const [name, cap] of registry) {
-        if (!cap.inputSchema && cap.intent !== 'query') {
+        if (!cap.inputSchema && effectiveIntent(name, cap) !== 'query') {
           print.warn(`${name}: mutation capability has no input schema`);
           warnings++;
         }

@@ -4,7 +4,7 @@
  */
 
 import type { CapabilityRegistry, AnyCapability } from '@capixjs/core';
-import { inferIntent } from '@capixjs/core';
+import { resolveIntent } from '@capixjs/core';
 
 export type RouteDefinition = {
   readonly method: string;
@@ -275,8 +275,8 @@ function inferRoutes(
   const groupSegments = segments.slice(0, -1).map((s) => applyUrlCase(s, urlCase));
   const groupPath = '/' + groupSegments.join('/');
 
-  // Use cap.intent when the user set it explicitly; otherwise infer from key name
-  const intent = cap._intentExplicit ? cap.intent : inferIntent(key);
+  // Explicit intent wins; otherwise inferred from the key name
+  const intent = resolveIntent(cap, key);
   const hasIdField = cap.inputSchema
     ? 'shape' in cap.inputSchema &&
       typeof cap.inputSchema.shape === 'object' &&

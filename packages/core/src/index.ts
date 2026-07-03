@@ -15,7 +15,7 @@ export { defineGuard, defineGuardFor, runGuards, defineInputGuard, runInputGuard
 export type { Guard, NarrowingGuard, AnyGuard, NarrowContext, InputGuard, AnyInputGuard } from './guards.js';
 
 // Capability
-export { capability, isCapability, compileRegistry, inferIntent } from './capability.js';
+export { capability, isCapability, compileRegistry, inferIntent, resolveIntent } from './capability.js';
 export type {
   Intent,
   Enhancer,

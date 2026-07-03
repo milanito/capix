@@ -18,7 +18,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
-import { inferIntent } from '@capixjs/core';
+import { resolveIntent } from '@capixjs/core';
 import type { CapabilityRegistry, InvokeFn, SerializedError } from '@capixjs/core';
 
 export type McpServerOptions = {
@@ -61,10 +61,10 @@ export function buildTools(registry: CapabilityRegistry): { tools: Tool[]; byNam
     const name = toToolName(dotPath);
     byName.set(name, dotPath);
 
-    // Same rule as the REST router: explicit intent wins, otherwise infer
+    // Same rule as the REST router: explicit intent wins, otherwise inferred
     // from the capability's key name (getUser → query, deleteUser → delete).
     const key = dotPath.split('.').pop() ?? dotPath;
-    const intent = cap._intentExplicit ? cap.intent : inferIntent(key);
+    const intent = resolveIntent(cap, key);
 
     const inputJs = cap.inputSchema !== null ? toJsonSchema(cap.inputSchema, 'input') : null;
     // MCP requires inputSchema to be an object schema. Non-object inputs

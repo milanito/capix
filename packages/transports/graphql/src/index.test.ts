@@ -326,3 +326,26 @@ describe('buildGraphQLSchema — all-mutation registry', () => {
     expect(schema.getMutationType()).toBeUndefined();
   });
 });
+
+describe('buildGraphQLSchema — intent inference', () => {
+  it('places inferred-query capabilities under Query, matching REST routing', async () => {
+    const invoke = makeInvoke({ ok: true, data: { id: '1' } });
+    // No explicit intent — the getUser key name infers 'query'
+    const schema = makeSchema({
+      users: { getUser: capability(z.object({ id: z.string() }), (i) => i) },
+    }, invoke);
+
+    const result = await graphql({ schema, source: '{ users_getUser(id: "1") }' });
+    expect(result.errors).toBeUndefined();
+  });
+
+  it('explicit intent still overrides key-name inference', async () => {
+    const invoke = makeInvoke({ ok: true, data: { id: '1' } });
+    const schema = makeSchema({
+      users: { getSnapshot: capability(z.object({}), () => ({ id: '1' }), 'mutation') },
+    }, invoke);
+
+    const result = await graphql({ schema, source: 'mutation { users_getSnapshot }' });
+    expect(result.errors).toBeUndefined();
+  });
+});

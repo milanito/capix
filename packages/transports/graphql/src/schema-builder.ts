@@ -2,7 +2,8 @@
  * schema-builder.ts — Converts a Capix registry into a GraphQL schema.
  *
  * Rules:
- *   - intent: 'query'  → Query field
+ *   - effective intent 'query' (explicit, or inferred from the key name via
+ *     resolveIntent — same rule as REST routing) → Query field
  *   - all other intents → Mutation field
  *   - Dot-path names become underscore-separated field names (users.getUser → users_getUser)
  *   - Zod input schema fields → individual GraphQL args
@@ -25,6 +26,7 @@ import {
   Kind,
 } from 'graphql';
 import type { GraphQLOutputType, GraphQLInputType, GraphQLFieldConfig } from 'graphql';
+import { resolveIntent } from '@capixjs/core';
 import type { CapabilityRegistry, InvokeFn } from '@capixjs/core';
 
 export const JSONScalar = new GraphQLScalarType({
@@ -227,7 +229,10 @@ export function buildGraphQLSchema(registry: CapabilityRegistry, invoke: InvokeF
       },
     };
 
-    if (cap.intent === 'query') {
+    // Same rule as REST routing and MCP annotations: explicit intent wins,
+    // otherwise inferred from the key name (getUser → Query field).
+    const key = name.split('.').pop() ?? name;
+    if (resolveIntent(cap, key) === 'query') {
       queryFields[fnName] = field;
     } else {
       mutationFields[fnName] = field;

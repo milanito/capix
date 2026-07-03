@@ -2,6 +2,8 @@
 
 Complete reference for all exports in the `capix` package.
 
+See [API stability](./stability.md) for what counts as public API and the compatibility policy per release stage.
+
 For transport-specific APIs, see:
 - [@capixjs/transport-rest](../../packages/transports/rest/README.md)
 - [@capixjs/transport-ws](../../packages/transports/ws/README.md)

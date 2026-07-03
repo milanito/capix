@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { z } from 'zod';
-import { capability, isCapability, compileRegistry, inferIntent } from './capability.js';
+import { capability, isCapability, compileRegistry, inferIntent, resolveIntent } from './capability.js';
 import { defaultErrors } from './errors.js';
 
 const baseCtx = { requestId: 'test' };
@@ -362,5 +362,33 @@ describe('Capability has no http field', () => {
   it('capability factory accepts no http option (3-arg max)', () => {
     const cap = capability(z.object({ id: z.string() }), async (i) => i, 'query');
     expect(cap.intent).toBe('query');
+  });
+});
+
+describe('resolveIntent', () => {
+  it('uses the explicit intent when one was passed to capability()', () => {
+    const listTasks = capability(z.object({}), () => [], 'mutation');
+    expect(resolveIntent(listTasks, 'listTasks')).toBe('mutation');
+  });
+
+  it('infers from the key name when intent was defaulted', () => {
+    const cap = capability(z.object({ id: z.string() }), (i) => i);
+    expect(resolveIntent(cap, 'getUser')).toBe('query');
+    expect(resolveIntent(cap, 'deleteUser')).toBe('delete');
+    expect(resolveIntent(cap, 'replaceUser')).toBe('replace');
+    expect(resolveIntent(cap, 'updateUser')).toBe('update');
+  });
+
+  it('falls back to mutation for unrecognized key names', () => {
+    const cap = capability(z.object({}), () => null);
+    expect(resolveIntent(cap, 'doTheThing')).toBe('mutation');
+  });
+
+  it('matches transport behavior for compiled registry entries', () => {
+    const registry = compileRegistry({ users: { getUser: capability(z.object({}), () => null) } });
+    const cap = registry.get('users.getUser')!;
+    expect(resolveIntent(cap, 'getUser')).toBe('query');
+    // raw .intent still reports the constructor default
+    expect(cap.intent).toBe('mutation');
   });
 });

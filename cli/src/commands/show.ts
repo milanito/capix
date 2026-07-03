@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import * as print from '../utils/print.js';
 import { loadRegistry } from '../utils/loader.js';
 import { zodSchemaToString } from '../utils/zod-to-string.js';
+import { effectiveIntent } from '../utils/intent.js';
 
 export function registerShow(program: Command): void {
   program
@@ -26,7 +27,7 @@ export function registerShow(program: Command): void {
 
       print.header(cap.name);
       print.blank();
-      print.item('intent', cap.intent);
+      print.item('intent', effectiveIntent(cap.name, cap));
       print.item('guards', String(cap.guards.length));
 
       if (cap.inputSchema) {

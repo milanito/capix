@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import * as print from '../utils/print.js';
 import { loadRegistry } from '../utils/loader.js';
 import type { CapabilityRegistry } from '@capixjs/core';
+import { effectiveIntent } from '../utils/intent.js';
 
 type CapSnap = { intent: string; guards: number; hasInput: boolean; hasOutput: boolean };
 
@@ -9,7 +10,7 @@ function registrySnapshot(registry: CapabilityRegistry): Map<string, CapSnap> {
   const snap = new Map<string, CapSnap>();
   for (const [name, cap] of registry) {
     snap.set(name, {
-      intent: cap.intent,
+      intent: effectiveIntent(name, cap),
       guards: cap.guards.length,
       hasInput: cap.inputSchema !== null,
       hasOutput: cap.outputSchema !== null,

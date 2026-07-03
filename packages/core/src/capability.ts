@@ -22,6 +22,20 @@ const UPDATE_PREFIXES = ['update', 'edit', 'patch', 'modify'] as const;
 const REPLACE_PREFIXES = ['replace', 'set', 'put'] as const;
 const DELETE_PREFIXES = ['delete', 'remove', 'destroy', 'cancel'] as const;
 
+/**
+ * Resolves a capability's effective intent: an intent passed explicitly to
+ * `capability()` wins; otherwise it is inferred from the capability's key
+ * name in the group tree (`getUser` → query, `deleteUser` → delete).
+ *
+ * This is the rule every transport uses — REST for route methods, MCP for
+ * tool annotations, GraphQL for query/mutation placement. Transport authors
+ * should call this instead of reading `intent` directly, so explicit and
+ * inferred intents behave identically across transports.
+ */
+export function resolveIntent(cap: AnyCapability, key: string): Intent {
+  return cap._intentExplicit ? cap.intent : inferIntent(key);
+}
+
 /** Infers capability intent from its key name in the parent group. */
 export function inferIntent(key: string): Intent {
   const lower = key.toLowerCase();
@@ -69,23 +83,31 @@ export type Capability<
   TOutput,
   TContext extends BaseContext,
 > = {
+  /** @internal Brand field — use {@link isCapability} instead of reading this. */
   readonly _capix: true;
   readonly [CAPABILITY_BRAND]: true;
   readonly name: string;
-  // phantom type fields for inference — never accessed at runtime
+  /** @internal Phantom type field for inference — never set at runtime. Use {@link InferInput}. */
   readonly _input: TInput;
+  /** @internal Phantom type field for inference — never set at runtime. Use {@link InferOutput}. */
   readonly _output: TOutput;
+  /** @internal Phantom type field for inference — never set at runtime. Use {@link InferContext}. */
   readonly _context: TContext;
   readonly inputSchema: ZodType | null;
   readonly outputSchema: ZodType | null;
   readonly guards: ReadonlyArray<AnyGuard>;
   readonly inputGuards: ReadonlyArray<AnyInputGuard>;
+  /**
+   * The intent passed to capability(), or 'mutation' when defaulted.
+   * Transports should use {@link resolveIntent} rather than reading this —
+   * it applies key-name inference when no explicit intent was given.
+   */
   readonly intent: Intent;
-  /** True when intent was explicitly passed to capability(); false when defaulted. */
+  /** @internal True when intent was explicitly passed to capability(). Use {@link resolveIntent}. */
   readonly _intentExplicit: boolean;
   /**
-   * Set by compileRegistry when inputSchema is a z.object({}) with no keys.
-   * The execution engine skips input validation entirely — there is nothing to validate.
+   * @internal Set by compileRegistry when inputSchema is a z.object({}) with no
+   * keys — the execution engine skips input validation entirely.
    */
   readonly _skipValidation: boolean;
 
@@ -115,9 +137,9 @@ export type Capability<
   resolve: (input: TInput, ctx: BaseContext) => Promise<TOutput>;
 
   /**
-   * Raw resolver — no guards. Used by the execution engine after it has
-   * already run guards. Also used internally by enhancers wrapping the resolver.
-   * Do not call this from application code — use resolve() instead.
+   * Raw resolver — no guards. Extension-author API: enhancers wrap this to
+   * avoid re-running guards, and the execution engine calls it after running
+   * guards itself. Do not call from application code — use resolve() instead.
    */
   _resolverOnly: (input: TInput, ctx: TContext) => Promise<TOutput>;
 

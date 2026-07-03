@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.1.0-alpha.16 — 2026-07-03
+
+### Changed
+- **API surface audit — first beta-gate release.** New
+  [API stability policy](https://github.com/milanito/capix/blob/master/docs/api/stability.md)
+  defines three tiers (public, extension-author, internal) and the semver
+  commitment per release stage. Internal capability fields (`_capix`,
+  phantom type fields, `_intentExplicit`, `_skipValidation`) are now marked
+  `@internal` in the type definitions
+- **New core export: `resolveIntent(cap, key)`.** The shared effective-intent
+  rule (explicit intent wins, otherwise inferred from the key name). REST
+  routing, GraphQL placement, MCP annotations, and the CLI all use it now —
+  transport authors should too, instead of reading `intent` directly
+- **GraphQL: key-name intent inference now applies.** Capabilities without
+  an explicit intent whose name infers `query` (`getUser`, `listPosts`)
+  are now Query fields instead of Mutation fields, matching how REST routes
+  them as GET. Explicit intents behave as before
+- **CLI: `check`, `show`, `docs`, `diff`, and `ai-context` report effective
+  intent.** `capix check` no longer warns "mutation capability has no input
+  schema" for capabilities that route as queries via name inference
+
+---
+
 ## 0.1.0-alpha.15 — 2026-07-02
 
 ### Added
