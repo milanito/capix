@@ -31,46 +31,46 @@ pnpm --filter capix-benchmarks bench
 | 2 | `GET /users/:id` | Zod input validation + path-param extraction |
 | 3 | `GET /profile` + `Authorization: Bearer …` | Auth header read + sync guard |
 
-## Results (v4 — current)
+## Results (v5 — 0.1.0-beta.1)
 
-All figures are **req/s (average)** over the 10-second window.
+All figures are **req/s (average)** over the 10-second window. Re-measured on `0.1.0-beta.1` after the beta-hardening work (Zod 4 migration, graceful shutdown, pluggable enhancer stores, lifecycle hooks).
 
 ### Scenario 1 — Hello World
 
 | Framework | req/s | p50 | p99 |
 |-----------|------:|-----|-----|
-| Fastify   | 29,531 | 3ms | 6ms |
-| **Capix** | **28,488** | **3ms** | **6ms** |
-| Hono      | 23,970 | 3ms | 7ms |
-| Express   | 16,632 | 5ms | 10ms |
+| Fastify   | 27,659 | 3ms | 6ms |
+| **Capix** | **26,240** | **3ms** | **7ms** |
+| Hono      | 22,910 | 4ms | 7ms |
+| Express   | 16,176 | 5ms | 11ms |
 
 ### Scenario 2 — Zod Validation
 
 | Framework | req/s | p50 | p99 |
 |-----------|------:|-----|-----|
-| Fastify   | 28,353 | 3ms | 6ms |
-| **Capix** | **26,097** | **3ms** | **6ms** |
-| Hono      | 23,482 | 3ms | 7ms |
-| Express   | 16,733 | 5ms | 9ms |
+| Fastify   | 25,526 | 3ms | 7ms |
+| **Capix** | **24,316** | **3ms** | **7ms** |
+| Hono      | 21,876 | 4ms | 7ms |
+| Express   | 15,259 | 6ms | 10ms |
 
 ### Scenario 3 — Auth + Guard
 
 | Framework | req/s | p50 | p99 |
 |-----------|------:|-----|-----|
-| Fastify   | 27,899 | 3ms | 6ms |
-| **Capix** | **27,102** | **3ms** | **6ms** |
-| Hono      | 21,365 | 4ms | 8ms |
-| Express   | 16,239 | 5ms | 9ms |
+| Fastify   | 25,813 | 3ms | 7ms |
+| **Capix** | **24,194** | **3ms** | **7ms** |
+| Hono      | 20,332 | 4ms | 8ms |
+| Express   | 15,366 | 5ms | 10ms |
 
 ## Analysis
 
-Capix trails Fastify by 3–4% in Scenarios 1–2. In Scenario 3 (auth + sync guard) the gap narrows to **3%** — the sync-guard and sync-buildContext fast-paths eliminate two microtask ticks per request.
+Capix trails Fastify by **5–6%** across the three scenarios — the sync-guard and sync-buildContext fast-paths keep the auth scenario from widening the gap.
 
-Capix **beats Hono** in all three scenarios (+19% hello world, +11% Zod, +27% auth).
+Capix **beats Hono** in all three scenarios (+15% hello world, +11% Zod, +19% auth) and **beats Express by ~60%** everywhere.
 
 The remaining Fastify gap is deliberate:
 - Zod `safeParse` costs ~270ns/request. Fastify uses Ajv + JSON Schema, which V8 can specialize better. Capix chose Zod for TypeScript-native authoring.
-- Fastify's handler model is thinner — no context builder, no capability registry lookup. The ~3% gap in Scenario 1 is the irreducible cost of Capix's dispatch pipeline.
+- Fastify's handler model is thinner — no context builder, no capability registry lookup. The gap in Scenario 1 is the irreducible cost of Capix's dispatch pipeline.
 
 ## Honest caveats
 
@@ -83,7 +83,7 @@ The remaining Fastify gap is deliberate:
 
 A `uWS`-based transport is planned. uWS is a C++ HTTP/WebSocket server bound to Node.js; it is typically 2–3× faster than Node.js's native `http` module. When the `uWS` transport ships, Scenario 1 throughput should exceed Fastify.
 
-The current benchmarks use Node.js native `http`. The gap between Capix and Fastify in Scenario 1 (~3%) is primarily explained by Capix's capability dispatch overhead, not the HTTP layer — so a `uWS` transport could push Capix ahead of Fastify even on Scenario 1.
+The current benchmarks use Node.js native `http`. The gap between Capix and Fastify in Scenario 1 (~5%) is primarily explained by Capix's capability dispatch overhead, not the HTTP layer — so a `uWS` transport could push Capix ahead of Fastify even on Scenario 1.
 
 ## Optimization history
 

@@ -1,0 +1,41 @@
+name: Feature request
+description: Propose an addition or change to the public API
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What can't you do today?
+      description: >
+        Describe the problem, not the solution — "I can't expose a capability
+        that streams progress" is more useful than "add streaming".
+    validations:
+      required: true
+
+  - type: textarea
+    id: sketch
+    attributes:
+      label: API sketch (optional)
+      description: What would using the feature look like?
+      render: ts
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - core primitive (capability / guard / enhancer)
+        - a transport
+        - a plugin or store
+        - CLI / tooling
+        - new package
+    validations:
+      required: true
+
+  - type: markdown
+    attributes:
+      value: >
+        Note: Capix is in beta with a frozen API surface — see the
+        [stability policy](https://github.com/milanito/capix/blob/master/docs/api/stability.md).
+        Additive features are welcome; breaking changes need a strong case
+        and wait for a major.

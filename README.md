@@ -60,7 +60,7 @@ No `req`/`res`. No `next()`. No middleware stack. Transports are wiring, not arc
 | [`@capixjs/transport-rest`](packages/transports/rest) | HTTP/1.1 REST transport with automatic route inference |
 | [`@capixjs/transport-ws`](packages/transports/ws) | WebSocket transport for real-time capabilities and server push |
 | [`@capixjs/transport-graphql`](packages/transports/graphql) | GraphQL transport with auto-generated schema and GraphiQL playground |
-| [`@capixjs/transport-queue`](packages/transports/queue) | Queue transport for background jobs via BullMQ, SQS, or any adapter |
+| [`@capixjs/transport-queue`](packages/transports/queue) | Queue transport for background jobs — BullMQ adapter included, or bring any queue via `QueueAdapter` |
 | [`@capixjs/transport-mcp`](packages/transports/mcp) | MCP transport — expose capabilities as Model Context Protocol tools |
 | [`@capixjs/store-redis`](packages/stores/redis) | Redis-backed cache and rate-limit stores for multi-instance deployments |
 | [`@capixjs/plugin-auth`](packages/plugins/auth) | JWT authentication — `jwtContextBuilder`, `createJWTHelpers`, `mustBeAuthenticated` |
@@ -386,10 +386,12 @@ Capix's REST transport trails Fastify by ~3% in a hello-world microbenchmark and
 
 | Framework | req/s (hello world) | req/s (auth + guard) |
 |---|---|---|
-| Fastify | 29,531 | 27,899 |
-| **Capix** | **28,488** | **27,102** |
-| Hono | 23,970 | 21,365 |
-| Express | 16,632 | 16,239 |
+| Fastify | 27,659 | 25,813 |
+| **Capix** | **26,240** | **24,194** |
+| Hono | 22,910 | 20,332 |
+| Express | 16,176 | 15,366 |
+
+Measured on `0.1.0-beta.1` — see [docs/benchmarks.md](docs/benchmarks.md) for methodology, caveats, and how to reproduce.
 
 ## 605 tests passing
 
@@ -494,6 +496,16 @@ cd packages/core
 pnpm test
 pnpm typecheck
 ```
+
+## Road to 1.0
+
+Capix is in **beta** with the [stability policy](docs/api/stability.md) in force: the documented public API and wire contracts only change with an explicit *Breaking* changelog section and a migration note. `1.0.0` ships when:
+
+- the beta has soaked in real projects long enough to trust the API shape — no breaking change needed for several consecutive releases,
+- field-reported bugs are burned down (see [issues](https://github.com/milanito/capix/issues)),
+- and the remaining pre-1.0 candidates are shipped or explicitly deferred: a distributed event bus adapter (cross-instance WebSocket broadcast) and an SQS queue adapter.
+
+Found a bug or missing piece? [Open an issue](https://github.com/milanito/capix/issues/new/choose) — beta feedback directly shapes what 1.0 looks like.
 
 ## License
 

@@ -24,7 +24,7 @@ features:
 
   - icon: ⚡
     title: Fast
-    details: 28,000 req/s on hello world. Beats Express by 65%, Hono by 19–27%. Within 3% of Fastify on auth+guard.
+    details: 26,000+ req/s on hello world. Beats Express by ~60%, Hono by 11–19%. Within 6% of Fastify across all scenarios.
 
   - icon: 🧰
     title: Complete CLI

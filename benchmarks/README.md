@@ -174,3 +174,21 @@ A few honest caveats:
 - **Shared machine**: all processes compete for the same CPU. Numbers shift run-to-run; treat them as order-of-magnitude, not precise ratios.
 - **`timeout: false`**: the benchmark server disables per-request AbortSignal creation. Production code (default `timeout: 30_000`) is ~6% slower. This is a fair comparison for throughput benchmarks; real apps need timeouts.
 - **This is not a real app**: a single-route microbenchmark is the best case for every framework. Real workloads with middleware stacks and database I/O will dominate any framework-level difference.
+
+---
+
+## v5 — re-measured on 0.1.0-beta.1
+
+Re-run after the beta-hardening work (Zod 4 migration, graceful shutdown with
+connection tracking, pluggable enhancer stores, optional lifecycle hooks —
+hooks unconfigured here, so the engine runs unwrapped).
+
+| Scenario | Fastify | **Capix** | Hono | Express |
+|---|------:|------:|------:|------:|
+| Hello world | 27,659 | **26,240** | 22,910 | 16,176 |
+| Zod validation | 25,526 | **24,316** | 21,876 | 15,259 |
+| Auth + guard | 25,813 | **24,194** | 20,332 | 15,366 |
+
+Relative standing after all the hardening: within 5–6% of Fastify, +11–19%
+over Hono, ~+60% over Express. The absolute numbers moved with the
+environment (different load, Zod 4); the ranking did not.

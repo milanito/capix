@@ -1,0 +1,60 @@
+name: Bug report
+description: Something behaves differently than documented
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Capix version
+      placeholder: 0.1.0-beta.1
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - core (capability / guards / enhancers / engine)
+        - transport-rest
+        - transport-ws
+        - transport-graphql
+        - transport-queue
+        - transport-mcp
+        - store-redis
+        - plugin (auth / cors / helmet / logging)
+        - cli
+        - testing
+        - docs
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: >
+        The smallest capability + server setup that shows the problem.
+        A runnable snippet beats a description — most fixes start by
+        pasting this into a test.
+      render: ts
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected vs actual
+      placeholder: |
+        Expected: GET /users/1 returns 200 { data: ... }
+        Actual:   returns 400 BadRequest with ...
+    validations:
+      required: true
+
+  - type: input
+    id: node
+    attributes:
+      label: Node.js version
+      placeholder: 22.x
+    validations:
+      required: true
