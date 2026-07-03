@@ -333,6 +333,31 @@ importers:
         specifier: ^5.5.0
         version: 5.9.3
 
+  examples/with-mcp:
+    dependencies:
+      '@capixjs/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@capixjs/transport-mcp':
+        specifier: workspace:*
+        version: link:../../packages/transports/mcp
+      '@capixjs/transport-rest':
+        specifier: workspace:*
+        version: link:../../packages/transports/rest
+      zod:
+        specifier: ^4.0.0
+        version: 4.4.3
+    devDependencies:
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.41
+      tsx:
+        specifier: ^4.0.0
+        version: 4.22.3
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+
   packages/core:
     dependencies:
       zod:

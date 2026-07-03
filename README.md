@@ -432,6 +432,7 @@ See [docs/cli.md](docs/cli.md) for all commands.
 | [`examples/file-upload`](examples/file-upload) | Multipart file upload |
 | [`examples/pagination`](examples/pagination) | Query string coercion, filters, sorting |
 | [`examples/jwt-auth`](examples/jwt-auth) | Full JWT auth flow |
+| [`examples/with-mcp`](examples/with-mcp) | Same capabilities served over REST and MCP at once |
 
 ## Testing
 

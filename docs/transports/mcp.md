@@ -75,3 +75,7 @@ mcpTransport({ port: 3001, capabilities: { search: { findDocs }, users: { getUse
 ```
 
 Guards still run on every call — but not exposing a capability at all is the stronger default.
+
+## Example
+
+[`examples/with-mcp`](https://github.com/milanito/capix/tree/master/examples/with-mcp) serves the same notes registry over REST and MCP simultaneously, with an `x-api-key` admin guard enforced identically on both transports.
