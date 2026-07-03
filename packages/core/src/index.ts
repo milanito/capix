@@ -71,6 +71,7 @@ export type {
   SerializedError,
   InvokeFn,
   ExecutionEngineOptions,
+  LifecycleHooks,
 } from './execution-engine.js';
 
 // Plugin

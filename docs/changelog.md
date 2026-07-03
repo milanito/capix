@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.1.0-alpha.23 — 2026-07-03
+
+### Added
+- **Lifecycle hooks.** `createServer({ hooks })` observes every capability
+  invocation on every transport: `onRequest`, `onResponse` (with
+  `durationMs` and data), and `onError` (fires for unknown capabilities,
+  guard rejections, validation failures, and resolver throws alike). The
+  same request object flows through a call's hooks, so a `WeakMap` keys
+  tracing spans — hook errors are isolated and never affect the request.
+  Also available on `createExecutionEngine` directly
+- **New guide: Observability** — lifecycle hooks, an OpenTelemetry span
+  recipe, Sentry error reporting, and per-capability metrics
+
+### Fixed
+- **Publishing was blocked since alpha.19**: the packages that gained
+  tests in that release shipped compiled test files in their tarballs,
+  failing the audit's pack-integrity gate. alpha.19–alpha.21 never
+  reached npm; their changes ship in alpha.22+
+
+---
+
 ## 0.1.0-alpha.22 — 2026-07-03
 
 ### Added

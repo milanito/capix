@@ -4,6 +4,7 @@ import { capability } from './capability.js';
 import { compileRegistry } from './capability.js';
 import { createExecutionEngine } from './execution-engine.js';
 import { defineError, defaultErrors } from './errors.js';
+import { defineContext } from './context.js';
 import { defineInputGuard } from './guards.js';
 
 const buildContext = async () => ({ requestId: 'test-id', user: null as null | { id: string } });
@@ -321,5 +322,100 @@ describe('execution engine', () => {
     expect(r1).toEqual({ ok: true, data: 1 });
     expect(r2).toEqual({ ok: true, data: 2 });
     expect(r3).toEqual({ ok: true, data: 3 });
+  });
+});
+
+describe('lifecycle hooks', () => {
+  const okCap = capability(z.object({ id: z.string() }), ({ id }) => ({ id }));
+  const boomCap = capability(z.object({}), () => {
+    throw new Error('kaboom');
+  });
+
+  function engineWith(hooks: NonNullable<Parameters<typeof createExecutionEngine>[0]['hooks']>) {
+    return createExecutionEngine({
+      registry: compileRegistry({ users: { getUser: okCap }, sys: { doBoom: boomCap } }),
+      buildContext: defineContext(async () => ({ requestId: 't' })),
+      isDevelopment: false,
+      hooks,
+    });
+  }
+
+  const req = (capability: string, input: unknown) => ({
+    capability,
+    input,
+    headers: {},
+    signal: AbortSignal.timeout(1000),
+  });
+
+  it('fires onRequest and onResponse around a successful call', async () => {
+    const events: string[] = [];
+    const invoke = engineWith({
+      onRequest: (r) => events.push(`req:${r.capability}`),
+      onResponse: (r, info) => {
+        events.push(`res:${r.capability}:${typeof info.durationMs}`);
+        expect(info.data).toEqual({ id: '1' });
+      },
+      onError: () => events.push('error'),
+    });
+
+    await invoke(req('users.getUser', { id: '1' }));
+    expect(events).toEqual(['req:users.getUser', 'res:users.getUser:number']);
+  });
+
+  it('fires onError for resolver failures, validation failures, and unknown capabilities', async () => {
+    const errors: Array<[string, number]> = [];
+    const invoke = engineWith({
+      onError: (r, info) => errors.push([r.capability, info.error.status]),
+    });
+
+    await invoke(req('sys.doBoom', {}));
+    await invoke(req('users.getUser', { id: 42 }));
+    await invoke(req('ghost.missing', {}));
+
+    expect(errors).toEqual([
+      ['sys.doBoom', 500],
+      ['users.getUser', 400],
+      ['ghost.missing', 404],
+    ]);
+  });
+
+  it('correlates onRequest and completion via request object identity', async () => {
+    const spans = new WeakMap<object, { started: true }>();
+    let paired = false;
+    const invoke = engineWith({
+      onRequest: (r) => spans.set(r, { started: true }),
+      onResponse: (r) => {
+        paired = spans.has(r);
+      },
+    });
+
+    await invoke(req('users.getUser', { id: '1' }));
+    expect(paired).toBe(true);
+  });
+
+  it('hook errors are isolated — the request still succeeds', async () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const invoke = engineWith({
+      onRequest: () => {
+        throw new Error('hook exploded');
+      },
+      onResponse: () => {
+        throw new Error('hook exploded again');
+      },
+    });
+
+    const response = await invoke(req('users.getUser', { id: '1' }));
+    expect(response.ok).toBe(true);
+    expect(consoleSpy).toHaveBeenCalledTimes(2);
+    consoleSpy.mockRestore();
+  });
+
+  it('no hooks configured — engine is returned unwrapped', async () => {
+    const invoke = createExecutionEngine({
+      registry: compileRegistry({ users: { getUser: okCap } }),
+      buildContext: defineContext(async () => ({ requestId: 't' })),
+    });
+    const response = await invoke(req('users.getUser', { id: '1' }));
+    expect(response.ok).toBe(true);
   });
 });

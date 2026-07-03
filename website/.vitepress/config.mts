@@ -36,7 +36,7 @@ export default defineConfig({
       { text: 'Patterns',    link: '/patterns/auth' },
       { text: 'Benchmarks',  link: '/benchmarks' },
       {
-        text: 'v0.1.0-alpha.22',
+        text: 'v0.1.0-alpha.23',
         items: [
           { text: 'Changelog', link: '/changelog' },
           { text: 'npm',       link: 'https://www.npmjs.com/package/@capixjs/core' },
@@ -63,6 +63,7 @@ export default defineConfig({
             { text: 'Errors',       link: '/guide/errors' },
             { text: 'Enhancers',    link: '/guide/enhancers' },
             { text: 'Plugins',      link: '/guide/plugins' },
+            { text: 'Observability', link: '/guide/observability' },
             { text: 'Testing',      link: '/guide/testing' },
           ],
         },

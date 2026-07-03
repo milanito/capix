@@ -30,10 +30,28 @@ export type CapabilityResponse =
 
 export type InvokeFn = (req: CapabilityRequest) => Promise<CapabilityResponse>;
 
+/**
+ * Lifecycle hooks observing every capability invocation on every transport.
+ *
+ * Hooks receive the same CapabilityRequest object across the request's
+ * lifecycle — key a WeakMap on it to correlate onRequest with the outcome
+ * (e.g. to close a tracing span). Hook errors are caught and logged; they
+ * never affect the request.
+ */
+export type LifecycleHooks = {
+  /** Fires when a request enters the engine, before lookup and validation. */
+  readonly onRequest?: (req: CapabilityRequest) => void;
+  /** Fires after a successful resolve. */
+  readonly onResponse?: (req: CapabilityRequest, info: { durationMs: number; data: unknown }) => void;
+  /** Fires on any failure: unknown capability, guard rejection, validation, resolver throw. */
+  readonly onError?: (req: CapabilityRequest, info: { durationMs: number; error: SerializedError }) => void;
+};
+
 export type ExecutionEngineOptions = {
   readonly registry: CapabilityRegistry;
   readonly buildContext: ContextBuilder;
   readonly isDevelopment?: boolean;
+  readonly hooks?: LifecycleHooks;
 };
 
 function toErrorResponse(err: unknown, isDevelopment: boolean): CapabilityResponse {
@@ -71,7 +89,7 @@ function toErrorResponse(err: unknown, isDevelopment: boolean): CapabilityRespon
 export function createExecutionEngine(options: ExecutionEngineOptions): InvokeFn {
   const { registry, buildContext, isDevelopment = false } = options;
 
-  return async function invoke(req: CapabilityRequest): Promise<CapabilityResponse> {
+  const invoke = async function invoke(req: CapabilityRequest): Promise<CapabilityResponse> {
     // 1. Look up capability
     const cap = registry.get(req.capability);
     if (!cap) {
@@ -240,5 +258,33 @@ export function createExecutionEngine(options: ExecutionEngineOptions): InvokeFn
     }
 
     return { ok: true, data: output };
+  };
+
+  const hooks = options.hooks;
+  if (hooks === undefined) return invoke;
+
+  // Hook errors are isolated: observability must never fail a request.
+  const fire = (fn: (() => void) | undefined, name: string): void => {
+    if (fn === undefined) return;
+    try {
+      fn();
+    } catch (err) {
+      console.error(`[capix] Lifecycle hook '${name}' threw:`, err);
+    }
+  };
+
+  return async function invokeWithHooks(req: CapabilityRequest): Promise<CapabilityResponse> {
+    const start = Date.now();
+    fire(hooks.onRequest && (() => hooks.onRequest!(req)), 'onRequest');
+
+    const response = await invoke(req);
+    const durationMs = Date.now() - start;
+
+    if (response.ok) {
+      fire(hooks.onResponse && (() => hooks.onResponse!(req, { durationMs, data: response.data })), 'onResponse');
+    } else {
+      fire(hooks.onError && (() => hooks.onError!(req, { durationMs, error: response.error })), 'onError');
+    }
+    return response;
   };
 }

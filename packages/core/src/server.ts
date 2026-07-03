@@ -6,7 +6,7 @@
 import type { AnyCapability, CapabilityRegistry, GroupTree } from './capability.js';
 import { compileRegistry } from './capability.js';
 import type { ContextBuilder } from './context.js';
-import type { InvokeFn } from './execution-engine.js';
+import type { InvokeFn, LifecycleHooks } from './execution-engine.js';
 import { createExecutionEngine } from './execution-engine.js';
 import type { Plugin } from './plugin.js';
 import { mergePlugins } from './plugin.js';
@@ -41,6 +41,12 @@ export type ServerConfig = {
   readonly transports: Transport[];
   readonly plugins?: Plugin[];
   readonly isDevelopment?: boolean;
+  /**
+   * Lifecycle hooks observing every capability invocation on every transport
+   * — the integration point for tracing, metrics, and error reporting.
+   * See the observability guide for OpenTelemetry and Sentry recipes.
+   */
+  readonly hooks?: LifecycleHooks;
 };
 
 export type Server = {
@@ -102,6 +108,7 @@ export function createServer(config: ServerConfig): Server {
     registry:      serverRegistry,
     buildContext:  wrappedContext,
     isDevelopment: config.isDevelopment ?? process.env['NODE_ENV'] !== 'production',
+    ...(config.hooks !== undefined ? { hooks: config.hooks } : {}),
   });
 
   const isDev = config.isDevelopment ?? process.env['NODE_ENV'] !== 'production';
@@ -143,7 +150,12 @@ export function createServer(config: ServerConfig): Server {
         // Plugin additional capabilities are always merged in
         const tree = { ...caps, ...additionalCapabilities };
         const registry = compileRegistry(tree as Parameters<typeof compileRegistry>[0]);
-        const invoke   = createExecutionEngine({ registry, buildContext: wrappedContext, isDevelopment: isDev });
+        const invoke   = createExecutionEngine({
+          registry,
+          buildContext: wrappedContext,
+          isDevelopment: isDev,
+          ...(config.hooks !== undefined ? { hooks: config.hooks } : {}),
+        });
 
         await transport.mount(invoke, { registry, invoke });
       }
