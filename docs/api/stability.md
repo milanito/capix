@@ -36,6 +36,18 @@ These are public API — clients depend on them:
 
 All `@capixjs/*` packages are versioned in lockstep — mixing versions across packages is unsupported.
 
+## Non-goals for 1.0
+
+**Streaming responses.** Capabilities return a value; they do not stream. The execution engine explicitly rejects async iterables, and this is a decision, not a gap: the capability contract ("one typed input, one typed output, identical on every transport") is what lets REST, WebSocket, GraphQL, queue, and MCP share one engine, one validation pipeline, and one error model. Streaming has no uniform meaning across those transports, so admitting it would fork the contract per transport.
+
+What to use instead:
+
+- **Incremental updates to clients** — publish to the event bus from your resolver; WebSocket subscribers receive each event as it happens (see the real-time pattern).
+- **Large file downloads** — serve them from the REST transport's `hooks.onRequest` escape hatch or a dedicated static file server/CDN; a capability can return the signed URL.
+- **Long-running work** — enqueue a job (queue transport) and let the client poll a status capability or subscribe to a completion event.
+
+If a first-class streaming story lands post-1.0, it will be a new primitive alongside capabilities, not a change to them.
+
 ## Zod
 
 Capix requires `zod@^4` and reads schema internals via Zod's documented library-author surface (`schema._zod.def`, `z.toJSONSchema`). A future Zod major is a breaking change for Capix and will be handled as one.

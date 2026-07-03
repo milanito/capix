@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.1.0-alpha.24 — 2026-07-03
+
+### Added
+- **npm provenance.** Packages are now published with provenance
+  attestations linking each tarball to the exact commit and workflow run
+  that built it — verify with `npm audit signatures`
+- **`SECURITY.md`** — private vulnerability reporting channel, supported
+  versions, and scope notes
+- **Streaming: documented as an explicit 1.0 non-goal** in the API
+  stability page, with the reasoning (one capability contract across five
+  transports) and the supported alternatives: event bus for incremental
+  client updates, the REST `onRequest` hook or a CDN for file downloads,
+  and queue + status polling for long-running work
+
+### Verified
+- **Soak test**: ~2 million mixed requests (success, validation failures,
+  guard rejections, 404s, create/delete cycles) at ~7 000 req/s over
+  sustained load — zero errors, memory flat at steady state with no
+  growth between consecutive load bursts
+
+This completes the 1.0-readiness gate: pluggable distributed stores
+(alpha.21), JWKS/RS256 auth (alpha.22), lifecycle hooks and the
+observability guide (alpha.23), and this release's engineering items.
+
+---
+
 ## 0.1.0-alpha.23 — 2026-07-03
 
 ### Added

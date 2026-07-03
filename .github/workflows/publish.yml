@@ -50,6 +50,9 @@ jobs:
     needs: [check-version, audit]
     if: needs.check-version.outputs.should-publish == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # GitHub release creation
+      id-token: write   # npm provenance attestation
 
     steps:
       - name: Checkout
@@ -91,7 +94,7 @@ jobs:
             local pkg=$1
             echo "Publishing $pkg..."
             cd "$pkg"
-            pnpm publish --tag "$TAG" --access public --no-git-checks
+            pnpm publish --tag "$TAG" --access public --no-git-checks --provenance
             cd "$GITHUB_WORKSPACE"
           }
 
