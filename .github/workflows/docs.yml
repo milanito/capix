@@ -49,5 +49,17 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
+      # deploy-pages fails transiently on GitHub's side (~half our runs;
+      # build never fails) and a manual relaunch always lands it — so
+      # retry once automatically after a pause instead.
       - uses: actions/deploy-pages@v4
         id: deployment
+        continue-on-error: true
+
+      - name: Pause before retry
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 30
+
+      - uses: actions/deploy-pages@v4
+        id: retry
+        if: steps.deployment.outcome == 'failure'

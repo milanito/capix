@@ -91,6 +91,17 @@ jobs:
             cd "$pkg" && npx tsc --noEmit && cd "$GITHUB_WORKSPACE"
           done
 
+      # Examples are workspace packages but have no test/typecheck scripts —
+      # without this step, API changes can silently break every example.
+      - name: TypeScript check (examples)
+        run: |
+          for ex in examples/*/; do
+            if [ -f "$ex/tsconfig.json" ]; then
+              echo "Checking $ex..."
+              cd "$ex" && npx tsc --noEmit && cd "$GITHUB_WORKSPACE"
+            fi
+          done
+
       # ─── Package integrity ────────────────────────────────────────────────
 
       - name: Verify all packages are scoped @capixjs/*
