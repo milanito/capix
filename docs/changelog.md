@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.1.0-alpha.20 — 2026-07-03
+
+### Fixed
+- **`capix --version` reported a hardcoded `0.1.0`** regardless of the
+  installed version. It now reads the CLI's own package.json at runtime
+
+### Added
+- **Coverage gate in CI.** Core's existing coverage thresholds
+  (85% statements / 80% branches / 90% functions / 85% lines in
+  `vitest.config.ts`) were never enforced — the audit workflow now runs
+  the coverage suite and fails the publish if they regress
+
+This release completes the beta gate: API surface frozen (alpha.16),
+graceful shutdown (alpha.17), WebSocket hardening (alpha.18), full test
+coverage of every package plus a Node 20/22/24 CI matrix (alpha.19), and
+these final correctness items.
+
+---
+
 ## 0.1.0-alpha.19 — 2026-07-03
 
 ### Added

@@ -74,6 +74,10 @@ jobs:
       - name: Run test suite
         run: pnpm test
 
+      # Coverage gate — thresholds live in packages/core/vitest.config.ts
+      - name: Core coverage gate
+        run: pnpm --dir packages/core test:coverage
+
       # ─── TypeScript ───────────────────────────────────────────────────────
 
       - name: TypeScript check (all packages)

@@ -13,13 +13,14 @@ import { registerOpenapi } from './commands/openapi.js';
 import { registerMcp } from './commands/mcp.js';
 import { registerDiff } from './commands/diff.js';
 import { registerAiContext } from './commands/ai-context.js';
+import { cliVersion } from './utils/version.js';
 
 const program = new Command();
 
 program
   .name('capix')
   .description('CLI for the Capix framework')
-  .version('0.1.0');
+  .version(cliVersion());
 
 registerNew(program);
 registerGenerate(program);
