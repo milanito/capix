@@ -1,7 +1,17 @@
 {
   "name": "@capixjs/cli",
   "version": "0.1.0-alpha.24",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/milanito/capix.git",
+    "directory": "cli"
+  },
+  "homepage": "https://github.com/milanito/capix#readme",
+  "bugs": {
+    "url": "https://github.com/milanito/capix/issues"
+  },
   "description": "CLI for the Capix framework",
+  "license": "MIT",
   "type": "module",
   "bin": {
     "capix": "./dist/index.js"

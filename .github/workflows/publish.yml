@@ -90,11 +90,14 @@ jobs:
           TAG="${{ steps.tag.outputs.tag }}"
           echo "Publishing with tag: $TAG"
 
+          # pnpm pack rewrites workspace:* deps to real versions; npm publish
+          # provides the provenance attestation (pnpm has no --provenance).
           publish_pkg() {
             local pkg=$1
             echo "Publishing $pkg..."
             cd "$pkg"
-            pnpm publish --tag "$TAG" --access public --no-git-checks --provenance
+            TARBALL=$(pnpm pack --pack-destination "$RUNNER_TEMP" | tail -1)
+            npm publish "$TARBALL" --tag "$TAG" --access public --provenance
             cd "$GITHUB_WORKSPACE"
           }
 

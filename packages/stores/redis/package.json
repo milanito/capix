@@ -3,6 +3,15 @@
   "version": "0.1.0-alpha.24",
   "description": "Redis-backed cache and rate-limit stores for Capix enhancers",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/milanito/capix.git",
+    "directory": "packages/stores/redis"
+  },
+  "homepage": "https://github.com/milanito/capix#readme",
+  "bugs": {
+    "url": "https://github.com/milanito/capix/issues"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

@@ -3,6 +3,15 @@
   "version": "0.1.0-alpha.24",
   "description": "Message queue transport for Capix (BullMQ + in-memory)",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/milanito/capix.git",
+    "directory": "packages/transports/queue"
+  },
+  "homepage": "https://github.com/milanito/capix#readme",
+  "bugs": {
+    "url": "https://github.com/milanito/capix/issues"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

@@ -3,6 +3,15 @@
   "version": "0.1.0-alpha.24",
   "description": "Capix testing utilities",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/milanito/capix.git",
+    "directory": "packages/testing"
+  },
+  "homepage": "https://github.com/milanito/capix#readme",
+  "bugs": {
+    "url": "https://github.com/milanito/capix/issues"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

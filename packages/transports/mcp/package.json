@@ -1,8 +1,17 @@
 {
   "name": "@capixjs/transport-mcp",
   "version": "0.1.0-alpha.24",
-  "description": "Capix MCP transport — expose capabilities as Model Context Protocol tools",
+  "description": "Capix MCP transport \u2014 expose capabilities as Model Context Protocol tools",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/milanito/capix.git",
+    "directory": "packages/transports/mcp"
+  },
+  "homepage": "https://github.com/milanito/capix#readme",
+  "bugs": {
+    "url": "https://github.com/milanito/capix/issues"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
