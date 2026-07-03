@@ -5,15 +5,15 @@ export type NewProjectOptions = {
 
 export function renderPackageJson(opts: NewProjectOptions): string {
   const deps: Record<string, string> = {
-    '@capixjs/core': 'alpha',
+    '@capixjs/core': 'beta',
     zod: '^4.0.0',
   };
 
   if (opts.transport === 'rest' || opts.transport === 'both') {
-    deps['@capixjs/transport-rest'] = 'alpha';
+    deps['@capixjs/transport-rest'] = 'beta';
   }
   if (opts.transport === 'ws' || opts.transport === 'both') {
-    deps['@capixjs/transport-ws'] = 'alpha';
+    deps['@capixjs/transport-ws'] = 'beta';
   }
 
   return JSON.stringify(

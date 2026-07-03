@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.1.0-beta.1 — 2026-07-03
+
+**Capix is in beta.** From this release on, the
+[API stability policy](https://github.com/milanito/capix/blob/master/docs/api/stability.md)
+is in force: the documented public API and the wire contracts (the
+`{ data }` envelope, the error shape, route inference, GraphQL/MCP
+naming) only change with an explicit *Breaking* changelog section and a
+migration note. Install with the `beta` tag (also tracked by `latest`):
+
+```bash
+npm install @capixjs/core@beta @capixjs/transport-rest@beta zod@^4
+```
+
+What the alpha hardening delivered, in one place: an audited and frozen
+API surface, graceful shutdown on every transport, WebSocket
+payload/heartbeat/subscription hardening, tests for every package with a
+Node 20/22/24 + Windows CI matrix and a coverage gate, pluggable
+cache/rate-limit stores with a Redis adapter, JWKS/RS256 auth with pinned
+algorithms, lifecycle hooks for tracing and error reporting, npm
+provenance attestations, and a clean multi-million-request soak.
+
+### Changed
+- `capix new` scaffolds and the docs now install from the `beta` dist-tag
+
+---
+
 ## 0.1.0-alpha.24 — 2026-07-03
 
 ### Added
