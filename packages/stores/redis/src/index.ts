@@ -12,6 +12,13 @@
 
 import type { CacheStore, RateLimitStore } from '@capixjs/core';
 
+export { createRedisEventBus } from './event-bus.js';
+export type {
+  RedisPublisherClient,
+  RedisSubscriberClient,
+  RedisEventBusOptions,
+} from './event-bus.js';
+
 /**
  * The subset of a Redis client the stores need — structurally compatible
  * with ioredis. No Redis library is bundled or required by this package.

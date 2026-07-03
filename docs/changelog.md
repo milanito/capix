@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.0-beta.2 — 2026-07-03
+
+### Added
+- **Cross-instance event bus: `createRedisEventBus` in
+  `@capixjs/store-redis`.** The in-memory bus delivers only within one
+  process — behind a load balancer, an event published on instance A never
+  reached WebSocket clients on instance B. The Redis bus is a drop-in
+  `EventBus` (same `wsTransport({ eventBus })` wiring, same
+  `publish`/`subscribe`/filters) that routes events through Redis pub/sub;
+  every instance, including the publisher's own, receives through the same
+  broker path. Verified end to end: two full servers, a REST mutation on
+  one delivering to a WebSocket subscriber on the other
+
+---
+
 ## 0.1.0-beta.1 — 2026-07-03
 
 **Capix is in beta.** From this release on, the

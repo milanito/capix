@@ -121,6 +121,22 @@ createServer({
 });
 ```
 
+### Multiple instances
+
+`createEventBus` is in-memory: behind a load balancer, an event published on instance A never reaches WebSocket clients connected to instance B. Swap in the Redis-backed bus from [`@capixjs/store-redis`](https://github.com/milanito/capix/tree/master/packages/stores/redis) — same interface, cross-instance delivery via Redis pub/sub:
+
+```ts
+import Redis from 'ioredis';
+import { createRedisEventBus } from '@capixjs/store-redis';
+
+export const eventBus = createRedisEventBus<AppEvents>(
+  new Redis(process.env.REDIS_URL),  // publisher connection
+  new Redis(process.env.REDIS_URL),  // dedicated subscriber connection
+);
+```
+
+Everything else — `wsTransport({ eventBus })`, `eventBus.publish(...)` in resolvers, client subscribe messages — stays identical.
+
 ```ts
 // src/capabilities/orders/pay.ts
 import { eventBus } from '../../events.js';

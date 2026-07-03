@@ -15,7 +15,8 @@
     "@capixjs/plugin-logging": "workspace:*",
     "@capixjs/core": "workspace:*",
     "@capixjs/transport-graphql": "workspace:*",
-    "@capixjs/transport-mcp": "workspace:*"
+    "@capixjs/transport-mcp": "workspace:*",
+    "@capixjs/store-redis": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

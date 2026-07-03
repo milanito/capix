@@ -635,6 +635,9 @@ importers:
       '@capixjs/plugin-logging':
         specifier: workspace:*
         version: link:../../packages/plugins/logging
+      '@capixjs/store-redis':
+        specifier: workspace:*
+        version: link:../../packages/stores/redis
       '@capixjs/transport-graphql':
         specifier: workspace:*
         version: link:../../packages/transports/graphql
