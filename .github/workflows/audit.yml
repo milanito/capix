@@ -84,7 +84,7 @@ jobs:
         run: |
           for pkg in packages/core packages/transports/rest packages/transports/ws \
                      packages/transports/graphql packages/transports/queue \
-                     packages/transports/mcp \
+                     packages/transports/mcp packages/stores/redis \
                      packages/testing packages/plugins/cors packages/plugins/helmet \
                      packages/plugins/logging packages/plugins/auth cli; do
             echo "Checking $pkg..."
@@ -98,7 +98,7 @@ jobs:
           FAILED=0
           for pkg in packages/core packages/transports/rest packages/transports/ws \
                      packages/transports/graphql packages/transports/queue \
-                     packages/transports/mcp \
+                     packages/transports/mcp packages/stores/redis \
                      packages/testing packages/plugins/cors packages/plugins/helmet \
                      packages/plugins/logging packages/plugins/auth cli; do
             name=$(node -p "require('./$pkg/package.json').name")
@@ -117,7 +117,7 @@ jobs:
           FAILED=0
           for pkg in packages/transports/rest packages/transports/ws \
                      packages/transports/graphql packages/transports/queue \
-                     packages/transports/mcp \
+                     packages/transports/mcp packages/stores/redis \
                      packages/testing packages/plugins/cors packages/plugins/helmet \
                      packages/plugins/logging packages/plugins/auth cli; do
             ver=$(node -p "require('./$pkg/package.json').version")
@@ -136,7 +136,7 @@ jobs:
           # Packages that peer on @capixjs/core
           for pkg in packages/transports/rest packages/transports/ws \
                      packages/transports/graphql packages/transports/queue \
-                     packages/transports/mcp \
+                     packages/transports/mcp packages/stores/redis \
                      packages/testing packages/plugins/logging packages/plugins/auth; do
             peer=$(node -p "require('./$pkg/package.json').peerDependencies?.['@capixjs/core'] || ''")
             if [[ "$peer" != *"-0"* ]]; then
@@ -163,7 +163,7 @@ jobs:
           FAILED=0
           for pkg in packages/core packages/transports/rest packages/transports/ws \
                      packages/transports/graphql packages/transports/queue \
-                     packages/transports/mcp \
+                     packages/transports/mcp packages/stores/redis \
                      packages/testing packages/plugins/cors packages/plugins/helmet \
                      packages/plugins/logging packages/plugins/auth cli; do
             [ -f "$pkg/LICENSE" ]   || { echo "✗ $pkg: missing LICENSE";   FAILED=1; }
@@ -177,7 +177,7 @@ jobs:
           FAILED=0
           for pkg in packages/core packages/transports/rest packages/transports/ws \
                      packages/transports/graphql packages/transports/queue \
-                     packages/transports/mcp \
+                     packages/transports/mcp packages/stores/redis \
                      packages/testing packages/plugins/cors packages/plugins/helmet \
                      packages/plugins/logging packages/plugins/auth cli; do
             cd "$pkg"

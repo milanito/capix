@@ -1,6 +1,6 @@
 {
   "name": "@capixjs/cli",
-  "version": "0.1.0-alpha.20",
+  "version": "0.1.0-alpha.21",
   "description": "CLI for the Capix framework",
   "type": "module",
   "bin": {

@@ -6,6 +6,8 @@
 import type { Enhancer, AnyCapability } from './capability.js';
 import { defineError, isFrameworkError } from './errors.js';
 import { defaultErrors } from './errors.js';
+import { createMemoryCacheStore, createMemoryRateLimitStore } from './stores.js';
+import type { CacheStore, RateLimitStore } from './stores.js';
 
 /** Pass-through for type inference. */
 export function defineEnhancer(fn: Enhancer): Enhancer {
@@ -34,8 +36,9 @@ export const withLogging = defineEnhancer((cap) => ({
 
 export type CacheOptions = {
   /**
-   * Maximum number of cached entries. Least-recently-used entries are evicted
-   * when the limit is reached. Default: 1_000.
+   * Maximum number of cached entries in the default in-memory store.
+   * Least-recently-used entries are evicted when the limit is reached.
+   * Default: 1_000. Ignored when a custom `store` is provided.
    */
   readonly maxSize?: number;
   /**
@@ -50,35 +53,31 @@ export type CacheOptions = {
    * withCache(30, { keyFn: (input, ctx) => `${(ctx as AppContext).user?.id}:${JSON.stringify(input)}` })
    */
   readonly keyFn?: (input: unknown, ctx: unknown) => string;
+  /**
+   * Cache backend. Defaults to an in-memory LRU, which is per-process — behind
+   * a load balancer each instance caches independently. Use a shared store
+   * (e.g. redisCacheStore from @capixjs/store-redis) for multi-instance
+   * deployments.
+   */
+  readonly store?: CacheStore;
 };
 
-/** In-memory LRU cache. Key = capabilityName:keyFn(input, ctx). TTL in seconds. */
+/** Caches resolver results. Key = capabilityName:keyFn(input, ctx). TTL in seconds. */
 export function withCache(ttlSeconds: number, options: CacheOptions = {}): Enhancer {
-  const maxSize = options.maxSize ?? 1_000;
   const keyFn = options.keyFn;
-  const store = new Map<string, { value: unknown; expiresAt: number }>();
+  const store = options.store ?? createMemoryCacheStore(
+    options.maxSize !== undefined ? { maxSize: options.maxSize } : {},
+  );
 
   return defineEnhancer((cap) => ({
     ...cap,
     resolve: async (input: unknown, ctx: unknown) => {
       const key = `${cap.name}:${keyFn ? keyFn(input, ctx) : JSON.stringify(input)}`;
-      const cached = store.get(key);
-      if (cached !== undefined) {
-        if (cached.expiresAt > Date.now()) {
-          // Refresh recency for LRU ordering
-          store.delete(key);
-          store.set(key, cached);
-          return cached.value;
-        }
-        store.delete(key); // expired — don't let dead entries occupy capacity
-      }
+      const cached = await store.get(key);
+      if (cached !== undefined) return cached;
+
       const result = await (cap as AnyCapability)._resolverOnly(input, ctx);
-      if (store.size >= maxSize) {
-        // Evict least-recently-used (first key in Map insertion order)
-        const oldest = store.keys().next().value;
-        if (oldest !== undefined) store.delete(oldest);
-      }
-      store.set(key, { value: result, expiresAt: Date.now() + ttlSeconds * 1000 });
+      await store.set(key, result, ttlSeconds * 1000);
       return result;
     },
   })) as Enhancer;
@@ -152,63 +151,44 @@ export type RateLimitOptions = {
    */
   readonly keyFn?: (input: unknown, ctx: unknown) => string;
   /**
-   * Maximum number of distinct keys tracked. Default: 10_000.
-   *
-   * When exceeded, keys with no activity in the current window are swept;
-   * if every key is still active, the oldest-tracked keys are evicted (their
-   * rate-limit state resets). This bounds memory when keyFn has unbounded
-   * cardinality (per-user, per-IP).
+   * Maximum number of distinct keys tracked by the default in-memory store.
+   * Default: 10_000. When exceeded, keys with no activity in the current
+   * window are swept; if every key is still active, the oldest-tracked keys
+   * are evicted (their rate-limit state resets). This bounds memory when
+   * keyFn has unbounded cardinality (per-user, per-IP).
+   * Ignored when a custom `store` is provided.
    */
   readonly maxKeys?: number;
+  /**
+   * Rate-limit backend. Defaults to an in-memory sliding window, which is
+   * per-process — N instances behind a load balancer enforce N times the
+   * intended limit. Use a shared store (e.g. redisRateLimitStore from
+   * @capixjs/store-redis) for multi-instance deployments.
+   */
+  readonly store?: RateLimitStore;
 };
 
-/** Sliding-window in-memory rate limiter. Throws 429 when limit exceeded. */
+/** Rate limiter. Throws 429 with retryAfter meta when the limit is exceeded. */
 export function withRateLimit(options: RateLimitOptions): Enhancer {
   const { limit, windowMs, keyFn } = options;
-  const maxKeys = options.maxKeys ?? 10_000;
-  const store = new Map<string, number[]>();
-
-  function evictStale(now: number): void {
-    const cutoff = now - windowMs;
-    for (const [k, ts] of store) {
-      const last = ts[ts.length - 1];
-      if (last === undefined || last <= cutoff) store.delete(k);
-    }
-    // Every key still active — hard-cap by evicting oldest-tracked keys
-    if (store.size > maxKeys) {
-      for (const k of store.keys()) {
-        store.delete(k);
-        if (store.size <= maxKeys) break;
-      }
-    }
-  }
+  const store = options.store ?? createMemoryRateLimitStore(
+    options.maxKeys !== undefined ? { maxKeys: options.maxKeys } : {},
+  );
 
   return defineEnhancer((cap) => ({
     ...cap,
     resolve: async (input: unknown, ctx: unknown) => {
       const key = keyFn ? keyFn(input, ctx) : cap.name;
-      const now = Date.now();
-      const windowStart = now - windowMs;
+      const decision = await store.hit(key, limit, windowMs);
 
-      if (store.size > maxKeys) evictStale(now);
-
-      let timestamps = store.get(key) ?? [];
-      timestamps = timestamps.filter((t) => t > windowStart);
-
-      if (timestamps.length >= limit) {
-        // Find the oldest timestamp in the window — client can retry after it expires
-        const oldestInWindow = timestamps[0] ?? now;
-        const resetAt = oldestInWindow + windowMs;
-        const retryAfter = Math.ceil((resetAt - now) / 1000);
+      if (!decision.allowed) {
+        const resetAt = Date.now() + decision.retryAfterMs;
         throw defaultErrors.TooManyRequests({
-          retryAfter,
+          retryAfter: Math.ceil(decision.retryAfterMs / 1000),
           resetAt: new Date(resetAt).toISOString(),
           limit,
         });
       }
-
-      timestamps.push(now);
-      store.set(key, timestamps);
 
       return (cap as AnyCapability)._resolverOnly(input, ctx);
     },

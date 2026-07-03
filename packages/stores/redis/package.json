@@ -1,7 +1,7 @@
 {
-  "name": "@capixjs/transport-queue",
+  "name": "@capixjs/store-redis",
   "version": "0.1.0-alpha.21",
-  "description": "Message queue transport for Capix (BullMQ + in-memory)",
+  "description": "Redis-backed cache and rate-limit stores for Capix enhancers",
   "license": "MIT",
   "type": "module",
   "main": "./dist/index.js",
@@ -10,14 +10,6 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
-    },
-    "./memory": {
-      "import": "./dist/adapters/memory.js",
-      "types": "./dist/adapters/memory.d.ts"
-    },
-    "./bullmq": {
-      "import": "./dist/adapters/bullmq.js",
-      "types": "./dist/adapters/bullmq.d.ts"
     }
   },
   "files": [
@@ -27,12 +19,10 @@
   ],
   "keywords": [
     "capix",
-    "queue",
-    "bullmq",
     "redis",
-    "transport",
-    "background-jobs",
-    "typescript"
+    "cache",
+    "rate-limit",
+    "store"
   ],
   "engines": {
     "node": ">=20"
@@ -45,21 +35,11 @@
   "peerDependencies": {
     "@capixjs/core": ">=0.1.0-0"
   },
-  "peerDependenciesMeta": {
-    "bullmq": {
-      "optional": true
-    },
-    "ioredis": {
-      "optional": true
-    }
-  },
   "devDependencies": {
     "@types/node": "^20.0.0",
-    "bullmq": "^5.0.0",
-    "ioredis": "^5.0.0",
     "typescript": "^5.5.0",
     "vitest": "^1.6.0",
-    "zod": "^4.0.0",
-    "@capixjs/core": "workspace:*"
+    "@capixjs/core": "workspace:*",
+    "zod": "^4.0.0"
   }
 }

@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.1.0-alpha.21 — 2026-07-03
+
+### Added
+- **Pluggable stores for `withCache` and `withRateLimit`.** Both enhancers
+  accept a `store` option; the interfaces (`CacheStore`, `RateLimitStore`)
+  live in core and the in-memory defaults are unchanged (and now exported
+  as `createMemoryCacheStore` / `createMemoryRateLimitStore`). This is the
+  multi-instance fix: the defaults are per-process, so behind a load
+  balancer each instance cached independently and N instances enforced N×
+  the intended rate limit
+- **New package: `@capixjs/store-redis`.** `redisCacheStore(client)`
+  (JSON values, Redis-native expiry) and `redisRateLimitStore(client)`
+  (atomic fixed-window Lua counter — one round-trip per request, no race
+  past the limit across instances). Works with any ioredis-compatible
+  client; nothing is bundled
+
+---
+
 ## 0.1.0-alpha.20 — 2026-07-03
 
 ### Fixed

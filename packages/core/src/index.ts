@@ -55,6 +55,16 @@ export type {
 // Execution engine
 export { createExecutionEngine } from './execution-engine.js';
 export { closeHttpServerGracefully } from './http-shutdown.js';
+
+// Stores (pluggable backends for withCache / withRateLimit)
+export { createMemoryCacheStore, createMemoryRateLimitStore } from './stores.js';
+export type {
+  CacheStore,
+  RateLimitStore,
+  RateLimitResult,
+  MemoryCacheStoreOptions,
+  MemoryRateLimitStoreOptions,
+} from './stores.js';
 export type {
   CapabilityRequest,
   CapabilityResponse,

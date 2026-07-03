@@ -24,9 +24,9 @@ const getProduct = cap(z.object({ id: z.string() }), fetchProduct, 'query')
   .enhance(withCache(60)); // cache for 60 seconds
 ```
 
-**Note:** The cache is local to the process and is not shared across instances. For distributed caching, write a custom enhancer that reads from Redis.
+**Note:** By default the cache is local to the process and not shared across instances. Pass a shared `store` for multi-instance deployments — see [Distributed stores](#distributed-stores).
 
-**Note:** The cache does not respect context. Two users calling `getUser({ id: '1' })` will get the same cached result. If the output is user-specific, do not use `withCache` — or include a user identifier in the input.
+**Note:** The default cache key does not respect context. Two users calling `getUser({ id: '1' })` will get the same cached result. If the output is user-specific, provide a `keyFn` that includes a user identifier.
 
 ---
 
@@ -39,9 +39,48 @@ const sendEmail = cap(schema, handler)
   .enhance(withRateLimit({ max: 10, windowMs: 60_000 })); // 10 calls per minute
 ```
 
-When the limit is exceeded, throws `429 TooManyRequests`.
+When the limit is exceeded, throws `429 TooManyRequests` with `retryAfter` meta (the REST transport also sets a `Retry-After` header).
 
-**Note:** Like `withCache`, the limiter state is in-memory and per-process. Use a shared store for distributed rate limiting.
+**Note:** Like `withCache`, the default limiter state is in-memory and per-process — N instances behind a load balancer enforce N× the intended limit. Pass a shared `store` for real deployments.
+
+---
+
+## Distributed stores
+
+Both `withCache` and `withRateLimit` accept a `store` option. The interfaces live in `@capixjs/core`:
+
+```ts
+type CacheStore = {
+  get(key: string): unknown | undefined | Promise<unknown | undefined>;
+  set(key: string, value: unknown, ttlMs: number): void | Promise<void>;
+};
+
+type RateLimitStore = {
+  hit(key: string, limit: number, windowMs: number): RateLimitResult | Promise<RateLimitResult>;
+};
+```
+
+[`@capixjs/store-redis`](https://github.com/milanito/capix/tree/master/packages/stores/redis) implements both against any ioredis-compatible client:
+
+```ts
+import Redis from 'ioredis';
+import { redisCacheStore, redisRateLimitStore } from '@capixjs/store-redis';
+
+const redis = new Redis(process.env.REDIS_URL);
+
+cap(schema, resolver, 'query')
+  .enhance(withCache(30, { store: redisCacheStore(redis) }));
+
+cap(schema, resolver)
+  .enhance(withRateLimit({
+    limit: 100,
+    windowMs: 60_000,
+    keyFn: (_i, ctx) => ctx.user?.id ?? 'anon',
+    store: redisRateLimitStore(redis),
+  }));
+```
+
+The Redis rate limiter uses an atomic fixed window (one Lua round-trip per request); the in-memory default uses a sliding window. The defaults are also exported as `createMemoryCacheStore` / `createMemoryRateLimitStore` if you want to compose or test against them.
 
 ---
 

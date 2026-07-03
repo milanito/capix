@@ -454,6 +454,24 @@ importers:
         specifier: ^4.0.0
         version: 4.4.3
 
+  packages/stores/redis:
+    devDependencies:
+      '@capixjs/core':
+        specifier: workspace:*
+        version: link:../../core
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.41
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+      vitest:
+        specifier: ^1.6.0
+        version: 1.6.1(@types/node@20.19.41)
+      zod:
+        specifier: ^4.0.0
+        version: 4.4.3
+
   packages/testing:
     dependencies:
       zod:

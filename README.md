@@ -45,6 +45,7 @@ No `req`/`res`. No `next()`. No middleware stack. The HTTP layer is an optional 
 | [`@capixjs/transport-graphql`](packages/transports/graphql) | GraphQL transport with auto-generated schema and GraphiQL playground |
 | [`@capixjs/transport-queue`](packages/transports/queue) | Queue transport for background jobs via BullMQ, SQS, or any adapter |
 | [`@capixjs/transport-mcp`](packages/transports/mcp) | MCP transport — expose capabilities as Model Context Protocol tools |
+| [`@capixjs/store-redis`](packages/stores/redis) | Redis-backed cache and rate-limit stores for multi-instance deployments |
 | [`@capixjs/plugin-auth`](packages/plugins/auth) | JWT authentication — `jwtContextBuilder`, `createJWTHelpers`, `mustBeAuthenticated` |
 | [`@capixjs/plugin-cors`](packages/plugins/cors) | CORS plugin |
 | [`@capixjs/plugin-helmet`](packages/plugins/helmet) | Security headers plugin |
@@ -373,10 +374,10 @@ Capix's REST transport trails Fastify by ~3% in a hello-world microbenchmark and
 | Hono | 23,970 | 21,365 |
 | Express | 16,632 | 16,239 |
 
-## 568 tests passing
+## 584 tests passing
 
 ```
-pnpm -r test  →  568 tests, 0 failures
+pnpm -r test  →  584 tests, 0 failures
 ```
 
 ## CLI
