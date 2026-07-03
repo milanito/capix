@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.1.0-beta.3 — 2026-07-03
+
+### Added
+- **Amazon SQS queue adapter: `SqsQueueAdapter` in
+  `@capixjs/transport-queue`.** Pass an `@aws-sdk/client-sqs` aggregated
+  client and a queue-name → URL map; nothing is bundled. Long-polling
+  receive loop with concurrent batch processing; success deletes the
+  message; failed capability results stay queued so the visibility
+  timeout and your redrive policy / DLQ drive retries; unparseable
+  bodies are deleted (poison-message protection); FIFO queues get
+  `MessageGroupId`/`MessageDeduplicationId` automatically; `stop()`
+  drains in-flight handlers. 13 tests against a fake SQS with real
+  visibility semantics, including an end-to-end run through
+  `queueTransport` and the execution engine
+- The queue docs now show the shipped `BullMQAdapter` instead of a
+  hand-rolled example that predated it
+
+This completes the named pre-1.0 feature candidates — what remains
+before 1.0 is soak time and field feedback.
+
+---
+
 ## 0.1.0-beta.2 — 2026-07-03
 
 ### Added

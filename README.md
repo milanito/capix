@@ -60,7 +60,7 @@ No `req`/`res`. No `next()`. No middleware stack. Transports are wiring, not arc
 | [`@capixjs/transport-rest`](packages/transports/rest) | HTTP/1.1 REST transport with automatic route inference |
 | [`@capixjs/transport-ws`](packages/transports/ws) | WebSocket transport for real-time capabilities and server push |
 | [`@capixjs/transport-graphql`](packages/transports/graphql) | GraphQL transport with auto-generated schema and GraphiQL playground |
-| [`@capixjs/transport-queue`](packages/transports/queue) | Queue transport for background jobs — BullMQ adapter included, or bring any queue via `QueueAdapter` |
+| [`@capixjs/transport-queue`](packages/transports/queue) | Queue transport for background jobs — BullMQ and SQS adapters included, or bring any queue via `QueueAdapter` |
 | [`@capixjs/transport-mcp`](packages/transports/mcp) | MCP transport — expose capabilities as Model Context Protocol tools |
 | [`@capixjs/store-redis`](packages/stores/redis) | Redis-backed cache, rate-limit stores, and cross-instance event bus |
 | [`@capixjs/plugin-auth`](packages/plugins/auth) | JWT authentication — `jwtContextBuilder`, `createJWTHelpers`, `mustBeAuthenticated` |
@@ -393,10 +393,10 @@ Capix's REST transport trails Fastify by ~3% in a hello-world microbenchmark and
 
 Measured on `0.1.0-beta.1` — see [docs/benchmarks.md](docs/benchmarks.md) for methodology, caveats, and how to reproduce.
 
-## 614 tests passing
+## 627 tests passing
 
 ```
-pnpm -r test  →  614 tests, 0 failures
+pnpm -r test  →  627 tests, 0 failures
 ```
 
 ## CLI
@@ -503,7 +503,7 @@ Capix is in **beta** with the [stability policy](docs/api/stability.md) in force
 
 - the beta has soaked in real projects long enough to trust the API shape — no breaking change needed for several consecutive releases,
 - field-reported bugs are burned down (see [issues](https://github.com/milanito/capix/issues)),
-- and the remaining pre-1.0 candidates are shipped or explicitly deferred: an SQS queue adapter (the cross-instance event bus shipped in `beta.2` via `@capixjs/store-redis`).
+- and the named pre-1.0 feature candidates are shipped — the cross-instance event bus landed in `beta.2` and the SQS queue adapter in `beta.3`. What remains is soak time and field feedback.
 
 Found a bug or missing piece? [Open an issue](https://github.com/milanito/capix/issues/new/choose) — beta feedback directly shapes what 1.0 looks like.
 

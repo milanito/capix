@@ -1,6 +1,6 @@
 {
   "name": "@capixjs/core",
-  "version": "0.1.0-beta.2",
+  "version": "0.1.0-beta.3",
   "description": "Capability-based Node.js server framework \u2014 core",
   "license": "MIT",
   "repository": {

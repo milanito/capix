@@ -41,42 +41,46 @@ import { MemoryQueueAdapter } from '@capixjs/transport-queue';
 const adapter = new MemoryQueueAdapter();
 ```
 
-### BullMQ adapter (Redis)
+### `BullMQAdapter` (Redis)
+
+Ships with the package; requires `bullmq` and `ioredis` at runtime:
 
 ```ts
-import { Queue, Worker } from 'bullmq';
-import type { QueueAdapter, QueueMessage } from '@capixjs/transport-queue';
+import { BullMQAdapter } from '@capixjs/transport-queue';
 
-class BullMQAdapter implements QueueAdapter {
-  private workers = new Map<string, Worker>();
-  private queues  = new Map<string, Queue>();
-
-  async start(queue: string, handler: (msg: QueueMessage) => Promise<unknown>): Promise<void> {
-    const worker = new Worker(queue, async (job) => handler(job.data as QueueMessage), {
-      connection: { host: 'localhost', port: 6379 },
-    });
-    this.workers.set(queue, worker);
-  }
-
-  async enqueue(queue: string, msg: QueueMessage): Promise<void> {
-    if (!this.queues.has(queue)) {
-      this.queues.set(queue, new Queue(queue, { connection: { host: 'localhost', port: 6379 } }));
-    }
-    await this.queues.get(queue)!.add(msg.capability, msg);
-  }
-
-  async stop(): Promise<void> {
-    await Promise.all([
-      ...[...this.workers.values()].map((w) => w.close()),
-      ...[...this.queues.values()].map((q) => q.close()),
-    ]);
-  }
-}
+const adapter = new BullMQAdapter({
+  connection: { host: 'localhost', port: 6379 },
+  concurrency: 10,
+});
 ```
+
+### `SqsQueueAdapter` (Amazon SQS)
+
+Ships with the package; pass an [`@aws-sdk/client-sqs`](https://www.npmjs.com/package/@aws-sdk/client-sqs) aggregated client (nothing is bundled):
+
+```ts
+import { SQS } from '@aws-sdk/client-sqs';
+import { SqsQueueAdapter } from '@capixjs/transport-queue';
+
+const adapter = new SqsQueueAdapter({
+  client: new SQS({ region: 'eu-west-1' }),
+  queueUrls: { jobs: process.env.JOBS_QUEUE_URL! },
+  onResult: (msg, result) => {
+    if (!result.ok) console.error(`job ${msg.id} failed:`, result.error);
+  },
+});
+```
+
+Semantics:
+- **Success** → the message is deleted.
+- **Failed result** (validation, guard, resolver error) → the message is *not* deleted; SQS redelivers it after the visibility timeout, and your queue's redrive policy / dead-letter queue caps the retries.
+- **Unparseable body** → deleted and reported via `onError` — a poison message would otherwise redeliver forever.
+- **FIFO queues** (`.fifo` URLs) automatically get `MessageGroupId` (the capability name) and `MessageDeduplicationId` (the message id).
+- **`stop()`** drains in-flight handlers, then leaves anything the long poll delivers late for redelivery.
 
 ### Custom adapters
 
-Implement the `QueueAdapter` interface to connect to SQS, Faktory, or any queue system:
+Implement the `QueueAdapter` interface to connect to Faktory, NATS, or any queue system:
 
 ```ts
 import type { QueueAdapter, QueueMessage } from '@capixjs/transport-queue';

@@ -1,6 +1,6 @@
 {
   "name": "@capixjs/store-redis",
-  "version": "0.1.0-beta.2",
+  "version": "0.1.0-beta.3",
   "description": "Redis-backed cache, rate-limit stores, and pub/sub event bus for Capix",
   "license": "MIT",
   "repository": {

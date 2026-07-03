@@ -39,7 +39,19 @@ await jobQueue.enqueue('jobs.processOrder', { orderId: '123' });
 | Adapter | Description |
 |---|---|
 | `MemoryQueueAdapter` | In-process queue. Jobs lost on restart. For dev and testing. |
-| Custom adapters | Implement `QueueAdapter` to use BullMQ, SQS, Faktory, etc. |
+| `BullMQAdapter` | Redis-backed via BullMQ (`pnpm add bullmq ioredis`). |
+| `SqsQueueAdapter` | Amazon SQS — pass an `@aws-sdk/client-sqs` client and queue URLs. Failed jobs retry via the queue's visibility timeout and redrive policy. |
+| Custom adapters | Implement `QueueAdapter` to use Faktory, NATS, or any queue system. |
+
+```ts
+import { SQS } from '@aws-sdk/client-sqs';
+import { SqsQueueAdapter } from '@capixjs/transport-queue';
+
+const adapter = new SqsQueueAdapter({
+  client: new SQS({ region: 'eu-west-1' }),
+  queueUrls: { jobs: process.env.JOBS_QUEUE_URL! },
+});
+```
 
 ## Message format
 
