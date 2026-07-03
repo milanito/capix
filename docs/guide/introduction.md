@@ -2,7 +2,7 @@
 
 Capix is a Node.js server framework built around a single primitive: the **capability**.
 
-A capability is a typed, composable function that declares exactly what your server can do. It has a clear input type, a clear output type, a set of preconditions (guards), and a resolver. Every request — whether it arrives over HTTP, WebSocket, GraphQL, or a job queue — is routed to a capability and executed through the same engine.
+A capability is a typed, composable function that declares exactly what your server can do. It has a clear input type, a clear output type, a set of preconditions (guards), and a resolver. Every request — whether it arrives over HTTP, WebSocket, GraphQL, a job queue, or an MCP tool call from an AI client — is routed to a capability and executed through the same engine.
 
 ## The problem with routes
 

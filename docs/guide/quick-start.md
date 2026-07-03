@@ -127,4 +127,4 @@ Now any request without a valid user gets `401 Unauthorized`.
 - [Context](./context.md) — building request context
 - [Errors](./errors.md) — typed error factories
 - [Enhancers](./enhancers.md) — caching, rate limiting, circuit breakers
-- [Transports](../transports/overview.md) — REST, WebSocket, GraphQL, Queue
+- [Transports](../transports/overview.md) — REST, WebSocket, GraphQL, Queue, MCP

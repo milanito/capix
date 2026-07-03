@@ -16,7 +16,7 @@ hero:
 features:
   - icon: 🎯
     title: One primitive
-    details: Capability — a typed, validated, guardable function. REST, GraphQL, WebSocket, and queue all invoke the same thing.
+    details: Capability — a typed, validated, guardable function. REST, GraphQL, WebSocket, queue, and MCP all invoke the same thing.
 
   - icon: 🔒
     title: Errors are caught

@@ -7,6 +7,7 @@ For transport-specific APIs, see:
 - [@capixjs/transport-ws](../../packages/transports/ws/README.md)
 - [@capixjs/transport-graphql](../../packages/transports/graphql/README.md)
 - [@capixjs/transport-queue](../../packages/transports/queue/README.md)
+- [@capixjs/transport-mcp](../../packages/transports/mcp/README.md)
 - [@capixjs/plugin-auth](../../packages/plugins/auth/README.md)
 
 ---

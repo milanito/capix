@@ -72,7 +72,7 @@ Plugins bundle capabilities and context extensions into a reusable package. They
 
 ## Transport
 
-A transport is anything that takes an incoming connection and routes it to the execution engine. Capix ships with REST, WebSocket, GraphQL, and Queue transports. You can write custom transports.
+A transport is anything that takes an incoming connection and routes it to the execution engine. Capix ships with REST, WebSocket, GraphQL, Queue, and MCP transports. You can write custom transports.
 
 ## Execution engine
 
