@@ -1,11 +1,21 @@
 # Capix
 
-A capability-based Node.js server framework. Replace routes and middleware with a single primitive: a **capability** — a typed, composable pure function that declares what your server can do.
+**Write what your server can do. The framework handles how it's exposed.**
+
+[![npm](https://img.shields.io/npm/v/@capixjs/core?label=npm)](https://www.npmjs.com/package/@capixjs/core)
+[![CI](https://github.com/milanito/capix/actions/workflows/ci.yml/badge.svg)](https://github.com/milanito/capix/actions/workflows/ci.yml)
+[![Pre-publish audit](https://github.com/milanito/capix/actions/workflows/audit.yml/badge.svg)](https://github.com/milanito/capix/actions/workflows/audit.yml)
+[![license](https://img.shields.io/npm/l/@capixjs/core)](LICENSE)
+[![node](https://img.shields.io/node/v/@capixjs/core)](package.json)
+
+Capix replaces routes and middleware with one primitive: a **capability** — a typed, guarded, pure function. Define it once, and every transport serves it: the same function is a REST endpoint, a GraphQL field, a WebSocket call, a background job, **and an MCP tool your AI agents can invoke** — with one validation pipeline, one error model, and guards that cannot be forgotten on any of them.
 
 ```ts
 import { z } from 'zod';
 import { capability, defineGuard, createServer } from '@capixjs/core';
 import { restTransport } from '@capixjs/transport-rest';
+import { graphqlTransport } from '@capixjs/transport-graphql';
+import { mcpTransport } from '@capixjs/transport-mcp';
 
 const mustBeAdmin = defineGuard((ctx) => {
   if (!ctx.user?.admin) throw new Error('Forbidden');
@@ -18,12 +28,19 @@ const createPost = capability(
 
 createServer({
   capabilities: { posts: { createPost } },
-  transports: [restTransport({ port: 3000 })],
+  transports: [
+    restTransport({ port: 3000 }),     // POST /posts            ← route inferred from the name
+    graphqlTransport({ port: 4000 }),  // mutation posts_createPost
+    mcpTransport({ port: 5000 }),      // MCP tool posts_createPost, guarded the same way
+  ],
 }).start();
-// POST /posts  ← inferred from capability name
 ```
 
-No `req`/`res`. No `next()`. No middleware stack. The HTTP layer is an optional transport.
+No `req`/`res`. No `next()`. No middleware stack. Transports are wiring, not architecture — add or remove one without touching a single capability.
+
+**[5-minute quick start →](https://milanito.github.io/capix/guide/quick-start)** · [Documentation](https://milanito.github.io/capix/) · [Examples](examples/) · [Benchmarks](docs/benchmarks.md) · [API stability](docs/api/stability.md)
+
+> **Status: beta.** The [public API and wire contracts](docs/api/stability.md) are frozen — breaking changes now require an explicit migration note. `npm install @capixjs/core` resolves to the current beta.
 
 ## Why capabilities?
 
@@ -374,10 +391,10 @@ Capix's REST transport trails Fastify by ~3% in a hello-world microbenchmark and
 | Hono | 23,970 | 21,365 |
 | Express | 16,632 | 16,239 |
 
-## 599 tests passing
+## 605 tests passing
 
 ```
-pnpm -r test  →  599 tests, 0 failures
+pnpm -r test  →  605 tests, 0 failures
 ```
 
 ## CLI
