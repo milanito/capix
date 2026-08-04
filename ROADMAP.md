@@ -15,9 +15,12 @@ the narrowed type). Additive: `capability()`, `.guard()` postfix, and
 for the full writeup and `packages/core/src/type-tests.ts` (Tests
 12-17) for the compile-time proof.
 
-Remaining follow-up: scaffolded projects (`capix new`) still generate
-the two-factory pattern by default — update the templates to use
-`capability.guard(...)` instead, now that it's the recommended default.
+`capix new` scaffolds (`cli/src/templates/new-project.ts`) and the
+generated `.cursor/rules` now demonstrate `capability.guard(...)`
+directly, including a guarded `auth.me` example capability — verified
+by scaffolding a project against the local build and confirming it
+typechecks and the guard actually enforces at runtime (401 when
+unauthenticated).
 
 ### GraphQL and Queue integration tests — done
 `test/integration/graphql.test.ts` drives a live `graphqlTransport`

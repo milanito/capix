@@ -70,11 +70,13 @@ export function renderTsConfig(): string {
 
 export function renderCapabilitiesTs(): string {
   return `import { z } from 'zod';
-import { capability, defineContext, defineError } from '@capixjs/core';
+import { capability, defineContext, defineError, defineGuard, defaultErrors } from '@capixjs/core';
 
 // ---------------------------------------------------------------------------
 // Context
 // ---------------------------------------------------------------------------
+
+export type AppUser = { id: string; email: string };
 
 export type AppContext = {
   readonly requestId: string;
@@ -82,10 +84,6 @@ export type AppContext = {
   // Add your app-specific fields here:
   // db: Database;
 };
-
-// Narrowed context for authenticated capabilities — user is guaranteed non-null.
-export type AppUser = { id: string; email: string };
-export type AuthContext = AppContext & { user: AppUser };
 
 export const buildContext = defineContext(async (_req): Promise<AppContext> => ({
   requestId: crypto.randomUUID(),
@@ -101,27 +99,30 @@ const errors = {
 };
 
 // ---------------------------------------------------------------------------
-// Scoped capability factories
+// Guards
 //
-// Use \`cap\` for public capabilities.
-// Use \`authCap\` for capabilities that require authentication — pair with
-// .guard(mustBeAuthenticated) so the narrowed \`ctx.user\` type is non-null.
+// Declare guards with capability.guard(...) BEFORE the resolver — the
+// resolver's ctx is then inferred fully narrowed (ctx.user non-null below),
+// with no annotation and no separate scoped factory needed.
 // See: https://milanito.github.io/capix/guide/guards
 // ---------------------------------------------------------------------------
 
-export const cap     = capability.withContext<AppContext>();
-export const authCap = capability.withContext<AuthContext>();
+export const mustBeAuthenticated = defineGuard(
+  (ctx: AppContext): asserts ctx is AppContext & { user: AppUser } => {
+    if (!ctx.user) throw defaultErrors.Unauthorized();
+  },
+);
 
 // ---------------------------------------------------------------------------
 // Example capabilities — replace with your own
 // ---------------------------------------------------------------------------
 
-const ping = cap(
+const ping = capability(
   async (_input, _ctx) => ({ message: 'pong', timestamp: Date.now() }),
   'query',
 );
 
-const getItem = cap(
+const getItem = capability(
   z.object({ id: z.string() }),
   async ({ id }, _ctx) => {
     if (id !== '1') throw errors.NotFound();
@@ -130,9 +131,17 @@ const getItem = cap(
   'query',
 );
 
+// Authenticated example — capability.guard(...) narrows ctx.user to AppUser
+// (non-null) with no annotation and no cast.
+const me = capability.guard(mustBeAuthenticated)(
+  async (_input, ctx) => ({ id: ctx.user.id, email: ctx.user.email }),
+  'query',
+);
+
 export const capabilities = {
   system: { ping },
   items: { getItem },
+  auth: { me },
 };
 `;
 }
@@ -201,7 +210,7 @@ separate from capability definitions.
 
 ## File layout
 
-- \`src/capabilities.ts\` — context type, scoped factories (\`cap\`, \`authCap\`), shared errors, all capabilities
+- \`src/capabilities.ts\` — context type, guards, shared errors, all capabilities
 - \`src/server.ts\` — creates and starts the server with transports
 - \`src/guards.ts\` — guard definitions (if you split them out)
 
@@ -209,53 +218,72 @@ For larger projects, split capabilities into \`src/capabilities/<group>.ts\` and
 
 ## Defining capabilities
 
-Always use the scoped factory (\`cap\` or \`authCap\`) instead of bare \`capability()\`:
+Use bare \`capability()\` for public capabilities that don't need guards. For
+capabilities that require guards, use \`capability.guard(...)\` — declare guards
+*before* the resolver so \`ctx\` is inferred fully narrowed, with no annotation
+and no separate scoped factory needed:
 
 \`\`\`ts
-// query (read)
-export const getItem = cap(
+// public query (read) — no guards
+export const getItem = capability(
   z.object({ id: z.string() }),
   async ({ id }, ctx) => { ... },
   'query',
 );
 
 // mutation (write) — no explicit intent needed for standard CRUD names
-export const createItem = cap(z.object({ name: z.string() }), async ({ name }) => { ... });
+export const createItem = capability(z.object({ name: z.string() }), async ({ name }) => { ... });
 
 // no-schema query
-export const ping = cap(async (_input, _ctx) => ({ ok: true }), 'query');
+export const ping = capability(async (_input, _ctx) => ({ ok: true }), 'query');
+
+// authenticated — capability.guard(...) narrows ctx.user to non-null
+export const getProfile = capability.guard(mustBeAuthenticated)(
+  z.object({}),
+  async (_input, ctx) => ({ id: ctx.user.id }), // ctx.user: AppUser, not AppUser | null
+  'query',
+);
 \`\`\`
 
 ## Guards
 
-Guards narrow the context type and run before the resolver:
+Guards narrow the context type and run before the resolver. Declare them with
+\`capability.guard(...)\`, not chained after the resolver — chaining \`.guard()\`
+*after* a resolver you've already written can't retroactively narrow that
+resolver's \`ctx\` type (a TypeScript limitation, not a Capix one):
 
 \`\`\`ts
 import { defineGuard, defaultErrors } from '@capixjs/core';
 
 export const mustBeAuthenticated = defineGuard(
-  (ctx: AppContext): asserts ctx is AuthContext => {
+  (ctx: AppContext): asserts ctx is AppContext & { user: AppUser } => {
     if (!ctx.user) throw defaultErrors.Unauthorized();
   },
 );
 
-// Apply to a capability:
-export const getProfile = authCap(schema, resolver).guard(mustBeAuthenticated);
+// Apply to a capability — guards first, resolver last:
+export const getProfile = capability.guard(mustBeAuthenticated)(schema, resolver);
 \`\`\`
 
-Always pair \`authCap\` with \`.guard(mustBeAuthenticated)\`. Using \`authCap\` without
-the guard is a footgun — TypeScript won't catch it but unauthenticated requests
-will throw at runtime.
+Chain multiple guards with \`capability.guard(g1).guard(g2)(schema, resolver)\` —
+each subsequent guard's own declared parameter type should build on what the
+previous guard already narrowed to (not the original wide context), e.g.
+\`mustBeAdmin\` should take \`AppContext & { user: AppUser }\`, not bare \`AppContext\`.
+
+If you need a fixed, reusable factory instead (e.g. many capabilities sharing
+the exact same context type but not necessarily the same guards),
+\`capability.withContext<T>()\` is still available.
 
 ## Context pattern
 
 \`\`\`ts
-export type AppContext  = { requestId: string; user: AppUser | null; db: Database };
-export type AuthContext = AppContext & { user: AppUser }; // narrowed
-
-export const cap     = capability.withContext<AppContext>();  // public endpoints
-export const authCap = capability.withContext<AuthContext>(); // authenticated endpoints
+export type AppUser = { id: string; email: string };
+export type AppContext = { requestId: string; user: AppUser | null; db: Database };
 \`\`\`
+
+Guards narrow \`AppContext\` per capability via \`capability.guard(...)\` — there's
+no need to hand-declare a separate narrowed context type or export scoped
+factories for it.
 
 ## Transport boundary
 
@@ -316,7 +344,7 @@ Framework errors: \`defaultErrors.Unauthorized()\`, \`defaultErrors.Forbidden()\
 \`\`\`ts
 import { withRateLimit, withCache } from '@capixjs/core';
 
-export const getItem = cap(schema, resolver).enhance(withRateLimit({ limit: 100, windowMs: 60_000 }));
+export const getItem = capability(schema, resolver).enhance(withRateLimit({ limit: 100, windowMs: 60_000 }));
 \`\`\`
 
 ## AI context
@@ -348,6 +376,7 @@ npm start
 ## Capabilities
 
 - \`system.ping\` — health check${opts.transport === 'rest' || opts.transport === 'both' ? '\n  - GET /system/ping' : ''}
-- \`items.get\` — get an item by id${opts.transport === 'rest' || opts.transport === 'both' ? '\n  - GET /items/:id' : ''}
+- \`items.getItem\` — get an item by id${opts.transport === 'rest' || opts.transport === 'both' ? '\n  - GET /items/:id' : ''}
+- \`auth.me\` — guarded example (\`capability.guard(mustBeAuthenticated)\`), returns 401 until \`buildContext\` is wired to real auth${opts.transport === 'rest' || opts.transport === 'both' ? '\n  - GET /auth/me' : ''}
 `;
 }
