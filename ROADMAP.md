@@ -31,10 +31,23 @@ REST call. BullMQ/SQS adapters remain covered by mocked unit tests only
 — a live-broker integration test would need a new CI service (Redis/
 LocalStack), left as a follow-up.
 
-### CLI test coverage
-The CLI commands work and are covered by smoke tests in CI. Unit tests
-for `generate`, `show`, `list`, `docs`, `check`, `diff`, `call`, and
-`ai-context` are needed before 1.0.
+### CLI test coverage — done
+Unit tests added for `generate`, `show`, `list`, `docs`, `check`,
+`diff`, `call`, and `ai-context` (60 new tests). `diff`, `ai-context`,
+`docs`, and `generate` had their pure logic extracted into exported
+functions (`computeDiff`, `buildAiContext`, `capabilityToMarkdown`,
+`parseCapabilityArgs`, etc.) and tested directly, matching the pattern
+`client.ts`/`generateClient` already used. `list`, `show`, `check`, and
+`call` are tested at the command level (mocked `loadRegistry`,
+captured console output, mocked `process.exit`).
+
+Writing real tests for `check` surfaced two genuine bugs, now fixed:
+route-conflict detection never actually ran (`generateRoutes()` only
+infers routes, it doesn't detect duplicates — conflict detection lives
+in `compileRouter()`, which `check` never called), and scaffold-
+placeholder detection read `cap.resolve.toString()` (the framework's
+guard-running wrapper, constant regardless of the user's resolver)
+instead of `cap._resolverOnly.toString()` (the actual user code).
 
 ### Migration guides
 A "From Express" guide exists. "From Fastify" and "From tRPC" are

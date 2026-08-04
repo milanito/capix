@@ -7,7 +7,7 @@ import type { RouteDefinition } from '@capixjs/transport-rest';
 import type { AnyCapability } from '@capixjs/core';
 import { effectiveIntent } from '../utils/intent.js';
 
-function capabilityToMarkdown(name: string, cap: AnyCapability, routes: RouteDefinition[]): string {
+export function capabilityToMarkdown(name: string, cap: AnyCapability, routes: RouteDefinition[]): string {
   const route = routes.find((r) => r.capability === name);
   const lines: string[] = [];
 

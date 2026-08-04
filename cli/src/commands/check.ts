@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import * as print from '../utils/print.js';
 import { loadRegistry } from '../utils/loader.js';
-import { generateRoutes } from '@capixjs/transport-rest';
+import { generateRoutes, compileRouter } from '@capixjs/transport-rest';
 import { effectiveIntent } from '../utils/intent.js';
 
 export function registerCheck(program: Command): void {
@@ -26,9 +26,12 @@ export function registerCheck(program: Command): void {
         }
       }
 
-      // 2. Check for route conflicts via generateRoutes (it throws on duplicates)
+      // 2. Check for route conflicts. generateRoutes() only infers routes — it
+      // never throws on duplicates. Conflict detection lives in compileRouter(),
+      // the function the REST transport itself uses at startup.
       try {
         const routes = generateRoutes(registry);
+        compileRouter(routes);
         print.success(`${routes.length} routes generated, no conflicts`);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -36,10 +39,13 @@ export function registerCheck(program: Command): void {
         errors++;
       }
 
-      // 3. Detect scaffold placeholder resolvers
+      // 3. Detect scaffold placeholder resolvers.
+      // Read _resolverOnly (the raw user function), not resolve() — resolve()
+      // is the framework's guard-running wrapper and its source never changes,
+      // so matching against it could never actually detect anything.
       const PLACEHOLDER_PATTERNS = [/not.?implemented/i, /TODO/i, /throw new Error\(['"]TODO/i];
       for (const [name, cap] of registry) {
-        const src = cap.resolve.toString();
+        const src = cap._resolverOnly.toString();
         if (PLACEHOLDER_PATTERNS.some((re) => re.test(src))) {
           print.warn(`${name}: resolver looks like a scaffold placeholder (not implemented)`);
           warnings++;

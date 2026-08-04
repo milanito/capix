@@ -7,7 +7,7 @@ import type { RouteDefinition } from '@capixjs/transport-rest';
 import type { CapabilityRegistry } from '@capixjs/core';
 import { effectiveIntent } from '../utils/intent.js';
 
-function schemaToObject(schema: unknown): Record<string, string> | null {
+export function schemaToObject(schema: unknown): Record<string, string> | null {
   if (!schema) return null;
   const s = schema as { shape?: Record<string, unknown> };
   if (!s.shape) return null;
@@ -18,7 +18,7 @@ function schemaToObject(schema: unknown): Record<string, string> | null {
   return result;
 }
 
-function buildAiContext(registry: CapabilityRegistry, projectName: string): string {
+export function buildAiContext(registry: CapabilityRegistry, projectName: string): string {
   let routes: RouteDefinition[] = [];
   try {
     routes = generateRoutes(registry);

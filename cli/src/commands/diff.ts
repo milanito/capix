@@ -4,9 +4,9 @@ import { loadRegistry } from '../utils/loader.js';
 import type { CapabilityRegistry } from '@capixjs/core';
 import { effectiveIntent } from '../utils/intent.js';
 
-type CapSnap = { intent: string; guards: number; hasInput: boolean; hasOutput: boolean };
+export type CapSnap = { intent: string; guards: number; hasInput: boolean; hasOutput: boolean };
 
-function registrySnapshot(registry: CapabilityRegistry): Map<string, CapSnap> {
+export function registrySnapshot(registry: CapabilityRegistry): Map<string, CapSnap> {
   const snap = new Map<string, CapSnap>();
   for (const [name, cap] of registry) {
     snap.set(name, {
@@ -19,6 +19,41 @@ function registrySnapshot(registry: CapabilityRegistry): Map<string, CapSnap> {
   return snap;
 }
 
+export type RegistryDiff = {
+  added: string[];
+  removed: string[];
+  changed: Array<[string, string]>;
+};
+
+/** Compares two registries: capabilities present in B but not A (added), A but not B (removed), and present in both with different intent/guards/schema presence (changed). */
+export function computeDiff(regA: CapabilityRegistry, regB: CapabilityRegistry): RegistryDiff {
+  const snapA = registrySnapshot(regA);
+  const snapB = registrySnapshot(regB);
+
+  const added: string[] = [];
+  const removed: string[] = [];
+  const changed: Array<[string, string]> = [];
+
+  for (const [name] of snapB) {
+    if (!snapA.has(name)) added.push(name);
+  }
+  for (const [name] of snapA) {
+    if (!snapB.has(name)) removed.push(name);
+  }
+  for (const [name, a] of snapA) {
+    const b = snapB.get(name);
+    if (!b) continue;
+    const diffs: string[] = [];
+    if (a.intent !== b.intent) diffs.push(`intent: ${a.intent} → ${b.intent}`);
+    if (a.guards !== b.guards) diffs.push(`guards: ${a.guards} → ${b.guards}`);
+    if (a.hasInput !== b.hasInput) diffs.push(`input: ${a.hasInput} → ${b.hasInput}`);
+    if (a.hasOutput !== b.hasOutput) diffs.push(`output: ${a.hasOutput} → ${b.hasOutput}`);
+    if (diffs.length > 0) changed.push([name, diffs.join(', ')]);
+  }
+
+  return { added, removed, changed };
+}
+
 export function registerDiff(program: Command): void {
   program
     .command('diff <config-a> <config-b>')
@@ -29,29 +64,7 @@ export function registerDiff(program: Command): void {
         loadRegistry(configB),
       ]);
 
-      const snapA = registrySnapshot(regA);
-      const snapB = registrySnapshot(regB);
-
-      const added: string[] = [];
-      const removed: string[] = [];
-      const changed: Array<[string, string]> = [];
-
-      for (const [name] of snapB) {
-        if (!snapA.has(name)) added.push(name);
-      }
-      for (const [name] of snapA) {
-        if (!snapB.has(name)) removed.push(name);
-      }
-      for (const [name, a] of snapA) {
-        const b = snapB.get(name);
-        if (!b) continue;
-        const diffs: string[] = [];
-        if (a.intent !== b.intent) diffs.push(`intent: ${a.intent} → ${b.intent}`);
-        if (a.guards !== b.guards) diffs.push(`guards: ${a.guards} → ${b.guards}`);
-        if (a.hasInput !== b.hasInput) diffs.push(`input: ${a.hasInput} → ${b.hasInput}`);
-        if (a.hasOutput !== b.hasOutput) diffs.push(`output: ${a.hasOutput} → ${b.hasOutput}`);
-        if (diffs.length > 0) changed.push([name, diffs.join(', ')]);
-      }
+      const { added, removed, changed } = computeDiff(regA, regB);
 
       if (added.length === 0 && removed.length === 0 && changed.length === 0) {
         print.success('No differences found');
