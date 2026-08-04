@@ -644,6 +644,9 @@ importers:
       '@capixjs/transport-mcp':
         specifier: workspace:*
         version: link:../../packages/transports/mcp
+      '@capixjs/transport-queue':
+        specifier: workspace:*
+        version: link:../../packages/transports/queue
       '@capixjs/transport-rest':
         specifier: workspace:*
         version: link:../../packages/transports/rest

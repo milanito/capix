@@ -16,6 +16,7 @@
     "@capixjs/core": "workspace:*",
     "@capixjs/transport-graphql": "workspace:*",
     "@capixjs/transport-mcp": "workspace:*",
+    "@capixjs/transport-queue": "workspace:*",
     "@capixjs/store-redis": "workspace:*"
   },
   "devDependencies": {
