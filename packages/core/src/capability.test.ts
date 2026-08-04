@@ -145,6 +145,90 @@ describe('.guard()', () => {
   });
 });
 
+describe('capability.guard() — guard-first builder', () => {
+  it('produces a capability with the guard already attached', () => {
+    const g = vi.fn();
+    const cap = capability.guard(g)(() => 1);
+    expect(cap.guards).toHaveLength(1);
+    expect(cap.guards[0]).toBe(g);
+  });
+
+  it('chains multiple guards in declaration order', () => {
+    const g1 = vi.fn();
+    const g2 = vi.fn();
+    const cap = capability.guard(g1).guard(g2)(() => 1);
+    expect(cap.guards).toEqual([g1, g2]);
+  });
+
+  it('works with schema + resolver', async () => {
+    const g = vi.fn();
+    const Input = z.object({ id: z.string() });
+    const cap = capability.guard(g)(Input, ({ id }) => ({ found: id }));
+    expect(cap.guards).toEqual([g]);
+    const result = await cap.resolve({ id: '123' }, baseCtx);
+    expect(result).toEqual({ found: '123' });
+  });
+
+  it('works with schema + resolver + explicit intent', () => {
+    const g = vi.fn();
+    const cap = capability.guard(g)(z.object({}), () => null, 'query');
+    expect(cap.intent).toBe('query');
+    expect(cap.guards).toEqual([g]);
+  });
+
+  it('works with resolver + explicit intent (no schema)', () => {
+    const g = vi.fn();
+    const cap = capability.guard(g)(() => null, 'delete');
+    expect(cap.intent).toBe('delete');
+  });
+
+  it('returns a real capability recognized by isCapability', () => {
+    const cap = capability.guard(vi.fn())(() => 1);
+    expect(isCapability(cap)).toBe(true);
+  });
+
+  it('guards actually run at resolve() time and can reject', async () => {
+    const cap = capability.guard((ctx) => {
+      if (!('user' in ctx)) throw defaultErrors.Unauthorized();
+    })(() => 'secret');
+    await expect(cap.resolve(undefined, baseCtx)).rejects.toMatchObject({ error: 'Unauthorized' });
+  });
+
+  it('guards actually run at resolve() time and can allow', async () => {
+    const cap = capability.guard((ctx) => {
+      if (!('user' in ctx)) throw defaultErrors.Unauthorized();
+    })(() => 'secret');
+    const richCtx = { ...baseCtx, user: { id: '1' } };
+    const result = await cap.resolve(undefined, richCtx);
+    expect(result).toBe('secret');
+  });
+
+  it('two independent builder chains do not share guard arrays', () => {
+    const shared = capability.guard(vi.fn());
+    const g2 = vi.fn();
+    const g3 = vi.fn();
+    const capA = shared.guard(g2)(() => 1);
+    const capB = shared.guard(g3)(() => 2);
+    expect(capA.guards).toHaveLength(2);
+    expect(capB.guards).toHaveLength(2);
+    expect(capA.guards).not.toContain(g3);
+    expect(capB.guards).not.toContain(g2);
+  });
+
+  it('works inside compileRegistry like any other capability', () => {
+    const cap = capability.guard(vi.fn())(() => 'ok');
+    const registry = compileRegistry({ system: { ping: cap } });
+    expect(registry.get('system.ping')?.guards).toHaveLength(1);
+  });
+
+  it('the returned builder still exposes .guard, .enhance, .output after the terminal call', () => {
+    const cap = capability.guard(vi.fn())(() => 1);
+    expect(typeof cap.guard).toBe('function');
+    expect(typeof cap.enhance).toBe('function');
+    expect(typeof cap.output).toBe('function');
+  });
+});
+
 describe('.enhance()', () => {
   it('wraps the resolver', async () => {
     const log: string[] = [];

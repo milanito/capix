@@ -302,6 +302,66 @@ function makeCapability<TInput, TOutput, TContext extends BaseContext>(
 // ---------------------------------------------------------------------------
 
 /**
+ * Shared arg-parsing for both capability(...) and a GuardBuilder's terminal
+ * call (capability.guard(...)(...)) — the only difference between the two
+ * call sites is which guards (if any) are already known when the base is
+ * constructed.
+ */
+function buildCapability(args: unknown[], guards: ReadonlyArray<AnyGuard>): AnyCapability {
+  const [first, second, thirdArg] = args as [
+    ZodType | ((...a: unknown[]) => unknown),
+    ((...a: unknown[]) => unknown) | Intent | undefined,
+    Intent | undefined,
+  ];
+
+  const isZodSchema =
+    first !== null &&
+    typeof first === 'object' &&
+    ('_zod' in (first as object) || '_def' in (first as object));
+
+  if (!isZodSchema) {
+    // No-schema overloads: capability(resolver) | capability(resolver, intent)
+    const explicitIntent = typeof second === 'string' ? (second as Intent) : undefined;
+    return makeCapability<undefined, unknown, BaseContext>({
+      _capix: true,
+      [CAPABILITY_BRAND]: true,
+      name: '(unnamed)',
+      _input: undefined,
+      _output: undefined,
+      _context: undefined,
+      inputSchema: null,
+      outputSchema: null,
+      guards,
+      inputGuards: [],
+      _intentExplicit: explicitIntent !== undefined,
+      intent: explicitIntent ?? 'mutation',
+      _skipValidation: false,
+      _fn: first as (...a: unknown[]) => unknown,
+    });
+  }
+
+  // Schema overloads: capability(schema, resolver) | capability(schema, resolver, intent)
+  const thirdIntent = typeof thirdArg === 'string' ? (thirdArg as Intent) : undefined;
+
+  return makeCapability<unknown, unknown, BaseContext>({
+    _capix: true,
+    [CAPABILITY_BRAND]: true,
+    name: '(unnamed)',
+    _input: undefined,
+    _output: undefined,
+    _context: undefined,
+    inputSchema: first as ZodType,
+    outputSchema: null,
+    guards,
+    inputGuards: [],
+    _intentExplicit: thirdIntent !== undefined,
+    intent: thirdIntent ?? 'mutation',
+    _skipValidation: false,
+    _fn: second as (...a: unknown[]) => unknown,
+  });
+}
+
+/**
  * Defines a capability — the unit of server-side logic in Capix.
  *
  * Wraps a resolver function with optional input validation (Zod schema), guards,
@@ -365,57 +425,7 @@ export function capability<
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function capability(...args: any[]): AnyCapability {
-  const [first, second, thirdArg] = args as [
-    ZodType | ((...a: unknown[]) => unknown),
-    ((...a: unknown[]) => unknown) | Intent | undefined,
-    Intent | undefined,
-  ];
-
-  const isZodSchema =
-    first !== null &&
-    typeof first === 'object' &&
-    ('_zod' in (first as object) || '_def' in (first as object));
-
-  if (!isZodSchema) {
-    // No-schema overloads: capability(resolver) | capability(resolver, intent)
-    const explicitIntent = typeof second === 'string' ? (second as Intent) : undefined;
-    return makeCapability<undefined, unknown, BaseContext>({
-      _capix: true,
-      [CAPABILITY_BRAND]: true,
-      name: '(unnamed)',
-      _input: undefined,
-      _output: undefined,
-      _context: undefined,
-      inputSchema: null,
-      outputSchema: null,
-      guards: [],
-      inputGuards: [],
-      _intentExplicit: explicitIntent !== undefined,
-      intent: explicitIntent ?? 'mutation',
-      _skipValidation: false,
-      _fn: first as (...a: unknown[]) => unknown,
-    });
-  }
-
-  // Schema overloads: capability(schema, resolver) | capability(schema, resolver, intent)
-  const thirdIntent = typeof thirdArg === 'string' ? (thirdArg as Intent) : undefined;
-
-  return makeCapability<unknown, unknown, BaseContext>({
-    _capix: true,
-    [CAPABILITY_BRAND]: true,
-    name: '(unnamed)',
-    _input: undefined,
-    _output: undefined,
-    _context: undefined,
-    inputSchema: first as ZodType,
-    outputSchema: null,
-    guards: [],
-    inputGuards: [],
-    _intentExplicit: thirdIntent !== undefined,
-    intent: thirdIntent ?? 'mutation',
-    _skipValidation: false,
-    _fn: second as (...a: unknown[]) => unknown,
-  });
+  return buildCapability(args, []);
 }
 
 // ---------------------------------------------------------------------------
@@ -551,6 +561,46 @@ export type ScopedCapabilityFactory<TContext extends BaseContext> = {
   ): Capability<ZodOutput<TSchema>, TOutput, TContext>;
 };
 
+// ---------------------------------------------------------------------------
+// capability.guard — guard-first builder, resolver typed against the
+// already-narrowed context with zero annotation and no factory pre-binding.
+// ---------------------------------------------------------------------------
+
+/**
+ * The type returned by `capability.guard(...)` and `GuardBuilder.guard(...)`.
+ * Callable with the same overloads as `capability()` (via ScopedCapabilityFactory,
+ * TContext fixed to the narrowed type accumulated so far), plus `.guard()` to
+ * keep narrowing before the resolver is written.
+ */
+export type GuardBuilder<TContext extends BaseContext> = ScopedCapabilityFactory<TContext> & {
+  /**
+   * Adds another guard, narrowing TContext further before the resolver is written.
+   *
+   * Bound to `(ctx: TContext) => any` — not `any` — so a guard incompatible with
+   * the context already established by prior guards in this chain is still a
+   * type error. Only the entry point (`capability.guard`) relaxes the bound,
+   * because only there is TContext guaranteed wider than any real guard's
+   * declared parameter (see NarrowContext's doc comment for why `any` is
+   * needed at all, and Test 12+ in type-tests.ts for what stays rejected).
+   */
+  guard<G extends (ctx: TContext) => any>(g: G): GuardBuilder<NarrowContext<TContext, G>>;
+};
+
+function makeGuardBuilder<TContext extends BaseContext>(
+  guards: ReadonlyArray<AnyGuard>,
+): GuardBuilder<TContext> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const callable = ((...args: any[]) => buildCapability(args, guards)) as GuardBuilder<TContext>;
+  Object.defineProperty(callable, 'guard', {
+    value: <G extends (ctx: TContext) => any>(g: G): GuardBuilder<NarrowContext<TContext, G>> =>
+      makeGuardBuilder<NarrowContext<TContext, G>>([...guards, g as AnyGuard]),
+    writable: false,
+    enumerable: false,
+    configurable: false,
+  });
+  return callable;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export namespace capability {
   /**
@@ -570,5 +620,40 @@ export namespace capability {
    */
   export function withContext<TContext extends BaseContext>(): ScopedCapabilityFactory<TContext> {
     return capability as unknown as ScopedCapabilityFactory<TContext>;
+  }
+
+  /**
+   * Starts a guard-first builder: declare guards before the resolver, so the
+   * resolver's `ctx` parameter is inferred as the fully-narrowed type with no
+   * annotation and no `capability.withContext<T>()` factory needed.
+   *
+   * Solves the ordering limitation documented in docs/ts-workarounds.md —
+   * `capability(resolver).guard(g)` type-checks the resolver *before* `.guard()`
+   * is seen, so TypeScript can't retroactively narrow it. Declaring guards
+   * first via this builder means TContext is already narrowed by the time the
+   * resolver function literal is contextually typed.
+   *
+   * The bound is `(ctx: any) => any`, not `(ctx: BaseContext) => any` — the
+   * capability starts with TContext = BaseContext, and any real guard (e.g.
+   * one requiring AppContext) declares a *more specific* parameter type than
+   * BaseContext. Function-parameter contravariance means that guard's type
+   * would never be assignable to a BaseContext-bound parameter, which is
+   * exactly the limitation this entry point exists to route around. Every
+   * `.guard()` call after this first one uses the real accumulated TContext
+   * (not `any`), so a guard genuinely incompatible with what prior guards
+   * established is still rejected — see type-tests.ts.
+   *
+   * @example
+   * const getProfile = capability
+   *   .guard(mustBeUser)
+   *   .guard(mustBeAdmin)(
+   *     z.object({}),
+   *     (_, ctx) => ctx.user.id, // ctx: AppContext & { user: User & { role: 'admin' } } — no annotation
+   *     'query',
+   *   );
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  export function guard<G extends (ctx: any) => any>(g: G): GuardBuilder<NarrowContext<BaseContext, G>> {
+    return makeGuardBuilder<NarrowContext<BaseContext, G>>([g as AnyGuard]);
   }
 }

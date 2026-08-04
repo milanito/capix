@@ -307,3 +307,129 @@ void _t11d;
 // schema + resolver + intent
 const _t11e = minCap(z.object({ id: z.string() }), ({ id }) => id, 'query');
 void _t11e;
+
+// ---------------------------------------------------------------------------
+// Test 12: capability.guard(...) narrows the resolver's ctx with ZERO
+// annotation and NO capability.withContext<T>() factory — this is the fix
+// for Test 6's documented limitation. Guards declared before the resolver
+// are visible to TypeScript by the time the resolver literal is checked,
+// unlike guard() called after the resolver (postfix chaining).
+// ---------------------------------------------------------------------------
+
+const capGuardFirst = capability.guard(mustBeAuthenticated)(
+  Input,
+  (_input, ctx) => ctx.token.toUpperCase(), // ctx: AppContext & { token: string } — no annotation
+);
+
+type _GuardFirstContext = typeof capGuardFirst['_context'];
+const _guardFirstCheck: _GuardFirstContext = { requestId: '', user: null, token: 'tok' };
+void _guardFirstCheck;
+
+// @ts-expect-error — token must be non-null after mustBeAuthenticated narrowed it
+const _guardFirstBad: _GuardFirstContext = { requestId: '', user: null, token: null };
+void _guardFirstBad;
+
+// ---------------------------------------------------------------------------
+// Test 13: capability.guard(...).guard(...) narrows progressively, same as
+// chaining on a Capability — still zero annotation on the resolver.
+//
+// NOTE: this requires the second guard's own declared parameter type to
+// already be (a supertype of) what the first guard narrowed to — exactly
+// the "mustBeUser -> mustBeAdmin" convention documented in ts-workarounds.md
+// ("ctx is already narrowed by mustBeUser"). mustHaveUser above is declared
+// against the ORIGINAL AppContext, independently of mustBeAuthenticated, so
+// chaining those two specific guards does NOT accumulate both narrowings —
+// that's a pre-existing NarrowContext limitation for orthogonal/independent
+// guards, unrelated to capability.guard() itself, and equally present with
+// today's postfix .guard().guard() chaining. mustHaveUserGivenAuth below is
+// written the way real sequential guards are meant to be written.
+// ---------------------------------------------------------------------------
+
+const mustHaveUserGivenAuth = defineGuard(
+  (ctx: AppContext & { token: string }): asserts ctx is AppContext & { token: string } & { user: { id: string; name: string } } => {
+    if (!ctx.user) throw errors.Unauthorized();
+  },
+);
+
+const capGuardFirstChained = capability
+  .guard(mustBeAuthenticated)
+  .guard(mustHaveUserGivenAuth)(
+    Input,
+    (_input, ctx) => `${ctx.token}-${ctx.user.id}`, // both narrowed, no annotation
+  );
+
+type _GuardFirstChainedContext = typeof capGuardFirstChained['_context'];
+const _guardFirstChainedCheck: _GuardFirstChainedContext = {
+  requestId: '',
+  user: { id: '1', name: 'Alice' },
+  token: 'tok',
+};
+void _guardFirstChainedCheck;
+
+// @ts-expect-error — token must be non-null in the chained context
+const _guardFirstChainedBad: _GuardFirstChainedContext = { requestId: '', user: { id: '1', name: 'A' }, token: null };
+void _guardFirstChainedBad;
+
+// ---------------------------------------------------------------------------
+// Test 14: forgetting a guard in the chain leaves the resolver under-narrowed
+// — capability.guard() must not grant more than what was actually chained.
+// (This is what makes it safer than the authCap footgun: narrowing is earned
+// by calling .guard(), never handed out by a pre-typed factory alone.)
+// ---------------------------------------------------------------------------
+
+// Only mustBeAuthenticated applied — `user` is still User | null, not narrowed.
+capability.guard(mustBeAuthenticated)(
+  Input,
+  // @ts-expect-error — mustHaveUser was never chained; ctx.user is still nullable
+  (_input, ctx) => ctx.user.id,
+);
+
+// ---------------------------------------------------------------------------
+// Test 15: chaining a guard incompatible with the already-narrowed context is
+// still a compile error — the `any` bound that makes the FIRST .guard() call
+// possible does not leak into later calls in the same chain. Only the entry
+// point (capability.guard) uses `(ctx: any) => any`; GuardBuilder.guard()
+// binds to the real accumulated TContext, so a genuinely wrong guard is
+// still rejected instead of silently accepted.
+// ---------------------------------------------------------------------------
+
+type TenantContext = { readonly requestId: string; readonly tenantId: number };
+const mustHaveTenant = defineGuard(
+  (ctx: TenantContext): asserts ctx is TenantContext & { tenantId: number } => {
+    if (!ctx.tenantId) throw errors.Unauthorized();
+  },
+);
+
+// @ts-expect-error — mustHaveTenant needs TenantContext (tenantId), but the
+// chain's context is AppContext & { token: string } at this point, which has
+// no tenantId — must not be silently accepted.
+capability.guard(mustBeAuthenticated).guard(mustHaveTenant);
+
+// ---------------------------------------------------------------------------
+// Test 16: capability.guard(...) supports the schema + resolver + intent
+// overload too, via ScopedCapabilityFactory.
+// ---------------------------------------------------------------------------
+
+const capGuardFirstWithIntent = capability.guard(mustBeAuthenticated)(
+  Input,
+  (_input, ctx) => ctx.token,
+  'query',
+);
+void capGuardFirstWithIntent;
+type _T16Intent = typeof capGuardFirstWithIntent['intent'];
+const _t16IntentCheck: _T16Intent = 'query';
+void _t16IntentCheck;
+
+// ---------------------------------------------------------------------------
+// Test 17: the capability returned by the builder's terminal call is a
+// regular Capability — .guard()/.enhance()/.output() still work afterward,
+// exactly like a capability built the old way.
+// ---------------------------------------------------------------------------
+
+const capGuardFirstThenMore = capability
+  .guard(mustBeAuthenticated)(Input, (_input, ctx) => ctx.token)
+  .output(z.string());
+
+type _T17Output = InferOutput<typeof capGuardFirstThenMore>;
+const _t17OutputCheck: _T17Output = 'ok';
+void _t17OutputCheck;

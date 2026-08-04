@@ -5,17 +5,28 @@ Nothing here is a commitment or a timeline.
 
 ## Before 1.0
 
-### Guard type ergonomics
-The two-factory pattern (`cap` / `authCap`) is the current workaround
-for a TypeScript limitation with guard narrowing. The goal is to make
-this pattern invisible — scaffolded projects show it by default so
-developers never need to discover it through a confusing error.
+### Guard type ergonomics — fixed
+`capability.guard(...)` lets guards be declared before the resolver, so
+the resolver's `ctx` is inferred fully narrowed with no annotation, no
+factory, and no footgun (forgetting a guard is still a compile error —
+unlike the two-factory pattern, where a bare `authCap` silently grants
+the narrowed type). Additive: `capability()`, `.guard()` postfix, and
+`capability.withContext()` are unchanged. See `docs/ts-workarounds.md`
+for the full writeup and `packages/core/src/type-tests.ts` (Tests
+12-17) for the compile-time proof.
 
-See `docs/ts-workarounds.md` for the current explanation.
+Remaining follow-up: scaffolded projects (`capix new`) still generate
+the two-factory pattern by default — update the templates to use
+`capability.guard(...)` instead, now that it's the recommended default.
 
-### GraphQL and Queue integration tests
-Both transports have unit tests but no end-to-end integration tests.
-Automated integration tests are needed before 1.0.
+### GraphQL and Queue integration tests — done
+`test/integration/graphql.test.ts` drives a live `graphqlTransport`
+over real HTTP; `test/integration/queue.test.ts` mounts `queueTransport`
+alongside `restTransport` on one server/store and asserts a queued job
+produces identical guard/validation/error results as the equivalent
+REST call. BullMQ/SQS adapters remain covered by mocked unit tests only
+— a live-broker integration test would need a new CI service (Redis/
+LocalStack), left as a follow-up.
 
 ### CLI test coverage
 The CLI commands work and are covered by smoke tests in CI. Unit tests
