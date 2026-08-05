@@ -7,7 +7,7 @@
 ```bash
 npm install -g @capixjs/cli
 # or use without installing:
-npx @capixjs/cli@beta <command>
+npx @capixjs/cli <command>
 ```
 
 ## Scaffolding

@@ -1,5 +1,91 @@
 # Changelog
 
+## 1.0.0 — 2026-08-05
+
+**Capix is stable.** The [API stability policy](https://github.com/milanito/capix/blob/master/docs/api/stability.md)'s
+top tier is now in force: the public API and wire contracts (the
+`{ data }` envelope, the error shape, route inference, GraphQL/MCP
+naming) change only in a major version, with deprecations living for
+at least one minor release before removal. `latest` now points here —
+install without a dist-tag:
+
+```bash
+npm install @capixjs/core @capixjs/transport-rest zod@^4
+```
+
+### Added
+- **`capability.guard(...)` — guard-first builder.** Declare guards
+  before the resolver and its `ctx` is inferred fully narrowed, with no
+  annotation and no `capability.withContext<T>()` factory:
+  `capability.guard(mustBeUser)(schema, (_, ctx) => ctx.user.id, 'query')`.
+  Fixes the ordering limitation where `capability(resolver).guard(g)`
+  type-checks the resolver before the guard is visible, and closes the
+  two-factory pattern's footgun — narrowing here is earned by actually
+  calling `.guard()`, not granted by a pre-typed factory alone that
+  still compiles if you forget the guard. Purely additive: `capability()`,
+  postfix `.guard()`, and `capability.withContext()` are unchanged. See
+  [TypeScript workarounds](https://github.com/milanito/capix/blob/master/docs/ts-workarounds.md).
+  `capix new` scaffolds and the AI-context docs now demonstrate it
+  directly, including a guarded example capability
+- **Two new migration guides: From Fastify and From tRPC**, alongside
+  the existing From Express guide
+- Expanded test coverage: end-to-end integration tests for the GraphQL
+  and Queue transports (previously unit-tested only), and unit tests
+  for the remaining untested CLI commands (`generate`, `show`, `list`,
+  `docs`, `check`, `diff`, `call`, `ai-context`)
+
+### Fixed
+- **`@capixjs/plugin-helmet`: `mergeHooks()` now carries the `cors`
+  field through.** The documented pattern for combining `cors()` +
+  `helmet()` — `restTransport({ ...mergeHooks(corsOpts, helmetOpts) })`
+  — silently dropped the CORS origin restriction: `mergeHooks()` only
+  merged each argument's `hooks`, never `cors`, so the transport fell
+  back to its default `origin: '*'` while Helmet's headers still
+  applied. Anyone following the documented pattern had no real origin
+  restriction in production regardless of what they configured
+- **`capix check`'s route-conflict detection was a no-op.**
+  `generateRoutes()` only infers routes — it never throws on
+  duplicates; conflict detection lives in `compileRouter()`, which
+  `check` never called. Two capabilities inferring to the same
+  method and path silently reported "no conflicts"
+- **`capix check`'s scaffold-placeholder detection could never match
+  anything.** It read `cap.resolve.toString()` — the framework's
+  guard-running wrapper, whose source is constant regardless of what
+  you wrote — instead of the actual resolver source
+- Docs and four package READMEs (`@capixjs/core`, `@capixjs/plugin-cors`,
+  `@capixjs/plugin-helmet`, `@capixjs/plugin-logging`) showed a
+  `corsPlugin`/`helmetPlugin`/`loggingPlugin` API via
+  `createServer({ plugins: [...] })` that was never shipped. The real
+  API: `cors()`/`helmet()` spread into `restTransport()`,
+  `loggingEnhancer()` via `.enhance()`
+- CI test flakiness: every test file that boots a real server picked
+  its port by probing port 0 and closing the probe before the real
+  server bound to it — under CI-level parallelism, another file's
+  probe could claim that exact ephemeral port in the gap. All 11
+  affected files now retry with a fresh port on `EADDRINUSE`
+
+### Security
+- `fast-uri` (pulled in via `@capixjs/transport-rest` →
+  `fast-json-stringify` → `ajv`) and `ip-address` /
+  `@hono/node-server` (via `@capixjs/transport-mcp` →
+  `@modelcontextprotocol/sdk`) updated past known advisories —
+  high-severity host-confusion and SSRF/trust-boundary issues, and a
+  moderate Windows-only path-traversal issue respectively. All
+  transitive; no Capix code changed
+- **CI now runs `pnpm audit` on every push** — blocking on high+
+  severity findings in production dependencies (what actually reaches
+  consumers of `@capixjs/*` packages), informational for everything
+  else
+- `vitest` and `@vitest/coverage-v8` updated from 1.6.x to 3.2.7 across
+  every package, fixing a critical advisory (arbitrary file read/execute
+  when `vitest --ui` is running). Dev-only; no published package
+  depends on vitest at runtime
+
+This closes the gate 0.1.0-beta.3 named: soak time and field feedback,
+plus everything above found along the way.
+
+---
+
 ## 0.1.0-beta.3 — 2026-07-03
 
 ### Added

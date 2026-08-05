@@ -5,7 +5,7 @@ From zero to a running API in 5 minutes.
 ## Scaffold a project
 
 ```bash
-npx @capixjs/cli@beta new my-api
+npx @capixjs/cli new my-api
 cd my-api
 pnpm install
 pnpm dev

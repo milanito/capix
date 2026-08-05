@@ -1,6 +1,6 @@
 {
   "name": "@capixjs/testing",
-  "version": "0.1.0-beta.3",
+  "version": "1.0.0",
   "description": "Capix testing utilities",
   "license": "MIT",
   "repository": {

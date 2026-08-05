@@ -1,6 +1,6 @@
 {
   "name": "@capixjs/plugin-auth",
-  "version": "0.1.0-beta.3",
+  "version": "1.0.0",
   "description": "JWT authentication plugin for Capix",
   "license": "MIT",
   "repository": {

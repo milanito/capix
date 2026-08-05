@@ -40,7 +40,7 @@ No `req`/`res`. No `next()`. No middleware stack. Transports are wiring, not arc
 
 **[5-minute quick start →](https://milanito.github.io/capix/guide/quick-start)** · [Documentation](https://milanito.github.io/capix/) · [Examples](examples/) · [Benchmarks](docs/benchmarks.md) · [API stability](docs/api/stability.md)
 
-> **Status: beta.** The [public API and wire contracts](docs/api/stability.md) are frozen — breaking changes now require an explicit migration note. `npm install @capixjs/core` resolves to the current beta.
+> **Status: stable (1.0).** The [public API and wire contracts](docs/api/stability.md) follow semantic versioning — breaking changes only ship in a new major version. `npm install @capixjs/core` resolves to the current stable release.
 
 ## Why capabilities?
 
@@ -497,15 +497,11 @@ pnpm test
 pnpm typecheck
 ```
 
-## Road to 1.0
+## Stability
 
-Capix is in **beta** with the [stability policy](docs/api/stability.md) in force: the documented public API and wire contracts only change with an explicit *Breaking* changelog section and a migration note. `1.0.0` ships when:
+Capix `1.0.0` is out. The [stability policy](docs/api/stability.md) is now in its stable phase: the documented public API and wire contracts only change across a major version, and deprecations live for at least one minor release before removal. See [`docs/changelog.md`](docs/changelog.md) for the full history from alpha through 1.0.
 
-- the beta has soaked in real projects long enough to trust the API shape — no breaking change needed for several consecutive releases,
-- field-reported bugs are burned down (see [issues](https://github.com/milanito/capix/issues)),
-- and the named pre-1.0 feature candidates are shipped — the cross-instance event bus landed in `beta.2` and the SQS queue adapter in `beta.3`. What remains is soak time and field feedback.
-
-Found a bug or missing piece? [Open an issue](https://github.com/milanito/capix/issues/new/choose) — beta feedback directly shapes what 1.0 looks like.
+Found a bug or a gap? [Open an issue](https://github.com/milanito/capix/issues/new/choose).
 
 ## License
 
