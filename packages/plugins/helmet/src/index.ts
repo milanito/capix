@@ -1,4 +1,4 @@
-import type { ServerResponse } from 'node:http';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { RestTransportOptions } from '@capixjs/transport-rest';
 
 export type HelmetOptions = {
@@ -62,22 +62,40 @@ export function helmet(options: HelmetOptions = {}): Pick<RestTransportOptions, 
 }
 
 /**
- * Merges multiple RestTransportOptions hook sets into one.
- * Use when combining cors() + helmet() hooks.
+ * Merges multiple RestTransportOptions hook/cors sets into one.
+ * Use when combining cors() + helmet() (+ optionally your own custom hooks).
+ *
+ * `hooks.onRequest` from every argument runs, in argument order. `cors` is
+ * carried through too — the last argument that defines it wins, so passing
+ * more than one non-empty `cors` is almost certainly a mistake (only cors()
+ * itself should ever provide one in practice).
+ *
+ * @example
+ * const corsOpts = cors({ origin: 'https://app.example.com' });
+ * restTransport({ port: 3000, ...mergeHooks(corsOpts, helmet()) })
  */
 export function mergeHooks(
-  ...hookSets: Array<Pick<RestTransportOptions, 'hooks'>>
-): Pick<RestTransportOptions, 'hooks'> {
-  const fns = hookSets
-    .map((h) => h.hooks?.onRequest)
+  ...optionSets: Array<Pick<RestTransportOptions, 'hooks' | 'cors'>>
+): Pick<RestTransportOptions, 'hooks' | 'cors'> {
+  const fns = optionSets
+    .map((o) => o.hooks?.onRequest)
     .filter((fn): fn is NonNullable<typeof fn> => fn !== undefined);
 
-  if (fns.length === 0) return {};
+  const cors = optionSets.reduce<RestTransportOptions['cors'] | undefined>(
+    (acc, o) => o.cors ?? acc,
+    undefined,
+  );
+
   return {
-    hooks: {
-      onRequest: (req, res) => {
-        for (const fn of fns) fn(req, res);
-      },
-    },
+    ...(cors !== undefined ? { cors } : {}),
+    ...(fns.length > 0
+      ? {
+          hooks: {
+            onRequest: (req: IncomingMessage, res: ServerResponse) => {
+              for (const fn of fns) fn(req, res);
+            },
+          },
+        }
+      : {}),
   };
 }

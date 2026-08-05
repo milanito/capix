@@ -95,16 +95,47 @@ pass.
 planned — the capability model looks similar to tRPC from the outside,
 and the differences are worth explaining clearly.
 
-Writing the Fastify guide surfaced three pre-existing documentation
-bugs (`docs/guide/plugins.md`, `docs/migration/from-express.md`,
-`docs/transports/rest.md`), all the same shape: examples referencing a
+Writing the Fastify guide surfaced a pre-existing documentation bug in
+the same shape across seven files (`docs/guide/plugins.md`,
+`docs/migration/from-express.md`, `docs/transports/rest.md`, and the
+`packages/core`, `packages/plugins/cors`, `packages/plugins/logging`,
+`packages/plugins/helmet` READMEs): examples referencing a
 `corsPlugin`/`helmetPlugin`/`loggingPlugin` API that was never actually
 shipped (real API: `cors()`/`helmet()` spread into `restTransport()`,
-`loggingEnhancer()` via `.enhance()`). Fixed in the three docs-site
-pages; the same wrong API also appears in four package READMEs
-(`packages/core`, `packages/plugins/cors`, `packages/plugins/logging`,
-`packages/plugins/helmet`) — not fixed yet, left as a follow-up since
-it's a distinct enough cleanup from the migration guide itself.
+`loggingEnhancer()` via `.enhance()`). All seven fixed. The `logging`
+and `helmet` READMEs also documented options/default headers/log
+fields that don't match the real implementation (`X-Frame-Options`
+default was documented as `DENY`, actually `SAMEORIGIN`; three headers
+listed that the plugin never sets; `HSTS` — a header it does set — was
+missing from the table entirely; `logging`'s `transport`/`base`
+options and its example log line didn't match `LoggingOptions` or the
+real log fields at all) — corrected against the source, not just
+renamed.
+
+Fixing these surfaced a real bug, not just a doc bug — now fixed:
+the "combine cors() + helmet()" pattern shown in every one of those
+files (and in `test/integration/plugins.test.ts`) — `restTransport({
+...mergeHooks(corsOpts, helmetOpts) })` — silently dropped the CORS
+origin restriction. `mergeHooks()` only merged each argument's `hooks`,
+never their `cors` field, so the transport fell back to its default
+`origin: '*'` while Helmet's headers still applied — confirmed with a
+live server before the fix: a disallowed `Origin` header still got
+back `Access-Control-Allow-Origin: *`. The integration test didn't
+catch it because it exercised `cors({ origin: '*' })`, which happens
+to match the fallback default.
+
+`mergeHooks()` (`packages/plugins/helmet/src/index.ts`) now carries
+`cors` through — the last argument that defines it wins, matching how
+plain object spread would behave. Backwards compatible: the return
+type only gained an optional field. 5 new unit tests cover it directly
+(carries through regardless of argument order, omitted when nothing
+defines it, last-wins when more than one argument does, hooks still
+merge correctly alongside it); the integration test now asserts on a
+distinguishing origin instead of `'*'` so it can no longer pass by
+accident. All doc examples simplified back to the plain
+`...mergeHooks(cors(...), helmet())` form now that it's correct by
+default. `packages/plugins/helmet/CHANGELOG.md` has an `[Unreleased]`
+entry.
 
 ## After 1.0
 

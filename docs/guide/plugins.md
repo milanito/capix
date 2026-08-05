@@ -53,6 +53,8 @@ restTransport({
 })
 ```
 
+`mergeHooks()` combines each argument's `hooks.onRequest` so neither plugin's hook overwrites the other's, and carries the `cors` field through too.
+
 `@capixjs/plugin-logging`'s `loggingEnhancer()` isn't request-scoped either — it wraps individual capabilities via `.enhance(loggingEnhancer())`, since there's no capability-registry hook that runs on every request. See each package's README for full options.
 
 ## Plugin composition order

@@ -307,7 +307,10 @@ describe('logging plugin', () => {
 describe('mergeHooks', () => {
   it('combines cors and helmet hooks on same transport', async () => {
     const port = await getFreePort();
-    const corsOpts = cors({ origin: '*' });
+    // A restricted, non-wildcard origin — '*' would happen to match the
+    // transport's own fallback default and mask a regression where
+    // mergeHooks() drops the `cors` field entirely (it used to).
+    const corsOpts = cors({ origin: 'https://allowed.example.com' });
     const helmetOpts = helmet();
     const combined = mergeHooks(corsOpts, helmetOpts);
 
@@ -320,6 +323,9 @@ describe('mergeHooks', () => {
 
     const res = await fetch(`http://localhost:${port}/system/ping`, { method: 'POST' });
     expect(res.headers.get('X-Frame-Options')).toBe('SAMEORIGIN');
+    // The regression: mergeHooks() used to drop `cors` entirely, so this
+    // fell back to the transport's default '*' instead of the configured origin.
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://allowed.example.com');
 
     await server.stop();
   });

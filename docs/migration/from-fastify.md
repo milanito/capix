@@ -181,7 +181,7 @@ restTransport({
 });
 ```
 
-`cors()` and `helmet()` each return a partial `RestTransportOptions` (`{ cors, hooks }` / `{ hooks }`); `mergeHooks` combines two or more of them into one options object without one overwriting the other's `hooks.onRequest`. Logging isn't a registered plugin either — `@capixjs/plugin-logging`'s `loggingEnhancer()` attaches to individual capabilities via `.enhance(loggingEnhancer())`, since Capix has no single "every request passes through here" HTTP-level hook beyond `onRequest` (see [Hooks](#hooks) above).
+`cors()` and `helmet()` each return a partial `RestTransportOptions` (`{ cors, hooks }` / `{ hooks }`); `mergeHooks` combines two or more of them into one options object — every `hooks.onRequest` runs (so neither overwrites the other's headers), and the `cors` field carries through. Logging isn't a registered plugin either — `@capixjs/plugin-logging`'s `loggingEnhancer()` attaches to individual capabilities via `.enhance(loggingEnhancer())`, since Capix has no single "every request passes through here" HTTP-level hook beyond `onRequest` (see [Hooks](#hooks) above).
 
 ## Multipart file uploads
 

@@ -78,4 +78,42 @@ describe('mergeHooks', () => {
     expect(headers['X-Content-Type-Options']).toBe('nosniff');
     expect(headers['X-Custom']).toBe('yes');
   });
+
+  // Regression: mergeHooks used to only merge `hooks`, silently dropping
+  // `cors` — combining cors() + helmet() looked correct (headers merged
+  // fine) but the origin restriction vanished, falling back to the
+  // transport's default `origin: '*'`.
+  it('carries the cors field through from whichever argument defines it', () => {
+    const corsOpts = { cors: { origin: 'https://app.example.com' } };
+    const helmetOpts = helmet();
+    const merged = mergeHooks(corsOpts, helmetOpts);
+    expect(merged.cors).toEqual({ origin: 'https://app.example.com' });
+  });
+
+  it('carries cors through regardless of argument order', () => {
+    const corsOpts = { cors: { origin: 'https://app.example.com' } };
+    const merged = mergeHooks(helmet(), corsOpts);
+    expect(merged.cors).toEqual({ origin: 'https://app.example.com' });
+  });
+
+  it('omits cors when no argument defines it', () => {
+    const merged = mergeHooks(helmet(), { hooks: { onRequest: () => {} } });
+    expect(merged).not.toHaveProperty('cors');
+  });
+
+  it('last non-empty cors wins when more than one argument defines it', () => {
+    const first = { cors: { origin: 'https://first.example.com' } };
+    const second = { cors: { origin: 'https://second.example.com' } };
+    expect(mergeHooks(first, second).cors).toEqual({ origin: 'https://second.example.com' });
+  });
+
+  it('still merges hooks correctly alongside cors', () => {
+    const headers: Record<string, string> = {};
+    const res = { setHeader: (n: string, v: string) => { headers[n] = v; } } as unknown as ServerResponse;
+    const corsOpts = { cors: { origin: 'https://app.example.com' } };
+    const merged = mergeHooks(corsOpts, helmet());
+    merged.hooks?.onRequest?.(req, res);
+    expect(merged.cors).toEqual({ origin: 'https://app.example.com' });
+    expect(headers['X-Content-Type-Options']).toBe('nosniff');
+  });
 });

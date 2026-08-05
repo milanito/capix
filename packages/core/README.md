@@ -234,10 +234,12 @@ const tenantPlugin = definePlugin({
 });
 
 createServer({
-  plugins:    [tenantPlugin, loggingPlugin],
+  plugins:    [tenantPlugin],
   transports: [restTransport({ port: 3000 })],
 }).start();
 ```
+
+`@capixjs/plugin-cors`, `@capixjs/plugin-helmet`, and `@capixjs/plugin-logging` are not `definePlugin()` plugins and don't go in `plugins: [...]` — see their READMEs for the REST-transport-option / `.enhance()` APIs they actually use.
 
 ## Event bus
 
