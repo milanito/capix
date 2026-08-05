@@ -90,10 +90,23 @@ a vitest 1.x → 3.x migration across every package in the workspace —
 real work, not a version-bump one-liner, and out of scope for this
 pass.
 
-### Migration guides
-"From Express" and "From Fastify" guides exist. "From tRPC" is still
-planned — the capability model looks similar to tRPC from the outside,
-and the differences are worth explaining clearly.
+### Migration guides — done
+"From Express", "From Fastify", and "From tRPC" all exist now. tRPC is
+the closest of the three to Capix conceptually — procedures and
+capabilities are the same idea (schema-validated input, typed
+resolver, no route file) — so that guide leans on the differences that
+actually matter: `capability.guard(...)` vs. tRPC's `protectedProcedure
+= publicProcedure.use(isAuthed)` (structurally the same problem Capix's
+old two-factory pattern solved, but `capability.guard` needs no second
+exported builder), and — stated plainly rather than glossed over —
+tRPC's live end-to-end type inference (no codegen, just importing the
+server's router type) has no Capix equivalent; `capix client` is
+codegen, and it currently only types inputs, not outputs
+(`Promise<unknown>` — verified by reading `cli/src/commands/client.ts`,
+not assumed). Also notes Capix has no request-batching equivalent to
+`httpBatchLink`, and that `.output()` is dev-only by default in Capix
+(verified against `execution-engine.ts`) where tRPC's runs on every
+call.
 
 Writing the Fastify guide surfaced a pre-existing documentation bug in
 the same shape across seven files (`docs/guide/plugins.md`,
