@@ -142,16 +142,20 @@ app.use(cors());
 app.use(helmet());
 app.use(morgan('combined'));
 
-// Capix — plugins compose cleanly
-createServer({
-  plugins: [
-    corsPlugin({ origin: 'https://app.example.com' }),
-    helmetPlugin(),
-    loggingPlugin({ level: 'info' }),
-  ],
-  ...
+// Capix — CORS and security headers are REST-transport options, not middleware
+import { cors } from '@capixjs/plugin-cors';
+import { helmet, mergeHooks } from '@capixjs/plugin-helmet';
+
+restTransport({
+  port: 3000,
+  ...mergeHooks(
+    cors({ origin: 'https://app.example.com' }),
+    helmet(),
+  ),
 });
 ```
+
+Logging isn't a global middleware either — `@capixjs/plugin-logging`'s `loggingEnhancer()` attaches per capability via `.enhance(loggingEnhancer())`, since there's no single "runs on every request" hook beyond the REST transport's `hooks.onRequest` (headers/response only, no access to input or context).
 
 ## File uploads
 
@@ -188,7 +192,7 @@ const uploadFile = capability(
 | `res.json(data)` | `return data` |
 | `next(error)` | `throw error` |
 | `express.Router()` | group object `{ users: { list, get, create } }` |
-| `app.use(cors())` | `plugins: [corsPlugin()]` |
+| `app.use(cors())` | `restTransport({ ...cors() })` |
 | `app.use((err, req, res, next) => ...)` | not needed — all errors caught automatically |
 | `req.user = ...` (via middleware) | `ctx.user = ...` (via `buildContext`) |
 | `app.listen(3000)` | `createServer({ transports: [restTransport({ port: 3000 })] }).start()` |

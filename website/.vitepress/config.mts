@@ -99,6 +99,7 @@ export default defineConfig({
           text: 'Migration',
           items: [
             { text: 'From Express', link: '/migration/from-express' },
+            { text: 'From Fastify', link: '/migration/from-fastify' },
           ],
         },
       ],

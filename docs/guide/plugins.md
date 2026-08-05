@@ -27,24 +27,33 @@ Both `capabilities` and `context` are optional. A plugin that only adds capabili
 ```ts
 import { createServer } from '@capixjs/core';
 import { restTransport } from '@capixjs/transport-rest';
-import { corsPlugin } from '@capixjs/plugin-cors';
-import { helmetPlugin } from '@capixjs/plugin-helmet';
-import { loggingPlugin } from '@capixjs/plugin-logging';
 
 createServer({
   context:      buildContext,
   capabilities: { users: { getUser, createUser } },
-  plugins: [
-    corsPlugin({ origin: 'https://app.example.com', credentials: true }),
-    helmetPlugin(),
-    loggingPlugin({ level: 'info' }),
-    auditPlugin,
-  ],
+  plugins: [auditPlugin],
   transports: [restTransport({ port: 3000 })],
 }).start();
 ```
 
-Plugins are merged at server creation. Their capabilities are merged into the registry alongside the server-level `capabilities`. Their context extensions are composed in order.
+Plugins (the `definePlugin()` kind on this page) are merged at server creation. Their capabilities are merged into the registry alongside the server-level `capabilities`. Their context extensions are composed in order.
+
+**`@capixjs/plugin-cors`, `@capixjs/plugin-helmet`, and `@capixjs/plugin-logging` are not `definePlugin()` plugins** — don't pass them to `plugins: [...]`. CORS and security headers are REST-transport concerns, so `cors()`/`helmet()` return partial `RestTransportOptions` meant to be spread into `restTransport()` directly:
+
+```ts
+import { cors } from '@capixjs/plugin-cors';
+import { helmet, mergeHooks } from '@capixjs/plugin-helmet';
+
+restTransport({
+  port: 3000,
+  ...mergeHooks(
+    cors({ origin: 'https://app.example.com' }),
+    helmet(),
+  ),
+})
+```
+
+`@capixjs/plugin-logging`'s `loggingEnhancer()` isn't request-scoped either — it wraps individual capabilities via `.enhance(loggingEnhancer())`, since there's no capability-registry hook that runs on every request. See each package's README for full options.
 
 ## Plugin composition order
 

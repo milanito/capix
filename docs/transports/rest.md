@@ -157,15 +157,25 @@ The CLI wraps this as [`capix openapi`](../cli.md#capix-openapi).
 restTransport({
   port: 3000,
   cors: {
-    origin:      (origin) => origin.endsWith('.example.com'),
-    methods:     ['GET', 'POST', 'PATCH', 'DELETE'],
-    headers:     ['Content-Type', 'Authorization'],
-    credentials: true,
+    origin:  (origin) => origin.endsWith('.example.com'),
+    methods: 'GET, POST, PATCH, DELETE',
+    headers: 'Content-Type, Authorization',
   },
 })
 ```
 
-Or use the `corsPlugin` for a plugin-based approach.
+`methods` and `headers` are the literal `Access-Control-Allow-*` header values, not arrays. Origin defaults to `'*'`, `methods` defaults to `'GET, POST, PATCH, PUT, DELETE, OPTIONS'`, `headers` defaults to `'Content-Type, Authorization'`.
+
+Or use `cors()` from `@capixjs/plugin-cors` for a slightly higher-level API (array-of-origins support, automatic `Vary: Origin` for dynamic origins):
+
+```ts
+import { cors } from '@capixjs/plugin-cors';
+
+restTransport({
+  port: 3000,
+  ...cors({ origin: ['https://app.example.com', 'https://admin.example.com'] }),
+})
+```
 
 ## Timeouts
 

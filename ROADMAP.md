@@ -91,9 +91,20 @@ real work, not a version-bump one-liner, and out of scope for this
 pass.
 
 ### Migration guides
-A "From Express" guide exists. "From Fastify" and "From tRPC" are
-planned — tRPC in particular because the capability model looks similar
-from the outside and the differences are worth explaining clearly.
+"From Express" and "From Fastify" guides exist. "From tRPC" is still
+planned — the capability model looks similar to tRPC from the outside,
+and the differences are worth explaining clearly.
+
+Writing the Fastify guide surfaced three pre-existing documentation
+bugs (`docs/guide/plugins.md`, `docs/migration/from-express.md`,
+`docs/transports/rest.md`), all the same shape: examples referencing a
+`corsPlugin`/`helmetPlugin`/`loggingPlugin` API that was never actually
+shipped (real API: `cors()`/`helmet()` spread into `restTransport()`,
+`loggingEnhancer()` via `.enhance()`). Fixed in the three docs-site
+pages; the same wrong API also appears in four package READMEs
+(`packages/core`, `packages/plugins/cors`, `packages/plugins/logging`,
+`packages/plugins/helmet`) — not fixed yet, left as a follow-up since
+it's a distinct enough cleanup from the migration guide itself.
 
 ## After 1.0
 
