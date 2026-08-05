@@ -64,6 +64,31 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # ─── Dependency vulnerability audit ──────────────────────────────────
+
+      # Blocking: production dependencies only, high+ severity. This is the
+      # supply-chain surface that actually reaches consumers of @capixjs/*
+      # packages (published devDependencies never ship). `benchmarks` is a
+      # private, unpublished comparison tool — its Fastify/Express/Hono/
+      # autocannon versions live in its own devDependencies precisely so
+      # they don't count as production risk here; they're intentionally
+      # older majors kept for benchmark stability, not vulnerable published
+      # code. Bumping them is tracked separately (would need re-validating
+      # docs/benchmarks.md's numbers, not a security fix).
+      - name: Dependency audit (production, high+ severity)
+        run: pnpm audit --prod --audit-level high
+
+      # Informational only: everything, including devDependencies (e.g. a
+      # vitest UI-server RCE only reachable by someone running `vitest --ui`
+      # locally) and moderate+ severity. Not blocking — devDependency fixes
+      # here can require major-version migrations (vitest 1.x -> 3.x across
+      # every package) that are their own project, not a one-line bump. This
+      # step exists so that work is visible and trackable, not silently
+      # invisible.
+      - name: Dependency audit (full, informational)
+        continue-on-error: true
+        run: pnpm audit --audit-level moderate
+
       # ─── Build ────────────────────────────────────────────────────────────
 
       - name: Build all packages

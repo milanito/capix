@@ -49,6 +49,47 @@ placeholder detection read `cap.resolve.toString()` (the framework's
 guard-running wrapper, constant regardless of the user's resolver)
 instead of `cap._resolverOnly.toString()` (the actual user code).
 
+### CI dependency vulnerability scanning — done
+`audit.yml` now runs `pnpm audit --prod --audit-level high` as a
+blocking step (production dependencies only — what actually reaches
+consumers of `@capixjs/*` packages) plus a full, informational
+`pnpm audit --audit-level moderate` (`continue-on-error: true`) for
+visibility into devDependency-only and lower-severity findings without
+blocking merges on them.
+
+Getting the blocking gate to a real, honest pass (not a suppressed
+one) took two fixes:
+- `fast-uri` (pulled in by `@capixjs/transport-rest` via
+  `fast-json-stringify` → `ajv`) and `ip-address` (pulled in by
+  `@capixjs/transport-mcp` via `@modelcontextprotocol/sdk` →
+  `express-rate-limit`) were both vulnerable at their locked versions
+  but already patched *within* the semver ranges their dependents
+  declare — the lockfile was simply stale. A plain `pnpm install`
+  refresh resolved both to patched versions; no override needed.
+- `benchmarks`' comparison-framework dependencies (Fastify 4.x,
+  Express 4.x, autocannon, an older Hono) accounted for the rest of
+  the findings. `benchmarks` is private and never published, so these
+  were never real production risk — but `pnpm audit` has no
+  workspace-scoping flag, so they showed up regardless. Moved to
+  `benchmarks`'s `devDependencies` (which `--prod` correctly excludes)
+  since that's what they actually are for an unpublished tool; verified
+  the benchmark servers still boot after the move.
+
+One known gap left as follow-up: `@hono/node-server` (pulled in by
+`@capixjs/transport-mcp` via `@modelcontextprotocol/sdk`) has a
+moderate-severity, Windows-only path-traversal advisory in its
+`serve-static` middleware fixed only in its 2.x line; the SDK's own
+`package.json` pins `^1.19.9`, so it can't move without an upstream SDK
+bump. Below the blocking gate's severity threshold, so it doesn't
+block, but isn't fixed either.
+
+Also surfaced (informational only, not fixed): `vitest` has a critical
+advisory (arbitrary file read/execute when `vitest --ui` is running)
+fixed in 3.2.6+; every package here is on vitest 1.6.x. Fixing it means
+a vitest 1.x → 3.x migration across every package in the workspace —
+real work, not a version-bump one-liner, and out of scope for this
+pass.
+
 ### Migration guides
 A "From Express" guide exists. "From Fastify" and "From tRPC" are
 planned — tRPC in particular because the capability model looks similar
