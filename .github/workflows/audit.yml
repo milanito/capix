@@ -78,13 +78,12 @@ jobs:
       - name: Dependency audit (production, high+ severity)
         run: pnpm audit --prod --audit-level high
 
-      # Informational only: everything, including devDependencies (e.g. a
-      # vitest UI-server RCE only reachable by someone running `vitest --ui`
-      # locally) and moderate+ severity. Not blocking — devDependency fixes
-      # here can require major-version migrations (vitest 1.x -> 3.x across
-      # every package) that are their own project, not a one-line bump. This
-      # step exists so that work is visible and trackable, not silently
-      # invisible.
+      # Informational only: everything, including devDependencies, and
+      # moderate+ severity. Not blocking — devDependency fixes here can
+      # require major-version migrations that are their own project, not a
+      # one-line bump (this caught vitest's critical UI-server RCE, fixed by
+      # the 1.x -> 3.x migration across every package). This step exists so
+      # that work is visible and trackable, not silently invisible.
       - name: Dependency audit (full, informational)
         continue-on-error: true
         run: pnpm audit --audit-level moderate

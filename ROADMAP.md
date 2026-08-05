@@ -83,12 +83,38 @@ moderate-severity, Windows-only path-traversal advisory in its
 bump. Below the blocking gate's severity threshold, so it doesn't
 block, but isn't fixed either.
 
-Also surfaced (informational only, not fixed): `vitest` has a critical
-advisory (arbitrary file read/execute when `vitest --ui` is running)
-fixed in 3.2.6+; every package here is on vitest 1.6.x. Fixing it means
-a vitest 1.x → 3.x migration across every package in the workspace —
-real work, not a version-bump one-liner, and out of scope for this
-pass.
+Also surfaced (informational only, at the time): `vitest` had a
+critical advisory (arbitrary file read/execute when `vitest --ui` is
+running) fixed in 3.2.6+; every package was on vitest 1.6.x. See
+"Vitest 1.x → 3.x migration" below — now fixed.
+
+### Vitest 1.x → 3.x migration — done
+Bumped `vitest` and `@vitest/coverage-v8` to `^3.2.7` (latest 3.x —
+past the critical UI-server RCE's 3.2.6 patch threshold, without
+jumping into v4's separate breaking changes, which wasn't what was
+scoped) across all 15 `package.json` files that reference either.
+
+Checked exposure to every breaking change in both the 1→2 and 2→3
+migration guides before touching anything, not just the ones that
+seemed obviously relevant: 2-arg `vi.fn<T1,T2>`/`Mock<T1,T2>` generics,
+`.mock.results`, `SpyInstance`, snapshot testing, third-arg test
+options, `.mockReset()`, `toThrowError`/`toEqual(new ...)` strictness —
+none are used anywhere in the repo. `vi.useFakeTimers()` is used in 4
+files, but v3's change (fake timers now also mock `performance.now()`
+by default) doesn't apply — nothing in the source ever calls
+`performance.now()`. The one real risk — Vite 6's stricter `module`
+condition resolution interacting with the documented CJS/ESM
+graphql-http workaround in `packages/transports/graphql` and
+`test/integration/vitest.config.ts` — turned out fine; both test
+suites passed unmodified.
+
+Full monorepo build + test suite passed on the first attempt, no code
+changes needed anywhere outside `package.json` files. Specifically
+re-verified the `packages/core` coverage gate (v3's V8 coverage
+provider changed how it counts empty lines by default) — thresholds
+still comfortably cleared (91%/92%/98%/91% vs. the 85/80/90/85 gates).
+`.github/workflows/audit.yml`'s comment about this being deferred work
+is updated to reflect it's done.
 
 ### Migration guides — done
 "From Express", "From Fastify", and "From tRPC" all exist now. tRPC is
