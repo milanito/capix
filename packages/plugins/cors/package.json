@@ -43,7 +43,7 @@
     "typecheck": "tsc --noEmit"
   },
   "peerDependencies": {
-    "@capixjs/transport-rest": ">=0.1.0-0"
+    "@capixjs/transport-rest": "^1.0.0"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",

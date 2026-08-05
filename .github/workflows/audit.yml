@@ -165,17 +165,21 @@ jobs:
           done
           exit $FAILED
 
-      - name: Verify peerDependencies include prereleases
+      - name: Verify peerDependencies are major-bounded
         run: |
           FAILED=0
-          # Packages that peer on @capixjs/core
+          CORE_MAJOR=$(node -p "require('./packages/core/package.json').version.split('.')[0]")
+          REST_MAJOR=$(node -p "require('./packages/transports/rest/package.json').version.split('.')[0]")
+          # Packages that peer on @capixjs/core — per docs/api/stability.md,
+          # stable releases only break on a major bump, so the peer range
+          # must be capped at the next major (^<major>.x.x), not open-ended.
           for pkg in packages/transports/rest packages/transports/ws \
                      packages/transports/graphql packages/transports/queue \
                      packages/transports/mcp packages/stores/redis \
                      packages/testing packages/plugins/logging packages/plugins/auth; do
             peer=$(node -p "require('./$pkg/package.json').peerDependencies?.['@capixjs/core'] || ''")
-            if [[ "$peer" != *"-0"* ]]; then
-              echo "✗ $(basename $pkg): @capixjs/core peerDep '$peer' must use >=x.x.x-0 range"
+            if [[ "$peer" != "^${CORE_MAJOR}."* ]]; then
+              echo "✗ $(basename $pkg): @capixjs/core peerDep '$peer' must be ^${CORE_MAJOR}.x.x"
               FAILED=1
             else
               echo "✓ $(basename $pkg): @capixjs/core $peer"
@@ -184,8 +188,8 @@ jobs:
           # Packages that peer on @capixjs/transport-rest
           for pkg in packages/plugins/cors packages/plugins/helmet; do
             peer=$(node -p "require('./$pkg/package.json').peerDependencies?.['@capixjs/transport-rest'] || ''")
-            if [[ "$peer" != *"-0"* ]]; then
-              echo "✗ $(basename $pkg): @capixjs/transport-rest peerDep '$peer' must use >=x.x.x-0 range"
+            if [[ "$peer" != "^${REST_MAJOR}."* ]]; then
+              echo "✗ $(basename $pkg): @capixjs/transport-rest peerDep '$peer' must be ^${REST_MAJOR}.x.x"
               FAILED=1
             else
               echo "✓ $(basename $pkg): @capixjs/transport-rest $peer"
