@@ -75,13 +75,25 @@ one) took two fixes:
   since that's what they actually are for an unpublished tool; verified
   the benchmark servers still boot after the move.
 
-One known gap left as follow-up: `@hono/node-server` (pulled in by
-`@capixjs/transport-mcp` via `@modelcontextprotocol/sdk`) has a
-moderate-severity, Windows-only path-traversal advisory in its
-`serve-static` middleware fixed only in its 2.x line; the SDK's own
-`package.json` pins `^1.19.9`, so it can't move without an upstream SDK
-bump. Below the blocking gate's severity threshold, so it doesn't
-block, but isn't fixed either.
+One gap was left as a follow-up at the time: `@hono/node-server`
+(pulled in by `@capixjs/transport-mcp` via
+`@modelcontextprotocol/sdk`) had a moderate-severity, Windows-only
+path-traversal advisory in its `serve-static` middleware, fixed only
+in its 2.x line — the SDK's `package.json` pinned `^1.19.9`. Now
+fixed: the SDK has since widened its own declared range to
+`^1.19.9 || ^2.0.5` (checked by fetching the current SDK's published
+`package.json` from the registry, not assumed). The lockfile doesn't
+jump majors on its own just because a range widens, so `pnpm update
+@hono/node-server --recursive --latest` was needed to actually move
+it — `transport-mcp` now resolves `@hono/node-server@2.1.0`, and
+`pnpm audit --prod` reports zero vulnerabilities (previously one
+moderate). The only package.json affected was `benchmarks`' own
+devDependency on the same package (bumped `^1.0.0` → `^2.1.0` by the
+same command); verified functionally, not just "it resolved" — booted
+`benchmarks/servers/hono.js` for real and hit both routes. Full
+monorepo build + test (670 tests, including the MCP transport's own
+suite and the cross-transport suite's real MCP-client-over-
+Streamable-HTTP test) passed unmodified.
 
 Also surfaced (informational only, at the time): `vitest` had a
 critical advisory (arbitrary file read/execute when `vitest --ui` is
