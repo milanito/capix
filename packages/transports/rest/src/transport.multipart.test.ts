@@ -18,6 +18,28 @@ async function getFreePort(): Promise<number> {
   });
 }
 
+/**
+ * getFreePort() closes its probe socket before the real server binds to that
+ * port number — under CI-level parallelism, another test file's probe can
+ * claim the same ephemeral port in that gap, so the real bind then fails
+ * with EADDRINUSE. Retries with a fresh port on that specific failure.
+ */
+async function startOnFreePort<T extends { start: () => Promise<void> }>(
+  build: (port: number) => T,
+  maxAttempts = 5,
+): Promise<{ server: T; port: number }> {
+  for (let attempt = 1; ; attempt++) {
+    const port = await getFreePort();
+    const server = build(port);
+    try {
+      await server.start();
+      return { server, port };
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException)?.code !== 'EADDRINUSE' || attempt >= maxAttempts) throw err;
+    }
+  }
+}
+
 const buildContext = defineContext(async () => ({ requestId: crypto.randomUUID() }));
 
 // A capability that accepts a multipart file + a text field
@@ -46,27 +68,22 @@ let portNoMultipart: number;
 let serverNoMultipart: Server;
 
 beforeAll(async () => {
-  port = await getFreePort();
-  portNoMultipart = await getFreePort();
-
-  server = createServer({
+  ({ server, port } = await startOnFreePort((p) => createServer({
     context: buildContext,
     capabilities: { files: { receiveFile } },
     transports: [
       restTransport({
-        port,
+        port: p,
         multipart: { maxFileSize: 512, maxFiles: 1 }, // tiny limit for test
       }),
     ],
-  });
-  await server.start();
+  })));
 
-  serverNoMultipart = createServer({
+  ({ server: serverNoMultipart, port: portNoMultipart } = await startOnFreePort((p) => createServer({
     context: buildContext,
     capabilities: { api: { jsonOnly } },
-    transports: [restTransport({ port: portNoMultipart })],
-  });
-  await serverNoMultipart.start();
+    transports: [restTransport({ port: p })],
+  })));
 });
 
 afterAll(async () => {
@@ -133,15 +150,12 @@ describe('multipart transport integration', () => {
       ({ file }: { file: UploadedFile }) => ({ filename: file.filename }),
     );
 
-    const srv = createServer({
+    const { server: srv } = await startOnFreePort((port) => createServer({
       context: buildContext,
       capabilities: { test: { restrictedCapability } },
-      transports: [restTransport({ port: await getFreePort(), multipart: true })],
-    });
-    await srv.start();
+      transports: [restTransport({ port, multipart: true })],
+    }));
 
-    const p = (srv as unknown as { transports: { port: number }[] }).transports;
-    void p;
     // Use the server's invoke directly to test the Zod schema
     const result = await srv.invoke({
       capability: 'test.restrictedCapability',

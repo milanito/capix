@@ -18,6 +18,28 @@ async function getFreePort(): Promise<number> {
   });
 }
 
+/**
+ * getFreePort() closes its probe socket before the real server binds to that
+ * port number — under CI-level parallelism, another test file's probe can
+ * claim the same ephemeral port in that gap, so the real bind then fails
+ * with EADDRINUSE. Retries with a fresh port on that specific failure.
+ */
+async function startOnFreePort<T extends { start: () => Promise<void> }>(
+  build: (port: number) => T,
+  maxAttempts = 5,
+): Promise<{ server: T; port: number }> {
+  for (let attempt = 1; ; attempt++) {
+    const port = await getFreePort();
+    const server = build(port);
+    try {
+      await server.start();
+      return { server, port };
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException)?.code !== 'EADDRINUSE' || attempt >= maxAttempts) throw err;
+    }
+  }
+}
+
 const buildContext = defineContext(async () => ({ requestId: crypto.randomUUID() }));
 const ping = capability(() => ({ ok: true }));
 
@@ -30,15 +52,14 @@ describe('cors plugin — string origin', () => {
   let baseUrl: string;
 
   beforeAll(async () => {
-    const port = await getFreePort();
-    baseUrl = `http://localhost:${port}`;
     const corsOptions = cors({ origin: 'https://example.com' });
-    server = createServer({
+    let port: number;
+    ({ server, port } = await startOnFreePort((p) => createServer({
       context: buildContext,
       capabilities: { system: { ping } },
-      transports: [restTransport({ port, ...corsOptions })],
-    });
-    await server.start();
+      transports: [restTransport({ port: p, ...corsOptions })],
+    })));
+    baseUrl = `http://localhost:${port}`;
   });
 
   afterAll(async () => { await server.stop(); });
@@ -66,15 +87,14 @@ describe('cors plugin — function origin', () => {
   let baseUrl: string;
 
   beforeAll(async () => {
-    const port = await getFreePort();
-    baseUrl = `http://localhost:${port}`;
     const corsOptions = cors({ origin: (o) => o === 'https://allowed.com' });
-    server = createServer({
+    let port: number;
+    ({ server, port } = await startOnFreePort((p) => createServer({
       context: buildContext,
       capabilities: { system: { ping } },
-      transports: [restTransport({ port, ...corsOptions })],
-    });
-    await server.start();
+      transports: [restTransport({ port: p, ...corsOptions })],
+    })));
+    baseUrl = `http://localhost:${port}`;
   });
 
   afterAll(async () => { await server.stop(); });
@@ -109,14 +129,12 @@ describe('cors plugin — array origin', () => {
   let port: number;
 
   beforeAll(async () => {
-    port = await getFreePort();
     const corsOptions = cors({ origin: ['https://a.com', 'https://b.com'] });
-    server = createServer({
+    ({ server, port } = await startOnFreePort((p) => createServer({
       context: buildContext,
       capabilities: { system: { ping } },
-      transports: [restTransport({ port, ...corsOptions })],
-    });
-    await server.start();
+      transports: [restTransport({ port: p, ...corsOptions })],
+    })));
   });
 
   afterAll(async () => { await server.stop(); });
@@ -147,15 +165,14 @@ describe('helmet plugin', () => {
   let baseUrl: string;
 
   beforeAll(async () => {
-    const port = await getFreePort();
-    baseUrl = `http://localhost:${port}`;
     const helmetOpts = helmet();
-    server = createServer({
+    let port: number;
+    ({ server, port } = await startOnFreePort((p) => createServer({
       context: buildContext,
       capabilities: { system: { ping } },
-      transports: [restTransport({ port, ...helmetOpts })],
-    });
-    await server.start();
+      transports: [restTransport({ port: p, ...helmetOpts })],
+    })));
+    baseUrl = `http://localhost:${port}`;
   });
 
   afterAll(async () => { await server.stop(); });
@@ -181,14 +198,12 @@ describe('helmet plugin', () => {
   });
 
   it('custom options override defaults', async () => {
-    const port2 = await getFreePort();
     const customHelmet = helmet({ frameOptions: 'DENY', noSniff: false });
-    const s = createServer({
+    const { server: s, port: port2 } = await startOnFreePort((port) => createServer({
       context: buildContext,
       capabilities: { system: { ping } },
-      transports: [restTransport({ port: port2, ...customHelmet })],
-    });
-    await s.start();
+      transports: [restTransport({ port, ...customHelmet })],
+    }));
     const res = await fetch(`http://localhost:${port2}/system/ping`, { method: 'POST' });
     expect(res.headers.get('X-Frame-Options')).toBe('DENY');
     expect(res.headers.get('X-Content-Type-Options')).toBeNull();
@@ -207,13 +222,11 @@ describe('logging plugin', () => {
 
     const loggedPing = ping.enhance(loggingEnhancer({ logger }));
 
-    const port = await getFreePort();
-    const server = createServer({
+    const { server, port } = await startOnFreePort((p) => createServer({
       context: buildContext,
       capabilities: { system: { ping: loggedPing } },
-      transports: [restTransport({ port })],
-    });
-    await server.start();
+      transports: [restTransport({ port: p })],
+    }));
 
     const res = await fetch(`http://localhost:${port}/system/ping`, { method: 'POST' });
     expect(res.status).toBe(200);
@@ -306,7 +319,6 @@ describe('logging plugin', () => {
 
 describe('mergeHooks', () => {
   it('combines cors and helmet hooks on same transport', async () => {
-    const port = await getFreePort();
     // A restricted, non-wildcard origin — '*' would happen to match the
     // transport's own fallback default and mask a regression where
     // mergeHooks() drops the `cors` field entirely (it used to).
@@ -314,12 +326,11 @@ describe('mergeHooks', () => {
     const helmetOpts = helmet();
     const combined = mergeHooks(corsOpts, helmetOpts);
 
-    const server = createServer({
+    const { server, port } = await startOnFreePort((p) => createServer({
       context: buildContext,
       capabilities: { system: { ping } },
-      transports: [restTransport({ port, ...combined })],
-    });
-    await server.start();
+      transports: [restTransport({ port: p, ...combined })],
+    }));
 
     const res = await fetch(`http://localhost:${port}/system/ping`, { method: 'POST' });
     expect(res.headers.get('X-Frame-Options')).toBe('SAMEORIGIN');

@@ -25,6 +25,28 @@ async function getFreePort(): Promise<number> {
   });
 }
 
+/**
+ * getFreePort() closes its probe socket before the real server binds to that
+ * port number — under CI-level parallelism, another test file's probe can
+ * claim the same ephemeral port in that gap, so the real bind then fails
+ * with EADDRINUSE. Retries with a fresh port on that specific failure.
+ */
+async function startOnFreePort<T extends { start: () => Promise<void> }>(
+  build: (port: number) => T,
+  maxAttempts = 5,
+): Promise<{ server: T; port: number }> {
+  for (let attempt = 1; ; attempt++) {
+    const port = await getFreePort();
+    const server = build(port);
+    try {
+      await server.start();
+      return { server, port };
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException)?.code !== 'EADDRINUSE' || attempt >= maxAttempts) throw err;
+    }
+  }
+}
+
 const buildContext = defineContext(async () => ({ requestId: crypto.randomUUID() }));
 
 async function post(url: string, body: Record<string, unknown> = {}): Promise<Response> {
@@ -47,13 +69,11 @@ async function makeCacheServer() {
     ({ id }) => { callCount++; return { id, seq: callCount }; },
   ).enhance(withCache(10));
 
-  const port = await getFreePort();
-  const srv = createServer({
+  const { server: srv, port } = await startOnFreePort((p) => createServer({
     context: buildContext,
     capabilities: { data: { getItem } },
-    transports: [restTransport({ port })],
-  });
-  await srv.start();
+    transports: [restTransport({ port: p })],
+  }));
 
   return {
     baseUrl: `http://localhost:${port}`,
@@ -110,13 +130,11 @@ async function makeRateLimitServer(limit: number, windowMs: number) {
   const ping = capability(() => ({ pong: true }))
     .enhance(withRateLimit({ limit, windowMs }));
 
-  const port = await getFreePort();
-  const srv = createServer({
+  const { server: srv, port } = await startOnFreePort((p) => createServer({
     context: buildContext,
     capabilities: { api: { ping } },
-    transports: [restTransport({ port })],
-  });
-  await srv.start();
+    transports: [restTransport({ port: p })],
+  }));
 
   return {
     url: `http://localhost:${port}/api/ping`,
@@ -166,13 +184,11 @@ async function makeCircuitServer(options: { failureThreshold: number; successThr
     return { ok: true };
   }).enhance(withCircuitBreaker(options));
 
-  const port = await getFreePort();
-  const srv = createServer({
+  const { server: srv, port } = await startOnFreePort((p) => createServer({
     context: buildContext,
     capabilities: { svc: { call } },
-    transports: [restTransport({ port })],
-  });
-  await srv.start();
+    transports: [restTransport({ port: p })],
+  }));
 
   return {
     url: `http://localhost:${port}/svc/call`,
@@ -223,14 +239,13 @@ describe('withTimeout — HTTP integration', () => {
   ).enhance(withTimeout(50));
 
   beforeAll(async () => {
-    const port = await getFreePort();
-    baseUrl = `http://localhost:${port}`;
-    server = createServer({
+    let port: number;
+    ({ server, port } = await startOnFreePort((p) => createServer({
       context: buildContext,
       capabilities: { ops: { run } },
-      transports: [restTransport({ port })],
-    });
-    await server.start();
+      transports: [restTransport({ port: p })],
+    })));
+    baseUrl = `http://localhost:${port}`;
   });
 
   afterAll(async () => { await server.stop(); });
@@ -272,14 +287,13 @@ describe('withMetrics — HTTP integration', () => {
   }));
 
   beforeAll(async () => {
-    const port = await getFreePort();
-    baseUrl = `http://localhost:${port}`;
-    server = createServer({
+    let port: number;
+    ({ server, port } = await startOnFreePort((p) => createServer({
       context: buildContext,
       capabilities: { ops: { track } },
-      transports: [restTransport({ port })],
-    });
-    await server.start();
+      transports: [restTransport({ port: p })],
+    })));
+    baseUrl = `http://localhost:${port}`;
     successCount = 0;
     errorCount = 0;
   });

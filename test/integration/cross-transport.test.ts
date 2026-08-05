@@ -44,6 +44,33 @@ async function getFreePort(): Promise<number> {
   });
 }
 
+/**
+ * getFreePort() closes its probe socket before the real server binds to that
+ * port number — under CI-level parallelism, another test file's probe can
+ * claim the same ephemeral port in that gap, so the real bind then fails
+ * with EADDRINUSE. Retries with a fresh set of ports on that specific
+ * failure. Four-port variant: this file's one server mounts all four
+ * transports via a single .start() call, so a collision on any one port
+ * means all four need fresh values together, not just the one that collided.
+ */
+async function startOnFreePorts<T extends { start: () => Promise<void> }>(
+  build: (ports: [number, number, number, number]) => T,
+  maxAttempts = 5,
+): Promise<{ server: T; ports: [number, number, number, number] }> {
+  for (let attempt = 1; ; attempt++) {
+    const ports: [number, number, number, number] = [
+      await getFreePort(), await getFreePort(), await getFreePort(), await getFreePort(),
+    ];
+    const server = build(ports);
+    try {
+      await server.start();
+      return { server, ports };
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException)?.code !== 'EADDRINUSE' || attempt >= maxAttempts) throw err;
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // One registry
 // ---------------------------------------------------------------------------
@@ -107,24 +134,19 @@ let server: Server;
 let restPort: number, wsPort: number, gqlPort: number, mcpPort: number;
 
 beforeAll(async () => {
-  [restPort, wsPort, gqlPort, mcpPort] = await Promise.all([
-    getFreePort(), getFreePort(), getFreePort(), getFreePort(),
-  ]);
-
-  server = createServer({
+  ({ server, ports: [restPort, wsPort, gqlPort, mcpPort] } = await startOnFreePorts(([restP, wsP, gqlP, mcpP]) => createServer({
     context: defineContext(async (req): Promise<Ctx> => ({
       requestId: crypto.randomUUID(),
       isAdmin: req.headers['x-role'] === 'admin',
     })),
     capabilities: tree,
     transports: [
-      restTransport({ port: restPort }),
-      wsTransport({ port: wsPort, eventBus: events }),
-      graphqlTransport({ port: gqlPort, playground: false }),
-      mcpTransport({ port: mcpPort }),
+      restTransport({ port: restP }),
+      wsTransport({ port: wsP, eventBus: events }),
+      graphqlTransport({ port: gqlP, playground: false }),
+      mcpTransport({ port: mcpP }),
     ],
-  });
-  await server.start();
+  })));
 });
 
 afterAll(async () => {

@@ -26,6 +26,28 @@ async function getFreePort(): Promise<number> {
   });
 }
 
+/**
+ * getFreePort() closes its probe socket before the real server binds to that
+ * port number — under CI-level parallelism, another test file's probe can
+ * claim the same ephemeral port in that gap, so the real bind then fails
+ * with EADDRINUSE. Retries with a fresh port on that specific failure.
+ */
+async function startOnFreePort<T extends { start: () => Promise<void> }>(
+  build: (port: number) => T,
+  maxAttempts = 5,
+): Promise<{ server: T; port: number }> {
+  for (let attempt = 1; ; attempt++) {
+    const port = await getFreePort();
+    const server = build(port);
+    try {
+      await server.start();
+      return { server, port };
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException)?.code !== 'EADDRINUSE' || attempt >= maxAttempts) throw err;
+    }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Setup
 // ---------------------------------------------------------------------------
@@ -101,18 +123,16 @@ let server: Server;
 let baseUrl: string;
 
 beforeAll(async () => {
-  const port = await getFreePort();
-  baseUrl = `http://localhost:${port}`;
-
-  server = createServer({
+  let port: number;
+  ({ server, port } = await startOnFreePort((p) => createServer({
     context: buildContext,
     capabilities: {
       system: { ping },
       users: { get: getUser, list: listUsers, create: createUser, delete: deleteUser },
     },
-    transports: [restTransport({ port })],
-  });
-  await server.start();
+    transports: [restTransport({ port: p })],
+  })));
+  baseUrl = `http://localhost:${port}`;
 });
 
 afterAll(async () => {

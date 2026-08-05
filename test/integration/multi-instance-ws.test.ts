@@ -30,6 +30,31 @@ async function getFreePort(): Promise<number> {
   });
 }
 
+/**
+ * getFreePort() closes its probe socket before the real server binds to that
+ * port number — under CI-level parallelism, another test file's probe can
+ * claim the same ephemeral port in that gap, so the real bind then fails
+ * with EADDRINUSE. Retries with a fresh pair of ports on that specific
+ * failure. Two-port variant: this file's servers each mount two transports
+ * (REST + WS) via one .start() call, so a collision on either port means
+ * both need fresh values together, not just the one that collided.
+ */
+async function startOnFreePorts<T extends { start: () => Promise<void> }>(
+  build: (ports: [number, number]) => T,
+  maxAttempts = 5,
+): Promise<{ server: T; ports: [number, number] }> {
+  for (let attempt = 1; ; attempt++) {
+    const ports: [number, number] = [await getFreePort(), await getFreePort()];
+    const server = build(ports);
+    try {
+      await server.start();
+      return { server, ports };
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException)?.code !== 'EADDRINUSE' || attempt >= maxAttempts) throw err;
+    }
+  }
+}
+
 // In-memory pub/sub broker with the Redis fan-out contract
 function fakeBroker(): { clients(): { pub: RedisPublisherClient; sub: RedisSubscriberClient } } {
   const listeners: Array<{ channels: Set<string>; fn: (ch: string, msg: string) => void }> = [];
@@ -80,31 +105,26 @@ beforeAll(async () => {
     return { paid: orderId };
   });
 
-  restPortA = await getFreePort();
-  const wsPortA = await getFreePort();
-  instanceA = createServer({
+  ({ server: instanceA, ports: [restPortA] } = await startOnFreePorts(([restP, wsP]) => createServer({
     context,
     capabilities: { orders: { payOrder } },
     transports: [
-      restTransport({ port: restPortA }),
-      wsTransport({ port: wsPortA, eventBus: busA }),
+      restTransport({ port: restP }),
+      wsTransport({ port: wsP, eventBus: busA }),
     ],
-  });
+  })));
 
   // Instance B: separate process in spirit — own registry copy, own transports, own bus client
-  wsPortB = await getFreePort();
-  const restPortB = await getFreePort();
-  instanceB = createServer({
+  let instanceBPorts: [number, number];
+  ({ server: instanceB, ports: instanceBPorts } = await startOnFreePorts(([restP, wsP]) => createServer({
     context,
     capabilities: { orders: { payOrder } },
     transports: [
-      restTransport({ port: restPortB }),
-      wsTransport({ port: wsPortB, eventBus: busB }),
+      restTransport({ port: restP }),
+      wsTransport({ port: wsP, eventBus: busB }),
     ],
-  });
-
-  await instanceA.start();
-  await instanceB.start();
+  })));
+  wsPortB = instanceBPorts[1];
 });
 
 afterAll(async () => {

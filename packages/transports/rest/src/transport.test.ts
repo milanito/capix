@@ -16,6 +16,28 @@ async function getFreePort(): Promise<number> {
   });
 }
 
+/**
+ * getFreePort() closes its probe socket before the real server binds to that
+ * port number — under CI-level parallelism, another test file's probe can
+ * claim the same ephemeral port in that gap, so the real bind then fails
+ * with EADDRINUSE. Retries with a fresh port on that specific failure.
+ */
+async function startOnFreePort<T extends { start: () => Promise<void> }>(
+  build: (port: number) => T,
+  maxAttempts = 5,
+): Promise<{ server: T; port: number }> {
+  for (let attempt = 1; ; attempt++) {
+    const port = await getFreePort();
+    const server = build(port);
+    try {
+      await server.start();
+      return { server, port };
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException)?.code !== 'EADDRINUSE' || attempt >= maxAttempts) throw err;
+    }
+  }
+}
+
 const buildContext = defineContext(async () => ({ requestId: crypto.randomUUID() }));
 
 // getStatus → query, no id → GET /status
@@ -65,8 +87,7 @@ let server: Server;
 let port: number;
 
 beforeAll(async () => {
-  port = await getFreePort();
-  server = createServer({
+  ({ server, port } = await startOnFreePort((p) => createServer({
     context: buildContext,
     capabilities: {
       status: { getStatus },
@@ -80,13 +101,12 @@ beforeAll(async () => {
     },
     transports: [
       restTransport({
-        port,
+        port: p,
         cors: { origin: (origin) => origin.includes('allowed') },
         maxBodySize: 256,
       }),
     ],
-  });
-  await server.start();
+  })));
 });
 
 afterAll(async () => {
@@ -202,13 +222,11 @@ describe('REST transport', () => {
 
   it('onRequest hook is called', async () => {
     const hook = vi.fn();
-    const p = await getFreePort();
-    const srv = createServer({
+    const { server: srv, port: p } = await startOnFreePort((port) => createServer({
       context: buildContext,
       capabilities: { status: { getStatus } },
-      transports: [restTransport({ port: p, hooks: { onRequest: hook } })],
-    });
-    await srv.start();
+      transports: [restTransport({ port, hooks: { onRequest: hook } })],
+    }));
     await fetch(`http://localhost:${p}/status`);
     expect(hook).toHaveBeenCalledOnce();
     await srv.stop();
@@ -228,13 +246,11 @@ describe('REST transport', () => {
   });
 
   it('static string cors origin uses the string directly', async () => {
-    const p = await getFreePort();
-    const srv = createServer({
+    const { server: srv, port: p } = await startOnFreePort((port) => createServer({
       context: buildContext,
       capabilities: { status: { getStatus } },
-      transports: [restTransport({ port: p, cors: { origin: 'https://example.com' } })],
-    });
-    await srv.start();
+      transports: [restTransport({ port, cors: { origin: 'https://example.com' } })],
+    }));
     const res = await fetch(`http://localhost:${p}/status`);
     expect(res.headers.get('access-control-allow-origin')).toBe('https://example.com');
     await srv.stop();
@@ -259,13 +275,11 @@ describe('request timeout', () => {
 
   it('timeout: false emits a console warning', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const p = await getFreePort();
-    const srv = createServer({
+    const { server: srv } = await startOnFreePort((port) => createServer({
       context: buildContext,
       capabilities: { status: { getStatus } },
-      transports: [restTransport({ port: p, timeout: false })],
-    });
-    await srv.start();
+      transports: [restTransport({ port, timeout: false })],
+    }));
     await srv.stop();
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('timeout: false'));
     expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Do not use this in production'));
@@ -273,7 +287,6 @@ describe('request timeout', () => {
   });
 
   it('timeout: false allows requests to complete without being aborted', async () => {
-    const p = await getFreePort();
     // Capability that takes 50ms — well under any real timeout but proves signal is not pre-aborted
     const slow = capability(
       async () => {
@@ -281,19 +294,17 @@ describe('request timeout', () => {
         return { ok: true };
       },
     );
-    const srv = createServer({
+    const { server: srv, port: p } = await startOnFreePort((port) => createServer({
       context: buildContext,
       capabilities: { slow: { list: slow } }, // list* → GET /slow
-      transports: [restTransport({ port: p, timeout: false })],
-    });
-    await srv.start();
+      transports: [restTransport({ port, timeout: false })],
+    }));
     const res = await fetch(`http://localhost:${p}/slow`);
     expect(res.status).toBe(200);
     await srv.stop();
   });
 
   it('custom timeout fires for hung capability — fetch times out', async () => {
-    const p = await getFreePort();
     // Capability hangs for longer than the configured timeout
     const hang = capability(
       async () => {
@@ -301,12 +312,11 @@ describe('request timeout', () => {
         return { ok: true };
       },
     );
-    const srv = createServer({
+    const { server: srv, port: p } = await startOnFreePort((port) => createServer({
       context: buildContext,
       capabilities: { hang: { list: hang } }, // list* → GET /hang
-      transports: [restTransport({ port: p, timeout: 80 })], // 80ms timeout
-    });
-    await srv.start();
+      transports: [restTransport({ port, timeout: 80 })], // 80ms timeout
+    }));
     // The AbortSignal.timeout(80) fires before the 500ms hang completes.
     // The execution engine catches the aborted signal and returns an error response.
     const res = await fetch(`http://localhost:${p}/hang`, {
@@ -317,13 +327,11 @@ describe('request timeout', () => {
   });
 
   it('completed requests are not affected by timeout', async () => {
-    const p = await getFreePort();
-    const srv = createServer({
+    const { server: srv, port: p } = await startOnFreePort((port) => createServer({
       context: buildContext,
       capabilities: { status: { getStatus } },
-      transports: [restTransport({ port: p, timeout: 5_000 })],
-    });
-    await srv.start();
+      transports: [restTransport({ port, timeout: 5_000 })],
+    }));
     const res = await fetch(`http://localhost:${p}/status`);
     expect(res.status).toBe(200);
     await srv.stop();
@@ -333,17 +341,15 @@ describe('request timeout', () => {
     // Regression: AbortSignal.timeout kept its timer + abort listener alive for
     // the full window after every completed request. The signal must NOT fire
     // after the response is sent — the timer is cleared on settle.
-    const p = await getFreePort();
     let captured: AbortSignal | undefined;
-    const srv = createServer({
+    const { server: srv, port: p } = await startOnFreePort((port) => createServer({
       context: defineContext(async (req) => {
         captured = req.signal;
         return { requestId: crypto.randomUUID() };
       }),
       capabilities: { status: { getStatus } },
-      transports: [restTransport({ port: p, timeout: 100 })],
-    });
-    await srv.start();
+      transports: [restTransport({ port, timeout: 100 })],
+    }));
     const res = await fetch(`http://localhost:${p}/status`);
     expect(res.status).toBe(200);
     // Wait past the 100ms timeout window — a leaked timer would abort the signal
@@ -354,21 +360,19 @@ describe('request timeout', () => {
   });
 
   it('hung capability aborts the request signal at timeout', async () => {
-    const p = await getFreePort();
     let captured: AbortSignal | undefined;
     const hang = capability(async () => {
       await new Promise((r) => setTimeout(r, 400));
       return { ok: true };
     });
-    const srv = createServer({
+    const { server: srv, port: p } = await startOnFreePort((port) => createServer({
       context: defineContext(async (req) => {
         captured = req.signal;
         return { requestId: crypto.randomUUID() };
       }),
       capabilities: { hang: { list: hang } },
-      transports: [restTransport({ port: p, timeout: 80 })],
-    });
-    await srv.start();
+      transports: [restTransport({ port, timeout: 80 })],
+    }));
     const res = await fetch(`http://localhost:${p}/hang`, {
       signal: AbortSignal.timeout(2_000),
     });
@@ -498,14 +502,11 @@ describe('graceful shutdown', () => {
     caps: NonNullable<Parameters<typeof createServer>[0]['capabilities']>,
     shutdownTimeoutMs: number,
   ) {
-    const port = await getFreePort();
-    const server = createServer({
+    return startOnFreePort((port) => createServer({
       context: buildContext,
       capabilities: caps,
       transports: [restTransport({ port, shutdownTimeoutMs })],
-    });
-    await server.start();
-    return { server, port };
+    }));
   }
 
   it('in-flight requests complete during the drain window', async () => {

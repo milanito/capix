@@ -5,6 +5,38 @@ Nothing here is a commitment or a timeline.
 
 ## Before 1.0
 
+### CI port-collision flakiness — fixed
+The pre-publish workflow failed with `EADDRINUSE` on
+`packages/transports/rest/src/transport.test.ts`. Root cause: every
+integration/unit test file that boots a real server picks a port via a
+copy-pasted `getFreePort()` helper that probes port 0, reads the
+assigned number, and closes the probe *before* the real server binds
+to it — under CI-level parallelism (many test files as concurrent
+worker processes), another file's probe can claim that exact same
+ephemeral port in the gap, so the real bind then loses the race.
+
+The same helper — and the same exposure — existed in 11 files, 26
+real call sites total. Fixed everywhere, not just the one that failed:
+added a `startOnFreePort` (single-port) / `startOnFreePorts`
+(fixed-tuple, for servers mounting multiple transports — e.g. the
+cross-transport test's one server on four ports — that bind together
+via one `.start()` call, so a collision on any one of them needs all
+of them retried as a unit) helper next to each file's existing
+`getFreePort()`, retrying with fresh port(s) specifically on
+`EADDRINUSE`. Proved the retry actually recovers — not just that
+existing tests still pass — with a standalone script that force-
+occupies the first port handed out and confirms a second attempt with
+a fresh port succeeds.
+
+Full monorepo build + test (670 tests) passed after every file was
+converted. `test/integration` isn't part of CI's `tsc` sweep — a
+pre-existing gap unrelated to this fix (the guard-type-narrowing
+limitation `docs/ts-workarounds.md` documents shows up as unrelated
+pre-existing typecheck errors in these same files) — but the
+multi-port tuple variants were still typed precisely (no
+`number | undefined` from destructuring plain arrays) rather than
+leaning on that gap.
+
 ### Guard type ergonomics — fixed
 `capability.guard(...)` lets guards be declared before the resolver, so
 the resolver's `ctx` is inferred fully narrowed with no annotation, no

@@ -37,6 +37,28 @@ async function getFreePort(): Promise<number> {
   });
 }
 
+/**
+ * getFreePort() closes its probe socket before the real server binds to that
+ * port number — under CI-level parallelism, another test file's probe can
+ * claim the same ephemeral port in that gap, so the real bind then fails
+ * with EADDRINUSE. Retries with a fresh port on that specific failure.
+ */
+async function startOnFreePort<T extends { start: () => Promise<void> }>(
+  build: (port: number) => T,
+  maxAttempts = 5,
+): Promise<{ server: T; port: number }> {
+  for (let attempt = 1; ; attempt++) {
+    const port = await getFreePort();
+    const server = build(port);
+    try {
+      await server.start();
+      return { server, port };
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException)?.code !== 'EADDRINUSE' || attempt >= maxAttempts) throw err;
+    }
+  }
+}
+
 async function gql(
   baseUrl: string,
   query: string,
@@ -121,15 +143,13 @@ let server: Server;
 let baseUrl: string;
 
 beforeAll(async () => {
-  const port = await getFreePort();
-  baseUrl = `http://localhost:${port}`;
-
-  server = createServer({
+  let port: number;
+  ({ server, port } = await startOnFreePort((p) => createServer({
     context: buildContext,
     capabilities: { books: { getBook, listBooks, createBook }, me: { whoAmI } },
-    transports: [graphqlTransport({ port })],
-  });
-  await server.start();
+    transports: [graphqlTransport({ port: p })],
+  })));
+  baseUrl = `http://localhost:${port}`;
 });
 
 afterAll(async () => {
@@ -242,14 +262,13 @@ describe('GraphQL transport — playground disabled', () => {
   let disabledBaseUrl: string;
 
   beforeAll(async () => {
-    const port = await getFreePort();
-    disabledBaseUrl = `http://localhost:${port}`;
-    disabledServer = createServer({
+    let port: number;
+    ({ server: disabledServer, port } = await startOnFreePort((p) => createServer({
       context: buildContext,
       capabilities: { books: { listBooks } },
-      transports: [graphqlTransport({ port, playground: false })],
-    });
-    await disabledServer.start();
+      transports: [graphqlTransport({ port: p, playground: false })],
+    })));
+    disabledBaseUrl = `http://localhost:${port}`;
   });
 
   afterAll(async () => {
