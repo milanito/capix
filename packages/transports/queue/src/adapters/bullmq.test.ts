@@ -3,6 +3,7 @@ import { BullMQAdapter } from './bullmq.js';
 import type { QueueMessage } from '../types.js';
 
 const queueInstances: MockQueue[] = [];
+const workerInstances: MockWorker[] = [];
 
 class MockQueue {
   name: string;
@@ -15,8 +16,16 @@ class MockQueue {
   }
 }
 
+type Processor = (job: { data: QueueMessage }) => Promise<unknown>;
+
 class MockWorker {
   close = vi.fn().mockResolvedValue(undefined);
+  processor: Processor;
+
+  constructor(_queueName: string, processor: Processor) {
+    this.processor = processor;
+    workerInstances.push(this);
+  }
 }
 
 vi.mock('bullmq', () => ({
@@ -31,6 +40,7 @@ function msg(id: string): QueueMessage {
 describe('BullMQAdapter', () => {
   beforeEach(() => {
     queueInstances.length = 0;
+    workerInstances.length = 0;
     vi.spyOn(console, 'log').mockImplementation(() => {});
   });
 
@@ -93,5 +103,27 @@ describe('BullMQAdapter', () => {
     await adapter.enqueue('jobs', m);
 
     expect(queueInstances[0]!.add).toHaveBeenCalledWith('jobs.process', m, { jobId: 'job-42' });
+  });
+
+  describe('Worker processor', () => {
+    it('returns the capability result data on success', async () => {
+      const adapter = new BullMQAdapter({ connection: { host: 'localhost', port: 6379 } });
+      await adapter.start('jobs', async () => ({ ok: true, data: { processed: true } }));
+
+      const result = await workerInstances[0]!.processor({ data: msg('1') });
+
+      expect(result).toEqual({ processed: true });
+    });
+
+    it('throws to trigger BullMQ retry when the capability invocation fails', async () => {
+      // BullMQ's own retry/backoff only kicks in when the processor function
+      // throws — a resolved result, even one describing a failure, is treated
+      // as job success. This is the path that actually drives redelivery.
+      const adapter = new BullMQAdapter({ connection: { host: 'localhost', port: 6379 } });
+      const error = { status: 500, error: 'Internal', message: 'boom' };
+      await adapter.start('jobs', async () => ({ ok: false, error }));
+
+      await expect(workerInstances[0]!.processor({ data: msg('1') })).rejects.toThrow(JSON.stringify(error));
+    });
   });
 });
