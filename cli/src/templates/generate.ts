@@ -14,6 +14,7 @@ export function renderCapabilityTs(name: string, withInput: boolean): string {
     return `import { capability } from '@capixjs/core';
 
 export const ${camel} = capability(async (_input, _ctx) => {
+  // TODO: implement
   return {};
 });
 `;
@@ -27,6 +28,7 @@ const inputSchema = z.object({
 });
 
 export const ${camel} = capability(inputSchema, async ({ id }, _ctx) => {
+  // TODO: implement
   return { id };
 });
 `;

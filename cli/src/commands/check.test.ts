@@ -5,6 +5,7 @@ import { capability, compileRegistry } from '@capixjs/core';
 import type { CapabilityRegistry } from '@capixjs/core';
 import { registerCheck } from './check.js';
 import { loadRegistry } from '../utils/loader.js';
+import { renderCapabilityTs } from '../templates/generate.js';
 
 vi.mock('../utils/loader.js', () => ({
   loadRegistry: vi.fn(),
@@ -74,6 +75,20 @@ describe('check command', () => {
         getItem: capability(() => { throw new Error('TODO: implement'); }, 'query'),
       },
     }));
+    const { logs } = await runCheck();
+    expect(logs).toMatch(/scaffold placeholder/);
+  });
+
+  it('flags a capability freshly scaffolded by `capix generate capability`, untouched', async () => {
+    // Derives the resolver from the actual template output (not a hand-typed
+    // stand-in) so this test breaks if renderCapabilityTs's placeholder marker
+    // and check's PLACEHOLDER_PATTERNS ever drift apart.
+    const source = renderCapabilityTs('getItem', false);
+    const captured = source.match(/capability\((async[\s\S]*)\);\n$/)?.[1];
+    if (captured === undefined) throw new Error('renderCapabilityTs output shape changed — update this test');
+    // eslint-disable-next-line no-eval
+    const resolver = (0, eval)(captured) as (input: unknown, ctx: unknown) => unknown;
+    mockRegistry(compileRegistry({ items: { getItem: capability(resolver, 'query') } }));
     const { logs } = await runCheck();
     expect(logs).toMatch(/scaffold placeholder/);
   });
