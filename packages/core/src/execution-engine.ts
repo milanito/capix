@@ -31,6 +31,21 @@ export type CapabilityResponse =
 export type InvokeFn = (req: CapabilityRequest) => Promise<CapabilityResponse>;
 
 /**
+ * Manual AbortController + timer instead of AbortSignal.timeout(ms): the
+ * timer here is cleared as soon as the caller is done with the signal.
+ * AbortSignal.timeout() keeps its internal timer (and abort-listener
+ * closure) alive for the full timeout window after every invocation
+ * settles — at high throughput that retains a large number of dead
+ * closures at steady state. Call clear() once the invocation this signal
+ * was created for has settled (in a try/finally).
+ */
+export function createTimeoutSignal(ms: number): { readonly signal: AbortSignal; readonly clear: () => void } {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  return { signal: controller.signal, clear: () => clearTimeout(timer) };
+}
+
+/**
  * Lifecycle hooks observing every capability invocation on every transport.
  *
  * Hooks receive the same CapabilityRequest object across the request's

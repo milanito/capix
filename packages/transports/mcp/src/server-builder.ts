@@ -11,15 +11,15 @@
  * validation, and typed errors behave exactly as on every other transport.
  */
 
+import { createTimeoutSignal, resolveIntent } from '@capixjs/core';
+import type { CapabilityRegistry, CapabilityResponse, InvokeFn, SerializedError } from '@capixjs/core';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
-  ListToolsRequestSchema,
   CallToolRequestSchema,
+  ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import type { CallToolResult, Tool } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
-import { resolveIntent } from '@capixjs/core';
-import type { CapabilityRegistry, InvokeFn, SerializedError } from '@capixjs/core';
 
 export type McpServerOptions = {
   /** Server name reported during the MCP handshake. Default: 'capix'. */
@@ -146,17 +146,21 @@ export function buildMcpServer(
       if (val !== undefined) headers[key] = Array.isArray(val) ? val.join(', ') : val;
     }
 
+    const { signal: timeoutSignal, clear } = createTimeoutSignal(timeoutMs);
     const signal =
-      typeof AbortSignal.any === 'function'
-        ? AbortSignal.any([extra.signal, AbortSignal.timeout(timeoutMs)])
-        : AbortSignal.timeout(timeoutMs);
+      typeof AbortSignal.any === 'function' ? AbortSignal.any([extra.signal, timeoutSignal]) : timeoutSignal;
 
-    const response = await invoke({
-      capability: dotPath,
-      input: request.params.arguments ?? {},
-      headers,
-      signal,
-    });
+    let response: CapabilityResponse;
+    try {
+      response = await invoke({
+        capability: dotPath,
+        input: request.params.arguments ?? {},
+        headers,
+        signal,
+      });
+    } finally {
+      clear();
+    }
 
     if (!response.ok) return errorResult(response.error);
 

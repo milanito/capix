@@ -7,7 +7,15 @@ import { randomUUID } from 'node:crypto';
 import { WebSocketServer } from 'ws';
 import type { WebSocket, RawData } from 'ws';
 import type { IncomingMessage } from 'node:http';
-import type { Transport, MountOptions, InvokeFn, GroupTree, TransportWithCapabilities } from '@capixjs/core';
+import type {
+  Transport,
+  MountOptions,
+  InvokeFn,
+  GroupTree,
+  TransportWithCapabilities,
+  CapabilityResponse,
+} from '@capixjs/core';
+import { createTimeoutSignal } from '@capixjs/core';
 import type { EventBus, EventMap } from './event-bus.js';
 
 export type WsTransportOptions = {
@@ -136,13 +144,18 @@ export function wsTransport(options: WsTransportOptions): TransportWithCapabilit
         return;
       }
 
-      const signal = AbortSignal.timeout(30_000);
-      const response = await invoke({
-        capability: msg.capability,
-        input: msg.input,
-        headers: rawHeaders,
-        signal,
-      });
+      const { signal, clear } = createTimeoutSignal(30_000);
+      let response: CapabilityResponse;
+      try {
+        response = await invoke({
+          capability: msg.capability,
+          input: msg.input,
+          headers: rawHeaders,
+          signal,
+        });
+      } finally {
+        clear();
+      }
 
       if (response.ok) {
         send(ws, { id: msg.id, ok: true, data: response.data });

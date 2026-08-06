@@ -26,8 +26,8 @@ import {
   Kind,
 } from 'graphql';
 import type { GraphQLOutputType, GraphQLInputType, GraphQLFieldConfig } from 'graphql';
-import { resolveIntent } from '@capixjs/core';
-import type { CapabilityRegistry, InvokeFn } from '@capixjs/core';
+import { resolveIntent, createTimeoutSignal } from '@capixjs/core';
+import type { CapabilityRegistry, InvokeFn, CapabilityResponse } from '@capixjs/core';
 
 export const JSONScalar = new GraphQLScalarType({
   name: 'JSON',
@@ -205,13 +205,18 @@ export function buildGraphQLSchema(registry: CapabilityRegistry, invoke: InvokeF
       type: returnType,
       args,
       resolve: async (_root, resolvedArgs, context) => {
-        const signal = AbortSignal.timeout(30_000);
-        const response = await invoke({
-          capability: name,
-          input: resolvedArgs,
-          headers: context?.headers ?? {},
-          signal,
-        });
+        const { signal, clear } = createTimeoutSignal(30_000);
+        let response: CapabilityResponse;
+        try {
+          response = await invoke({
+            capability: name,
+            input: resolvedArgs,
+            headers: context?.headers ?? {},
+            signal,
+          });
+        } finally {
+          clear();
+        }
         if (!response.ok) {
           // Preserve the typed FrameworkError shape in GraphQL extensions so
           // clients can branch on `extensions.code` / `extensions.status`

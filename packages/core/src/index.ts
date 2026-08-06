@@ -53,7 +53,7 @@ export type {
 } from './enhancers.js';
 
 // Execution engine
-export { createExecutionEngine } from './execution-engine.js';
+export { createExecutionEngine, createTimeoutSignal } from './execution-engine.js';
 export { closeHttpServerGracefully } from './http-shutdown.js';
 
 // Stores (pluggable backends for withCache / withRateLimit)

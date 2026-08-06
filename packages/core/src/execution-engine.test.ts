@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { z } from 'zod';
 import { capability } from './capability.js';
 import { compileRegistry } from './capability.js';
-import { createExecutionEngine } from './execution-engine.js';
+import { createExecutionEngine, createTimeoutSignal } from './execution-engine.js';
 import { defineError, defaultErrors } from './errors.js';
 import { defineContext } from './context.js';
 import { defineInputGuard } from './guards.js';
@@ -14,6 +14,26 @@ function makeEngine(caps: Record<string, unknown>, isDevelopment = true) {
   const registry = compileRegistry(caps as Parameters<typeof compileRegistry>[0]);
   return createExecutionEngine({ registry, buildContext, isDevelopment });
 }
+
+describe('createTimeoutSignal', () => {
+  it('aborts the signal once the timeout elapses', () => {
+    vi.useFakeTimers();
+    const { signal } = createTimeoutSignal(1000);
+    expect(signal.aborted).toBe(false);
+    vi.advanceTimersByTime(1000);
+    expect(signal.aborted).toBe(true);
+    vi.useRealTimers();
+  });
+
+  it('clear() cancels the pending timer so the signal never aborts', () => {
+    vi.useFakeTimers();
+    const { signal, clear } = createTimeoutSignal(1000);
+    clear();
+    vi.advanceTimersByTime(1000);
+    expect(signal.aborted).toBe(false);
+    vi.useRealTimers();
+  });
+});
 
 describe('execution engine', () => {
   it('happy path returns ok: true with data', async () => {
