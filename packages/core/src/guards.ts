@@ -1,9 +1,10 @@
 /**
  * guards.ts — guard types and execution
- * Depends on: context.ts
+ * Depends on: context.ts, errors.ts
  */
 
 import type { BaseContext } from './context.js';
+import { isFrameworkError } from './errors.js';
 
 /** A guard that passes silently or throws. May be async. */
 export type Guard<TContext extends BaseContext> = (
@@ -86,14 +87,34 @@ export function defineGuardFor<TContext extends BaseContext>() {
 
 /**
  * Runs guards in order. Stops at the first guard that throws.
- * Supports async guards.
+ * Supports async guards. Skips the microtask tick for synchronous guards —
+ * only awaits when the guard actually returns a thenable.
+ *
+ * When `isDevelopment` is true, logs the guard's name on any thrown error
+ * that isn't a framework error (an unexpected bug, not an intentional
+ * rejection like `defaultErrors.Unauthorized()`) — the same diagnostic the
+ * execution engine gives capability guards, so guards run this way (e.g.
+ * from a custom transport) get equivalent dev-time visibility.
  */
 export async function runGuards(
   guards: ReadonlyArray<AnyGuard>,
   ctx: BaseContext,
+  isDevelopment = false,
 ): Promise<void> {
   for (const guard of guards) {
-    await guard(ctx);
+    try {
+      const result = guard(ctx);
+      if (result !== undefined && result !== null &&
+          typeof (result as { then?: unknown }).then === 'function') {
+        await result;
+      }
+    } catch (err) {
+      if (isDevelopment && !isFrameworkError(err)) {
+        const name = (guard as { name?: string }).name || '(anonymous)';
+        console.error(`[capix] Guard '${name}' threw an unexpected error:`, err);
+      }
+      throw err;
+    }
   }
 }
 

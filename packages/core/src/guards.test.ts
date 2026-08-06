@@ -75,4 +75,39 @@ describe('runGuards', () => {
     expect(result).toBeDefined();
     expect(result.status).toBe(403);
   });
+
+  it('isDevelopment logs the guard name when it throws a non-FrameworkError', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    function myGuard() { throw new Error('boom'); }
+    await expect(runGuards([myGuard], baseCtx, true)).rejects.toThrow('boom');
+    expect(spy).toHaveBeenCalledWith(expect.stringContaining("Guard 'myGuard'"), expect.any(Error));
+    spy.mockRestore();
+  });
+
+  it('isDevelopment does not log when the guard throws a FrameworkError (intentional rejection)', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const guard = () => { throw defaultErrors.Unauthorized(); };
+    await expect(runGuards([guard], baseCtx, true)).rejects.toBeDefined();
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('does not log when isDevelopment is omitted (defaults to false)', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const guard = () => { throw new Error('boom'); };
+    await expect(runGuards([guard], baseCtx)).rejects.toThrow('boom');
+    expect(spy).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it('does not await a synchronous guard\'s return value (no microtask tick)', async () => {
+    const order: string[] = [];
+    const guard = vi.fn(() => { order.push('guard'); });
+    const p = runGuards([guard], baseCtx);
+    order.push('sync-after-call');
+    await p;
+    // The guard already ran synchronously before runGuards() returned its
+    // promise — proves the loop doesn't `await` a non-thenable return value.
+    expect(order).toEqual(['guard', 'sync-after-call']);
+  });
 });

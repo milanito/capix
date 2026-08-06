@@ -5,7 +5,7 @@
 
 import type { CapabilityRegistry } from './capability.js';
 import type { BaseContext, ContextBuilder, RawRequest } from './context.js';
-import { runInputGuards } from './guards.js';
+import { runGuards, runInputGuards } from './guards.js';
 import { isFrameworkError } from './errors.js';
 
 export type CapabilityRequest = {
@@ -147,22 +147,7 @@ export function createExecutionEngine(options: ExecutionEngineOptions): InvokeFn
 
     // 3. Run guards (log guard name on unexpected errors in dev mode)
     try {
-      for (const guard of cap.guards) {
-        try {
-          // Avoid microtask tick for sync guards (void return). Only await when the guard
-          // actually returns a Promise (async guards or explicit return Promise<void>).
-          const r = guard(ctx);
-          if (r !== undefined && r !== null && typeof (r as { then?: unknown }).then === 'function') {
-            await r;
-          }
-        } catch (err) {
-          if (isDevelopment && !isFrameworkError(err)) {
-            const name = (guard as { name?: string }).name || '(anonymous)';
-            console.error(`[capix] Guard '${name}' threw an unexpected error:`, err);
-          }
-          throw err;
-        }
-      }
+      await runGuards(cap.guards, ctx, isDevelopment);
     } catch (err) {
       return toErrorResponse(err, isDevelopment);
     }
