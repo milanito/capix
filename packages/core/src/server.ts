@@ -86,17 +86,27 @@ export function createServer(config: ServerConfig): Server {
 
   const wrappedContext = wrapContext(config.context);
 
-  // Detect collisions between server-level capabilities and plugin capabilities
-  if (config.capabilities) {
+  // Detect collisions between plugin capabilities and every capability tree a
+  // plugin capability could end up merged into — the server-level default AND
+  // each transport's own `_capabilities` override (transports fall back to
+  // config.capabilities only when they don't declare their own; either way,
+  // plugin capabilities are merged in unconditionally in start()).
+  function checkCapabilityCollision(caps: Record<string, unknown> | undefined, source: string): void {
+    if (caps === undefined) return;
     for (const key of Object.keys(additionalCapabilities)) {
-      if (key in config.capabilities) {
+      if (key in caps) {
         throw new Error(
-          `[capix] Capability name collision: '${key}' is defined by both the user and a plugin. ` +
+          `[capix] Capability name collision: '${key}' is defined by both ${source} and a plugin. ` +
           `Plugin capabilities must use unique top-level names.`,
         );
       }
     }
   }
+
+  checkCapabilityCollision(config.capabilities, 'the user');
+  config.transports.forEach((transport, i) => {
+    checkCapabilityCollision((transport as TransportWithCapabilities)._capabilities, `transport #${i}`);
+  });
 
   // Server-level registry — backs server.invoke() regardless of transport config
   const serverTree = {

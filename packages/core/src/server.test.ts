@@ -137,6 +137,22 @@ describe('createServer', () => {
     ).toThrow(/Capability name collision.*ping/);
   });
 
+  it('throws when a plugin capability collides with a per-transport capability, not just the server default', () => {
+    const health = capability(() => ({ status: 'ok' }));
+    const plugin = definePlugin({ name: 'health', capabilities: { ping: health } });
+    // No server-level 'ping' here — only this transport declares one. The
+    // collision check must still catch it instead of letting the plugin
+    // capability silently shadow it once start() merges the two trees.
+    const t = capturingTransport({ ping });
+    expect(() =>
+      createServer({
+        context: buildCtx,
+        transports: [t],
+        plugins: [plugin],
+      }),
+    ).toThrow(/Capability name collision.*ping.*transport #0/);
+  });
+
   it('isDevelopment defaults to !NODE_ENV=production', async () => {
     const old = process.env['NODE_ENV'];
     process.env['NODE_ENV'] = 'production';
