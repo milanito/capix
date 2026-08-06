@@ -53,3 +53,20 @@ export function getHeader(req: RawRequest, name: string): string | undefined {
   }
   return undefined;
 }
+
+/**
+ * Flattens Node's raw header shape (`string | string[] | undefined` per key,
+ * as seen on `http.IncomingMessage.headers`) into a plain
+ * `Record<string, string>`, joining repeated values with `, ` — every
+ * transport that builds a `RawRequest.headers` value from a Node request
+ * needs this same conversion. Uses `for..in` rather than `Object.entries`
+ * to avoid an intermediate array allocation per request.
+ */
+export function flattenHeaders(headers: Record<string, string | string[] | undefined>): Record<string, string> {
+  const flat: Record<string, string> = {};
+  for (const key in headers) {
+    const val = headers[key];
+    if (val !== undefined) flat[key] = Array.isArray(val) ? val.join(', ') : val;
+  }
+  return flat;
+}

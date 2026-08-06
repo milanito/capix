@@ -7,7 +7,7 @@ export { defineError, isFrameworkError, defaultErrors } from './errors.js';
 export type { FrameworkError, ErrorFactory } from './errors.js';
 
 // Context
-export { defineContext, getHeader } from './context.js';
+export { defineContext, getHeader, flattenHeaders } from './context.js';
 export type { RawRequest, BaseContext, ContextBuilder } from './context.js';
 
 // Guards

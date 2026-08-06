@@ -11,7 +11,7 @@
  * validation, and typed errors behave exactly as on every other transport.
  */
 
-import { createTimeoutSignal, resolveIntent } from '@capixjs/core';
+import { createTimeoutSignal, flattenHeaders, resolveIntent } from '@capixjs/core';
 import type { CapabilityRegistry, CapabilityResponse, InvokeFn, SerializedError } from '@capixjs/core';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import {
@@ -140,11 +140,7 @@ export function buildMcpServer(
     }
 
     // Headers reach context builders on HTTP connections; stdio has none.
-    const rawHeaders = extra.requestInfo?.headers ?? {};
-    const headers: Record<string, string> = {};
-    for (const [key, val] of Object.entries(rawHeaders)) {
-      if (val !== undefined) headers[key] = Array.isArray(val) ? val.join(', ') : val;
-    }
+    const headers = flattenHeaders(extra.requestInfo?.headers ?? {});
 
     const { signal: timeoutSignal, clear } = createTimeoutSignal(timeoutMs);
     const signal =

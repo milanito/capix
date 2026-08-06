@@ -10,7 +10,7 @@
 
 import * as http from 'node:http';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { closeHttpServerGracefully } from '@capixjs/core';
+import { closeHttpServerGracefully, flattenHeaders } from '@capixjs/core';
 import type { Transport, MountOptions, InvokeFn, CapabilityResponse, GroupTree, TransportWithCapabilities } from '@capixjs/core';
 import { compileRouter, generateRoutes } from './router.js';
 import type { Router, HttpOverride } from './router.js';
@@ -329,12 +329,7 @@ export function restTransport(options: RestTransportOptions): TransportWithCapab
         }
       }
 
-      // Build flat headers map using for..in (avoids Object.entries array allocation).
-      const headers: Record<string, string> = {};
-      for (const k in req.headers) {
-        const v = req.headers[k];
-        if (v !== undefined) headers[k] = Array.isArray(v) ? v.join(', ') : v;
-      }
+      const headers = flattenHeaders(req.headers);
 
       // Manual controller + timer instead of AbortSignal.timeout: the timer is
       // cleared as soon as the invocation settles. AbortSignal.timeout would keep

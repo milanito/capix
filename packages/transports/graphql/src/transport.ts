@@ -8,7 +8,7 @@
 import * as http from 'node:http';
 import { createHandler } from 'graphql-http/lib/use/node';
 import { buildGraphQLSchema } from './schema-builder.js';
-import { closeHttpServerGracefully } from '@capixjs/core';
+import { closeHttpServerGracefully, flattenHeaders } from '@capixjs/core';
 import type { Transport, MountOptions, InvokeFn, GroupTree, TransportWithCapabilities } from '@capixjs/core';
 
 export type GraphQLTransportOptions = {
@@ -70,16 +70,7 @@ export function graphqlTransport(options: GraphQLTransportOptions): TransportWit
 
       const gqlHandler = createHandler({
         schema,
-        context: (req) => {
-          const rawHeaders = req.raw.headers;
-          const headers: Record<string, string> = {};
-          for (const [key, val] of Object.entries(rawHeaders)) {
-            if (val !== undefined) {
-              headers[key] = Array.isArray(val) ? val.join(', ') : val;
-            }
-          }
-          return { headers };
-        },
+        context: (req) => ({ headers: flattenHeaders(req.raw.headers) }),
       });
 
       function httpHandler(req: http.IncomingMessage, res: http.ServerResponse): void {

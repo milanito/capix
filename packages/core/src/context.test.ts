@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { defineContext, getHeader } from './context.js';
+import { defineContext, getHeader, flattenHeaders } from './context.js';
 import type { RawRequest } from './context.js';
 
 function makeReq(headers: Record<string, string | string[] | undefined> = {}): RawRequest {
@@ -46,5 +46,27 @@ describe('getHeader', () => {
 
   it('returns undefined when header value is undefined', () => {
     expect(getHeader(makeReq({ 'x-empty': undefined }), 'x-empty')).toBeUndefined();
+  });
+});
+
+describe('flattenHeaders', () => {
+  it('passes single string values through unchanged', () => {
+    expect(flattenHeaders({ authorization: 'Bearer tok' })).toEqual({ authorization: 'Bearer tok' });
+  });
+
+  it('joins array values with a comma and space', () => {
+    expect(flattenHeaders({ 'x-ids': ['a', 'b', 'c'] })).toEqual({ 'x-ids': 'a, b, c' });
+  });
+
+  it('drops keys whose value is undefined', () => {
+    expect(flattenHeaders({ 'x-empty': undefined, 'x-present': 'yes' })).toEqual({ 'x-present': 'yes' });
+  });
+
+  it('returns an empty object for an empty input', () => {
+    expect(flattenHeaders({})).toEqual({});
+  });
+
+  it('preserves key casing (case-sensitivity is the caller\'s concern)', () => {
+    expect(flattenHeaders({ 'Content-Type': 'application/json' })).toEqual({ 'Content-Type': 'application/json' });
   });
 });
