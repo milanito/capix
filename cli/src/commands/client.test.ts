@@ -212,6 +212,44 @@ describe('client generator — type rendering', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Output type
+// ---------------------------------------------------------------------------
+
+describe('client generator — output type', () => {
+  it('capability with .output(schema) gets a typed return, not Promise<unknown>', () => {
+    const out = clientFor({
+      items: {
+        getItem: capability(
+          z.object({ id: z.string() }),
+          async ({ id }) => ({ id, name: 'x' }), 'query',
+        ).output(z.object({ id: z.string(), name: z.string() })),
+      },
+    });
+    expect(out).toContain('Promise<{ id: string, name: string }>');
+    expect(out).not.toContain('Promise<unknown>');
+  });
+
+  it('capability without .output(schema) falls back to Promise<unknown>', () => {
+    const out = clientFor({
+      items: {
+        getItem: capability(z.object({ id: z.string() }), async ({ id }) => ({ id }), 'query'),
+      },
+    });
+    expect(out).toContain('Promise<unknown>');
+  });
+
+  it('array output schema renders as an array return type', () => {
+    const out = clientFor({
+      items: {
+        listItems: capability(async () => [], 'query')
+          .output(z.array(z.object({ id: z.string() }))),
+      },
+    });
+    expect(out).toContain('Promise<{ id: string }[]>');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Path template
 // ---------------------------------------------------------------------------
 

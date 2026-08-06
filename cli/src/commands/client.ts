@@ -2,6 +2,7 @@ import { Command } from 'commander';
 import * as path from 'node:path';
 import * as print from '../utils/print.js';
 import { loadRegistry } from '../utils/loader.js';
+import { zodSchemaToString } from '../utils/zod-to-string.js';
 import { generateRoutes } from '@capixjs/transport-rest';
 import type { RouteDefinition, HttpOverride } from '@capixjs/transport-rest';
 import type { AnyCapability, CapabilityRegistry } from '@capixjs/core';
@@ -167,7 +168,13 @@ export function generateClient(
     // Only provided when there are remaining (non-path) fields
     const thirdArg = hasRemaining ? (isReadOnly ? ', query' : ', body') : '';
 
-    lines.push(`export async function ${fnName}(${fnParams.join(', ')}): Promise<unknown> {`);
+    // No .output(schema) on the capability means we genuinely have no type
+    // info for the response shape — 'unknown' is the honest fallback, not a
+    // gap. When it is set, request<T>()'s T is inferred from this return
+    // position, so the call site itself needs no change.
+    const outputType = cap.outputSchema !== null ? zodSchemaToString(cap.outputSchema) : 'unknown';
+
+    lines.push(`export async function ${fnName}(${fnParams.join(', ')}): Promise<${outputType}> {`);
     lines.push(`  return request('${route.method}', ${pathExpr}${thirdArg});`);
     lines.push(`}`);
     lines.push('');
