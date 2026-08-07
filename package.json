@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "description": "Capix — capability-based Node.js server framework",
-  "packageManager": "pnpm@11.20.0",
+  "packageManager": "pnpm@10.34.5",
   "engines": {
     "node": ">=20"
   },

@@ -18,8 +18,10 @@ overrides:
   # open vite CVEs are patched below 6.4.x. vitest's own peer range already
   # accepts 6.x (^5.0.0 || ^6.0.0 || ^7.0.0-0). Verified against
   # `pnpm docs:build` + full test suite after bumping pnpm itself to make
-  # this override actually reach vitepress's nested copy (pnpm 9.0.0
-  # couldn't; pnpm 11 can).
+  # this override actually reach vitepress's nested copy — pnpm@9.0.0
+  # couldn't. pnpm@11.x can too, but requires Node >=22.13 (hard crash,
+  # not a warning) and this repo still tests/supports Node 20; pnpm@10.34.5
+  # has the same fixed override resolution and only needs Node >=18.12.
   vite: ^6.4.3
   # hyperid@3.3.0 (via benchmarks' autocannon devDependency) pins an old
   # uuid; the fix landed in hyperid 4.x, which autocannon hasn't adopted.
