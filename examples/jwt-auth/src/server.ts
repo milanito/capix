@@ -46,7 +46,12 @@ server.start().then(() => {
   console.log(`JWT auth example listening on http://localhost:${PORT}`);
   console.log();
   console.log('Generate a dev token:');
-  console.log(`  node -e "const j=require('jsonwebtoken'); console.log(j.sign({sub:'1',name:'Alice',role:'admin'},'${JWT_SECRET}'))"`);
+  // Reads JWT_SECRET from the environment at run time instead of interpolating
+  // it here — this line lands in shell history and CI/terminal logs, and the
+  // fallback dev secret is fine to print, but a real JWT_SECRET is not.
+  console.log(
+    `  node -e "const j=require('jsonwebtoken'); console.log(j.sign({sub:'1',name:'Alice',role:'admin'}, process.env.JWT_SECRET || 'dev-secret-change-in-production'))"`,
+  );
   console.log();
   console.log('Try it:');
   console.log(`  curl -X POST http://localhost:${PORT}/auth/listRoles`);
